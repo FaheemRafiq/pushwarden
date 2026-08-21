@@ -1,0 +1,209 @@
+======================================================================
+LAZARUS C2 IMPLANT - STATIC ANALYSIS REPORT
+Campaign: Contagious Interview
+Type: Blockchain-based C2 dead-drop implant
+======================================================================
+
+File SHA256: 517c92cb4139a1b840108c2dc08ae2966f1b3e8f9453fd88a06e491b6d4c111b
+File size: 4818 bytes
+String array: 303 entries
+Array rotation: 0
+Lookup offset: 0
+
+--- DEOBFUSCATED STRING TABLE (first 50) ---
+  [  0] = "6f0121063e"
+  [  1] = "Mozilla/5."
+  [  2] = "vsVto"
+  [  3] = "BoIAd"
+  [  4] = "GGFaB"
+  [  5] = "ZFXMR"
+  [  6] = "createInfl"
+  [  7] = "cpUBI"
+  [  8] = "forEach"
+  [  9] = "m']=module"
+  [ 10] = "ogLQR"
+  [ 11] = "subarray"
+  [ 12] = "blockNumbe"
+  [ 13] = "ciBJl"
+  [ 14] = "adPes"
+  [ 15] = "protocol"
+  [ 16] = "concat"
+  [ 17] = "MpDag"
+  [ 18] = "POST"
+  [ 19] = "_t_u"
+  [ 20] = "HDeaX"
+  [ 21] = "gEJkK"
+  [ 22] = "dKrGP"
+  [ 23] = "nLoVU"
+  [ 24] = "mjtii"
+  [ 25] = "vNrQY"
+  [ 26] = "deflate"
+  [ 27] = "AfJYB"
+  [ 28] = "address="
+  [ 29] = "h.blocksco"
+  [ 30] = "0 (Windows"
+  [ 31] = ":80"
+  [ 32] = "3dYSGnS"
+  [ 33] = "LLEgr"
+  [ 34] = "xQSGI"
+  [ 35] = "CrnBu"
+  [ 36] = "qgnZE"
+  [ 37] = "zGBfJ"
+  [ 38] = "kbQjv"
+  [ 39] = "pZMEw"
+  [ 40] = "qemQD"
+  [ 41] = "createBrot"
+  [ 42] = "transactio"
+  [ 43] = "vwdIJ"
+  [ 44] = "TXebJ"
+  [ 45] = "x-payload-"
+  [ 46] = "count&acti"
+  [ 47] = "@^1aQk"
+  [ 48] = "PjPYE"
+  [ 49] = "EZzyY"
+  ... (253 more)
+
+--- WALLET ADDRESSES (C2 dead-drop target) ---
+
+--- URLs ---
+  https://1r
+  https://et
+
+--- DOMAINS ---
+  h.blocksco
+  public.bla
+  h.drpc.org
+  stapi.io
+  ut.com
+  process.env.ETH
+
+--- IP ADDRESSES ---
+  1.0.0.0
+
+--- GLOBAL VARIABLES (injected into runtime) ---
+  global['r']
+  global['m']
+
+--- NODE.JS MODULES ---
+
+--- C2 INDICATORS ---
+  * Process spawning
+  * Environment variable access
+  * Data compression/decompression
+  * Background persistence (fire-and-forget)
+  * C2 payload transfer header
+
+======================================================================
+ATTACK CHAIN RECONSTRUCTION
+======================================================================
+
+  STAGE 0: INFECTION
+    Developer runs npm install on a compromised package
+    (fake job interview lure: "Contagious Interview" campaign)
+
+  STAGE 1: INITIAL LOADER (in config file)
+    File: postcss.config.js / tailwind.config.js / eslint.config.js etc.
+    Technique: Payload hidden after ~280 trailing spaces on export line
+    Trigger: require() during build/dev server startup
+    Code: atob(process.env.SECRET_KEY) -> fetch(url) -> eval(response)
+
+  STAGE 2: C2 IMPLANT (THIS SAMPLE)
+    2a. BLOCKCHAIN DEAD-DROP SCANNING
+        - Connects to Ethereum RPC nodes (drpc.org, blastapi.io, publicnode)
+        - Scans last 1000 blocks for transactions to target wallet
+        - Target wallet: 0xa322E5f3... (see wallet addresses above)
+        - Extracts C2 server IP from transaction value field
+        - Uses binary search + linear scan for efficiency
+
+    2b. C2 COMMUNICATION
+        - HTTP requests to extracted IP on port 443
+        - Custom header: Sec-V = campaign version (A10-*23650)
+        - XOR cipher for response decryption
+        - Supports gzip, deflate, brotli decompression
+        - User-Agent: Chrome/Edge on Windows 10/11
+
+    2c. PAYLOAD EXECUTION
+        - Receives JavaScript code from C2
+        - eval() in current process
+        - Simultaneously spawns detached node -e process
+        - Detached: true, stdio: ignore, windowsHide: true
+
+    2d. CREDENTIAL THEFT
+        - Reads ALL process.env variables
+        - Targets: ETH_RPC_URL, GitHub PATs, API keys
+        - Exfiltrates via C2 channel
+
+    2e. PERSISTENCE
+        - Global variable injection: _V, _H, _H2, _t_u, _t_s, _H2
+        - Detached background processes
+        - .bat script drops (temp_auto_push.bat, config.bat)
+
+    2f. PROPAGATION
+        - Auto-pushes infected files to victim's GitHub repos
+        - Uses stolen PATs for authentication
+        - Amends commits to hide infection
+        - Force-pushes to overwrite clean history
+        - Commit messages: innocuous ("update config", "fix build")
+
+  STAGE 3: LATERAL MOVEMENT
+    - Stolen credentials used to infect other repos
+    - Supply chain spread via npm packages
+
+======================================================================
+DETECTION SIGNATURES
+======================================================================
+
+  LITERAL STRINGS:
+    ("rmcej%otb%",2857687)
+    global['!']='8-270-2';var $_1e42=
+    global['!']='4-1928'
+    global['_V']='A4-1928'
+    global['!']='10-83-10'
+    global['!']='A10-010'
+    global['!']='A10-2340'
+
+  REGEX PATTERNS:
+    global['!']='[A-Z0-9-]{4,}'
+    global['_V']='[A-Z0-9-]{4,}'
+    $_1e42
+    global['r']=require
+    atob(process.env
+    eval(atob
+
+  NETWORK IoCs (C2 IPs):
+    166.88.54.158    198.105.127.210
+    23.27.202.27     154.91.0.103
+    136.0.9.8        166.88.4.2
+    23.27.120.142    202.155.8.173
+    166.88.134.82    188.43.33.249
+
+  FILE INDICATORS:
+    - .bat files: temp_auto_push.bat, config.bat, auto_push.bat
+    - Config files >1024 bytes (normal: ~200 bytes)
+    - Lines >300 chars in config files (payload hidden after spaces)
+    - Font files with invalid magic bytes
+
+======================================================================
+BLOCKCHAIN C2 ARCHITECTURE
+======================================================================
+
+  The malware uses Ethereum as a dead-drop for C2 addresses:
+
+  1. Attacker sends ETH transaction to known wallet
+  2. Transaction 'value' field encodes C2 server IP
+  3. Malware scans recent blocks (1000 block window)
+  4. Finds matching transaction, extracts IP
+  5. Connects to new C2 server for commands
+
+  Benefits for attacker:
+  - No hardcoded C2 IPs in malware sample
+  - C2 can be changed by sending new transaction
+  - Transactions are immutable and public
+  - Difficult to takedown (blockchain is decentralized)
+
+  RPC Endpoints Used:
+    - {URL}https://eth-mainnet.g.alchemy.com...
+    - https://ethereum-rpc.publicnode.com
+    - https://rpc.ankr.com/eth
+    - https://eth.drpc.org
+    - https://1rpc.io/eth

@@ -1,0 +1,38 @@
+services:
+  analysis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: threatscan-analysis
+    network_mode: "none"
+    volumes:
+      - ./samples:/analysis/samples:ro
+      - ./output:/analysis/output
+      - ./mock-rpc.js:/analysis/mock-rpc.js:ro
+      - ./mock-c2.js:/analysis/mock-c2.js:ro
+      - ./monitor.sh:/analysis/monitor.sh:ro
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    stdin_open: true
+    tty: true
+
+  mock-network:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: threatscan-mock-network
+    network_mode: "none"
+    volumes:
+      - ./mock-rpc.js:/analysis/mock-rpc.js:ro
+      - ./mock-c2.js:/analysis/mock-c2.js:ro
+      - ./output:/analysis/output
+    ports:
+      - "127.0.0.1:8545:8545"
+      - "127.0.0.1:4443:4443"
+    command: >
+      bash -c "node /analysis/mock-rpc.js &
+               node /analysis/mock-c2.js &
+               sleep infinity"

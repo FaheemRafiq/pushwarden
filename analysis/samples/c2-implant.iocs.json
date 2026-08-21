@@ -1,0 +1,31 @@
+{
+  "wallets": [],
+  "urls": [
+    "https://1r",
+    "https://et"
+  ],
+  "domains": [
+    "h.blocksco",
+    "public.bla",
+    "h.drpc.org",
+    "stapi.io",
+    "ut.com",
+    "process.env.ETH"
+  ],
+  "ips": [
+    "1.0.0.0"
+  ],
+  "global_vars": [
+    "r",
+    "m"
+  ],
+  "modules": [],
+  "c2_indicators": [
+    "Process spawning",
+    "Environment variable access",
+    "Data compression/decompression",
+    "Background persistence (fire-and-forget)",
+    "C2 payload transfer header"
+  ],
+  "sha256": "517c92cb4139a1b840108c2dc08ae2966f1b3e8f9453fd88a06e491b6d4c111b"
+}
