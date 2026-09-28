@@ -1,5 +1,5 @@
 #!/bin/sh
-# ThreatScan installer for Linux (macOS works too; the .pkg is the usual route).
+# ThreatScan installer for macOS and Linux (the recommended route on both).
 #   curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/installers/install.sh | sh
 # Downloads the release binary, verifies its SHA-256 against checksums.txt, and
 # runs `threatscan install --unattended` (per user, no sudo). The signature on
