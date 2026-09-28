@@ -1,5 +1,6 @@
 // Command sign writes FILE.sig: a base64 ed25519 signature of FILE made with the
-// key in $THREATSCAN_SIGNING_KEY (base64 seed from scripts/keygen).
+// key in $THREATSCAN_SIGNING_KEY (base64 seed from scripts/keygen). It refuses a
+// key whose public half is not in internal/update/pubkeys.go.
 //
 //	THREATSCAN_SIGNING_KEY=... go run ./scripts/sign dist/checksums.txt
 package main
@@ -10,6 +11,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/FaheemRafiq/threatscan/internal/update"
 )
 
 func main() {
@@ -28,6 +31,11 @@ func main() {
 		os.Exit(1)
 	}
 	sig := ed25519.Sign(ed25519.NewKeyFromSeed(seed), msg)
+	// a release signed with a key the binaries do not trust could never self-update
+	if err := update.VerifySignature(msg, sig, update.PublicKeys); err != nil {
+		fmt.Fprintln(os.Stderr, "refusing to sign:", err, "(is THREATSCAN_SIGNING_KEY the key in internal/update/pubkeys.go?)")
+		os.Exit(1)
+	}
 	if err := os.WriteFile(os.Args[1]+".sig", []byte(base64.StdEncoding.EncodeToString(sig)+"\n"), 0o644); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

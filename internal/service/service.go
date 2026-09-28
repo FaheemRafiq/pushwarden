@@ -11,6 +11,7 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -23,6 +24,7 @@ import (
 	"time"
 
 	"github.com/FaheemRafiq/threatscan/internal/platform"
+	"github.com/FaheemRafiq/threatscan/internal/update"
 )
 
 const (
@@ -39,6 +41,31 @@ type Manager struct {
 	Log     string
 	// Src is the executable PlaceBinary copies; defaults to the running one.
 	Src string
+	// Version is Src's version. When set, PlaceBinary keeps an installed binary
+	// that reports a newer one (a self-updated copy survives a package upgrade).
+	Version string
+}
+
+// ErrNewerInstalled means PlaceBinary left a newer installed binary in place.
+type ErrNewerInstalled struct{ Installed string }
+
+func (e *ErrNewerInstalled) Error() string {
+	return "a newer version (" + e.Installed + ") is already installed"
+}
+
+// InstalledVersion runs `<exe> version` and returns the version it prints.
+func InstalledVersion(exe string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, exe, "version").Output()
+	if err != nil {
+		return ""
+	}
+	f := strings.Fields(string(out))
+	if len(f) >= 2 && f[0] == "ThreatScan" {
+		return strings.TrimPrefix(f[1], "v")
+	}
+	return ""
 }
 
 func New(p *platform.Info, dataDir string) *Manager {
@@ -243,6 +270,11 @@ func (m *Manager) PlaceBinary() (bool, error) {
 		if e1 == nil && e2 == nil && bytes.Equal(hs, hd) {
 			return false, nil
 		}
+		if m.Version != "" {
+			if iv := InstalledVersion(dst); iv != "" && update.CompareVersions(iv, m.Version) > 0 {
+				return false, &ErrNewerInstalled{iv}
+			}
+		}
 	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return false, err
@@ -353,11 +385,14 @@ func (m *Manager) Install() (bool, string) {
 		m.stopWindows()
 	}
 	copied, err := m.PlaceBinary()
-	if err != nil {
-		return false, "could not copy the program to " + m.Exe() + ": " + err.Error()
-	}
+	var newer *ErrNewerInstalled
 	note := ""
-	if copied {
+	switch {
+	case errors.As(err, &newer):
+		note = "kept " + m.Exe() + ": " + err.Error() + "\n"
+	case err != nil:
+		return false, "could not copy the program to " + m.Exe() + ": " + err.Error()
+	case copied:
 		note = "installed " + m.Exe() + "\n"
 	}
 	var ok bool
@@ -447,12 +482,16 @@ func (m *Manager) installWindows() (bool, string) {
 	return true, fmt.Sprintf("schtasks refused (%s); installed Startup launcher %s and started guard", firstLine(e, 80), vbs)
 }
 
-// stopWindows ends the scheduled task and any guard the Startup launcher started.
+// stopWindows ends the scheduled task, any guard the Startup launcher started,
+// and anything else running the installed exe (e.g. the background first scan),
+// since a running exe cannot be replaced or deleted.
 func (m *Manager) stopWindows() {
 	m.run("schtasks", "/End", "/TN", WinTask)
+	installed := strings.ToLower(m.Exe())
 	for _, pr := range m.P.Processes() {
 		lc := strings.ToLower(pr.Cmd)
-		if strings.Contains(lc, "threatscan") && strings.Contains(lc, "guard") && pr.PID != os.Getpid() {
+		guard := strings.Contains(lc, "threatscan") && strings.Contains(lc, "guard")
+		if (guard || strings.Contains(lc, installed)) && pr.PID != os.Getpid() {
 			m.P.Kill(pr.PID)
 		}
 	}

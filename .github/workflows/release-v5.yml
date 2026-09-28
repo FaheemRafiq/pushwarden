@@ -1,0 +1,77 @@
+name: Release (v5, Python)
+
+on:
+  push:
+    tags: ["v5.*"]   # v6+ is released by release.yml (Go)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  pyz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sh installers/build-pyz.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: threatscan-pyz
+          path: dist/threatscan.pyz*
+
+  binaries:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: threatscan-linux-x86_64
+          - os: macos-latest
+            name: threatscan-macos-arm64
+          - os: macos-13
+            name: threatscan-macos-x86_64
+          - os: windows-latest
+            name: threatscan-windows-x86_64.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install . pyinstaller
+      - name: Build single-file binary
+        run: >
+          pyinstaller --onefile --name threatscan --console
+          --add-data "threatscan/iocs.json${{ runner.os == 'Windows' && ';' || ':' }}threatscan"
+          --hidden-import threatscan.guard --hidden-import threatscan.scanner.repo
+          --hidden-import threatscan.scanner.system
+          -p . installers/pyinstaller_entry.py
+        shell: bash
+      - name: Rename + checksum
+        run: |
+          cd dist
+          if [ "${{ runner.os }}" = "Windows" ]; then mv threatscan.exe "${{ matrix.name }}"; else mv threatscan "${{ matrix.name }}"; fi
+          (sha256sum "${{ matrix.name }}" 2>/dev/null || shasum -a 256 "${{ matrix.name }}") > "${{ matrix.name }}.sha256"
+          ./"${{ matrix.name }}" --version
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/${{ matrix.name }}*
+
+  publish:
+    needs: [pyz, binaries]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true

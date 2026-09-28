@@ -120,7 +120,7 @@ jobs:
         run: dnf install -y -q python3 python3-pip git zenity jq iptables python3-pyyaml
       - uses: actions/checkout@v4
       - name: Install with the colleague installer (CLI only; no systemd in a container)
-        run: THREATSCAN_NO_INSTALL=1 sh installers/install.sh
+        run: THREATSCAN_NO_INSTALL=1 sh installers/v5/install.sh
         env:
           HOME: /root
       - name: Run test suite

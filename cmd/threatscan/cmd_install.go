@@ -112,6 +112,7 @@ func cmdInstall(args []string) int {
 
 	u.Section("BACKGROUND GUARD")
 	m := service.New(c.P, c.DataDir)
+	m.Version = version
 	ok := true
 	if *dry {
 		for _, l := range strings.Split(strings.TrimRight(m.Preview(), "\n"), "\n") {

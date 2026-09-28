@@ -1,77 +1,185 @@
 name: Release
 
+# v6+ (Go). Tag vX.Y.Z to publish; a tag with a hyphen (v6.0.0-rc1) becomes a
+# pre-release. Run manually to build and smoke-test without publishing.
 on:
   push:
-    tags: ["v*"]
+    tags: ["v[6-9].*", "v[1-9][0-9].*"]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+env:
+  GOTOOLCHAIN: local   # go.mod pins 1.24 so binaries run on macOS 11 / Windows 10
 
 jobs:
-  pyz:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.13"
+      - id: v
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then tag="$GITHUB_REF_NAME"; else tag="v0.0.0-ci.$GITHUB_RUN_NUMBER"; fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+      - name: Install nfpm (pinned, checksum-verified)
+        run: |
+          v=2.47.0
+          f="nfpm_${v}_Linux_x86_64.tar.gz"
+          curl -fsSLO "https://github.com/goreleaser/nfpm/releases/download/v$v/$f"
+          echo "0660ca602b2d2d2ae4781a06c692b3eeb9d437ffea05b831d76e41f4a3188783  $f" | sha256sum -c -
+          tar xzf "$f" nfpm && sudo mv nfpm /usr/local/bin/
+      - run: go test ./...
+      - run: scripts/release.sh "${{ steps.v.outputs.tag }}" dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  windows:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Build ThreatScan-Setup.exe
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=${{ needs.build.outputs.version }}" "/DDist=$PWD\dist" installers\windows\threatscan.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Smoke-test the installer
+        shell: pwsh
+        run: |
+          Start-Process -Wait -FilePath dist\ThreatScan-Setup.exe -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/LOG=setup.log'
+          $exe = "$env:LOCALAPPDATA\Programs\ThreatScan\threatscan.exe"
+          $s = ''
+          for ($i = 0; $i -lt 40; $i++) {
+            $s = & $exe status | Out-String
+            if ($s -match 'Guard:\s+alive') { break }
+            Start-Sleep 3
+          }
+          $s
+          if ($s -notmatch 'Guard:\s+alive') { Get-Content setup.log -Tail 60; exit 1 }
+          # the uninstaller relaunches itself from %TEMP%, so -Wait returns early
+          Start-Process -Wait -FilePath "$env:LOCALAPPDATA\Programs\ThreatScan\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES'
+          for ($i = 0; $i -lt 30 -and (Test-Path $exe); $i++) { Start-Sleep 2 }
+          if (Test-Path $exe) { Write-Error "uninstall left $exe"; exit 1 }
+          if (schtasks /Query /TN "ThreatScan Guard" 2>$null) { Write-Error "uninstall left the scheduled task"; exit 1 }
+          exit 0   # schtasks /Query above exits 1 when the task is gone, as it should be
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/ThreatScan-Setup.exe
+
+  macos:
+    needs: build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - run: chmod +x dist/threatscan-*
+      - run: installers/macos/build-pkg.sh "${{ needs.build.outputs.version }}" dist
+      - name: Smoke-test the package
+        run: |
+          installer -pkg dist/ThreatScan.pkg -target CurrentUserHomeDirectory
+          exe="$HOME/Library/Application Support/ThreatScan/threatscan"
+          for i in $(seq 1 40); do "$exe" status > status.txt 2>&1 || true; grep -Eq 'Guard:\s+alive' status.txt && break; sleep 3; done
+          cat status.txt
+          grep -Eq 'Guard:\s+alive' status.txt
+          "$exe" uninstall
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/ThreatScan.pkg
+
+  linux:
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/download-artifact@v4
         with:
-          python-version: "3.12"
-      - run: sh installers/build-pyz.sh
-      - uses: actions/upload-artifact@v4
-        with:
-          name: threatscan-pyz
-          path: dist/threatscan.pyz*
-
-  binaries:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            name: threatscan-linux-x86_64
-          - os: macos-latest
-            name: threatscan-macos-arm64
-          - os: macos-13
-            name: threatscan-macos-x86_64
-          - os: windows-latest
-            name: threatscan-windows-x86_64.exe
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: python -m pip install . pyinstaller
-      - name: Build single-file binary
-        run: >
-          pyinstaller --onefile --name threatscan --console
-          --add-data "threatscan/iocs.json${{ runner.os == 'Windows' && ';' || ':' }}threatscan"
-          --hidden-import threatscan.guard --hidden-import threatscan.scanner.repo
-          --hidden-import threatscan.scanner.system
-          -p . installers/pyinstaller_entry.py
-        shell: bash
-      - name: Rename + checksum
+          name: dist
+          path: dist
+      - name: Start a systemd user session (runners have none by default)
         run: |
-          cd dist
-          if [ "${{ runner.os }}" = "Windows" ]; then mv threatscan.exe "${{ matrix.name }}"; else mv threatscan "${{ matrix.name }}"; fi
-          (sha256sum "${{ matrix.name }}" 2>/dev/null || shasum -a 256 "${{ matrix.name }}") > "${{ matrix.name }}.sha256"
-          ./"${{ matrix.name }}" --version
-        shell: bash
-      - uses: actions/upload-artifact@v4
+          sudo loginctl enable-linger "$USER"
+          echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >> "$GITHUB_ENV"
+          for i in $(seq 1 30); do [ -S "/run/user/$(id -u)/bus" ] && break; sleep 1; done
+      - name: Smoke-test install.sh
+        run: |
+          THREATSCAN_BASE_URL="file://$PWD/dist" sh installers/install.sh
+          ts="$HOME/.local/bin/threatscan"
+          for i in $(seq 1 40); do "$ts" status > status.txt 2>&1 || true; grep -Eq 'Guard:\s+alive' status.txt && break; sleep 3; done
+          cat status.txt
+          grep -Eq 'Guard:\s+alive' status.txt
+          "$ts" uninstall --purge
+      - name: Smoke-test the .deb (postinstall registers the guard for $SUDO_USER)
+        run: |
+          sudo dpkg -i dist/threatscan-linux-amd64.deb
+          ts="$HOME/.local/bin/threatscan"
+          for i in $(seq 1 40); do "$ts" status > status.txt 2>&1 || true; grep -Eq 'Guard:\s+alive' status.txt && break; sleep 3; done
+          cat status.txt
+          grep -Eq 'Guard:\s+alive' status.txt
+
+  fedora:
+    needs: build
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    steps:
+      - run: dnf install -y -q tar gzip
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
-          name: ${{ matrix.name }}
-          path: dist/${{ matrix.name }}*
+          name: dist
+          path: dist
+      - name: install.sh and the .rpm (no systemd in a container, so no guard)
+        run: |
+          THREATSCAN_NO_INSTALL=1 THREATSCAN_BASE_URL="file://$PWD/dist" sh installers/install.sh
+          ~/.local/bin/threatscan version
+          dnf install -y -q ./dist/threatscan-linux-amd64.rpm
+          /usr/lib/threatscan/threatscan version
+          ~/.local/bin/threatscan scan --ci --no-system --no-report --no-prompt .
 
   publish:
-    needs: [pyz, binaries]
+    needs: [build, windows, macos, linux, fedora]
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.13"
       - uses: actions/download-artifact@v4
         with:
           path: out
           merge-multiple: true
+      - name: Checksums over every asset, signed
+        env:
+          THREATSCAN_SIGNING_KEY: ${{ secrets.THREATSCAN_SIGNING_KEY }}
+        run: |
+          [ -n "$THREATSCAN_SIGNING_KEY" ] || { echo "::error::THREATSCAN_SIGNING_KEY secret is not set"; exit 1; }
+          scripts/release.sh checksums out
+          ls -l out
       - uses: softprops/action-gh-release@v2
         with:
           files: out/*
+          prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true

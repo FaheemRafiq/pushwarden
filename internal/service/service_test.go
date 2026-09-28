@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -135,5 +136,32 @@ func TestLinkCLI(t *testing.T) {
 	m.UnlinkCLI()
 	if _, err := os.Lstat(link); err != nil {
 		t.Fatal("UnlinkCLI removed a file it does not own")
+	}
+}
+
+func TestPlaceBinaryKeepsNewerInstalled(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses a shell script as the installed binary")
+	}
+	m := testManager(t)
+	os.MkdirAll(m.P.InstallDir(), 0o755)
+	newer := "#!/bin/sh\necho 'ThreatScan 99.0.0'\n"
+	os.WriteFile(m.Exe(), []byte(newer), 0o755)
+	if v := InstalledVersion(m.Exe()); v != "99.0.0" {
+		t.Fatalf("InstalledVersion = %q", v)
+	}
+	m.Version = "6.0.0"
+	copied, err := m.PlaceBinary()
+	var e *ErrNewerInstalled
+	if copied || !errors.As(err, &e) || e.Installed != "99.0.0" {
+		t.Fatalf("copied=%v err=%v", copied, err)
+	}
+	if b, _ := os.ReadFile(m.Exe()); string(b) != newer {
+		t.Fatal("newer binary was overwritten")
+	}
+	// an older installed binary is replaced
+	os.WriteFile(m.Exe(), []byte("#!/bin/sh\necho 'ThreatScan 5.0.0'\n"), 0o755)
+	if copied, err := m.PlaceBinary(); !copied || err != nil {
+		t.Fatalf("older binary not replaced: %v %v", copied, err)
 	}
 }

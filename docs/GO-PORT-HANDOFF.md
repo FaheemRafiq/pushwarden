@@ -262,7 +262,47 @@ One-time setup: generate an ed25519 key pair (`go run ./scripts/keygen`),
 commit only the public key, put the private key in the GitHub secret
 `THREATSCAN_SIGNING_KEY` and an offline backup.
 
-## P7. Installers, download page, release pipeline
+## P7. Installers, download page, release pipeline (done, not yet run on GitHub)
+
+Files: `scripts/release.sh`, `installers/linux/{nfpm.yaml,postinstall.sh}`,
+`installers/windows/threatscan.iss`, `installers/macos/{build-pkg.sh,distribution.xml,scripts/postinstall}`,
+`installers/install.sh` (v6; the v5 one moved to `installers/v5/install.sh`),
+`docs/index.html`, `.github/workflows/release.yml` (Go, tags `v6+`) and
+`release-v5.yml` (the old PyInstaller workflow, now only for `v5.*` tags so P8's
+v5.2 can still ship).
+
+Verified locally: `release.sh v6.0.0-rc1` builds all six binaries and four
+packages (rpm version `6.0.0~rc1`); `install.sh` installs from a `file://`
+base and refuses a tampered binary; in a Fedora container the rpm installs and
+its postinstall sets up the sudo user's files, then reports that the guard
+could not start (no systemd there, as expected). `scripts/sign` refuses a key that is not
+in `pubkeys.go`, so a wrong secret fails the release rather than publishing
+assets no binary can verify.
+
+Choices worth knowing:
+- `install` no longer downgrades: when the installed binary reports a newer
+  version (a self-updated copy), a package or installer upgrade keeps it.
+- Windows: the installer ends the task and kills `threatscan.exe` before
+  replacing files; `uninstall` also kills anything running the installed exe
+  (the background first scan would otherwise lock it).
+- The release workflow publishes only after the Windows, macOS, Linux (Ubuntu
+  runner with lingering enabled, so systemd --user works) and Fedora smoke jobs
+  pass. `checksums.txt` is regenerated over every asset and signed in `publish`.
+- Neither installer is code-signed or notarized; the download page says how to
+  get past SmartScreen and Gatekeeper.
+
+Before tagging, the repository owner must:
+1. Add the `THREATSCAN_SIGNING_KEY` secret (the seed from `scripts/keygen`).
+2. Enable GitHub Pages from `main` `/docs` (after merging) for the download page.
+3. Run the Release workflow manually once (no publish) to see the smoke jobs pass.
+
+Release order: tag `v6.0.0-rc1` on this branch (pre-release; `releases/latest`
+does not see it, so test with `THREATSCAN_VERSION=v6.0.0-rc1`), then P8's
+v5.2 from `main`, then `v6.0.0`, then merge this branch. Until `v6.0.0` exists
+the README one-liner on `main` must keep pointing at an installer that works,
+which is why the merge comes last.
+
+### Original P7 specification
 
 - `scripts/release.sh`: `CGO_ENABLED=0 GOTOOLCHAIN=go1.24.13 go build -trimpath -ldflags "-s -w -X main.version=$TAG"`
   for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64,

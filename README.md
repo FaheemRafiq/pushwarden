@@ -30,38 +30,43 @@ September 2026. Sources are listed at the bottom.
 
 ## Install
 
-**Linux / macOS**
+Download page: https://faheemrafiq.github.io/threatscan/ (picks the right file for your system).
+
+- **Windows 10/11:** [ThreatScan-Setup.exe](https://github.com/FaheemRafiq/threatscan/releases/latest/download/ThreatScan-Setup.exe)
+- **macOS 11+:** [ThreatScan.pkg](https://github.com/FaheemRafiq/threatscan/releases/latest/download/ThreatScan.pkg)
+- **Linux** (no sudo):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/installers/install.sh | sh
 ```
 
-**Windows** (PowerShell, no admin needed)
+or a `.deb` / `.rpm` (`threatscan-linux-amd64.deb`, `-arm64.rpm`, ...) from the
+[latest release](https://github.com/FaheemRafiq/threatscan/releases/latest).
 
-```powershell
-irm https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/installers/install.ps1 | iex
-```
+Everything installs for your user only; no administrator password. The installer
 
-The installer
+1. puts the `threatscan` program in a per-user folder and on your PATH,
+2. hardens every VS Code-family editor it finds (`task.allowAutomaticTasks = off`, workspace trust on),
+3. registers the background guard as a **user** service (systemd `--user`, LaunchAgent, or a Scheduled Task),
+4. runs a first full scan in the background and cleans anything CRITICAL it finds (originals go to quarantine),
+5. keeps ThreatScan up to date: new releases are verified (ed25519 signature + SHA-256) before they replace
+   the program, and a release that fails to start is rolled back.
 
-1. finds or installs Python 3.8+ (winget / brew / apt / dnf),
-2. installs the package into its own virtualenv under `~/.threatscan/venv` and puts `threatscan` on your PATH,
-3. hardens every VS Code-family editor it finds (`task.allowAutomaticTasks = off`, workspace trust on),
-4. registers the background guard as a **user** service (systemd `--user`, LaunchAgent, or a Scheduled Task),
-5. runs a first full scan and cleans anything CRITICAL it finds (originals go to quarantine).
-
-Optional environment variables for the one-liners:
+Options for the Linux one-liner:
 
 | Variable | Effect |
 |---|---|
 | `THREATSCAN_WEBHOOK=https://hooks.slack.com/...` | send alerts from this machine to a Slack/Discord/Teams/custom webhook |
-| `THREATSCAN_ROOTS="~/code ~/work"` (`;`-separated on Windows) | which project directories to watch (default: auto-discover) |
-| `THREATSCAN_BLOCK_C2=1` | also add firewall rules for the C2 IPs (asks for sudo / needs elevated PowerShell) |
-| `THREATSCAN_NO_INSTALL=1` | install the CLI only, no guard |
+| `THREATSCAN_ROOTS="~/code ~/work"` | which project directories to watch (default: auto-discover) |
+| `THREATSCAN_VERSION=v6.0.0-rc1` | install a specific release (e.g. a pre-release) |
+| `THREATSCAN_NO_INSTALL=1` | install the program only, no guard |
 
-No Python and no admin? Download the single-file binary for your OS from the
-[Releases](https://github.com/FaheemRafiq/threatscan/releases) page and run `threatscan install`.
-There is also `threatscan.pyz`, a zero-dependency file that runs with any `python3`.
+Firewall blocking of the C2 addresses needs admin rights, so it is a separate step:
+`sudo threatscan protect` (Linux/macOS) or `threatscan protect` in an elevated terminal (Windows).
+
+Updates can be turned off with `threatscan config --set auto_update=false`; check by hand with `threatscan update --check`.
+
+The v5 (Python) installers remain in `installers/v5/install.sh` and `installers/install.ps1`.
 
 ---
 
@@ -263,7 +268,7 @@ threatscan/
   prompt.py          native dialogs, threat names service.py         systemd / launchd / schtasks
   hardening.py       editor + npm settings      notify.py           desktop + webhook
   cli.py             commands                   report.py, config.py, updater.py
-installers/          install.sh, install.ps1, build-pyz.sh
+installers/          install.sh (v6), windows/ (Inno Setup), macos/ (pkg), linux/ (nfpm), v5/, install.ps1, build-pyz.sh
 falco/               Linux runtime rules + response handler
 analysis/            sandbox, deobfuscator, YARA, sample notes (do not run samples)
 tests/               inert fixtures that mimic the artefacts' shape

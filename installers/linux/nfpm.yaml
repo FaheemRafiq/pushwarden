@@ -1,0 +1,24 @@
+# nfpm config template for the .deb and .rpm; scripts/release.sh fills in @ARCH@,
+# @VERSION@ and @BINARY@.
+# The package only ships the binary; postinstall registers the per-user guard
+# for the user who ran sudo, which copies the binary into their home.
+name: threatscan
+arch: @ARCH@
+platform: linux
+version: @VERSION@
+version_schema: semver
+section: utils
+priority: optional
+maintainer: ThreatScan <noreply@github.com>
+description: |
+  Detects, removes and blocks the PolinRider / Contagious Interview
+  supply-chain malware on developer machines.
+homepage: https://github.com/FaheemRafiq/threatscan
+license: MIT
+contents:
+  - src: @BINARY@
+    dst: /usr/lib/threatscan/threatscan
+    file_info:
+      mode: 0755
+scripts:
+  postinstall: installers/linux/postinstall.sh
