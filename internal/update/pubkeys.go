@@ -5,4 +5,6 @@ package update
 //
 // Generate a pair with `go run ./scripts/keygen PATH`; commit only the public
 // key here. Until a key is listed, self-update refuses to install anything.
-var PublicKeys = []string{}
+var PublicKeys = []string{
+	"Twttq9ERdflw7tFDObUhzP4wFuwrGIqQ/qC9Kk8gtBg=", // 2026-09-28
+}

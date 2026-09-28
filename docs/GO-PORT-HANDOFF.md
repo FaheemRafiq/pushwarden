@@ -204,7 +204,9 @@ macos-13, windows-latest and the Fedora containers: `go vet ./...`,
 - Signature format: `checksums.txt.sig` is base64 of the ed25519 signature
   over the exact bytes of `checksums.txt`. `go run ./scripts/sign FILE` makes
   it from `$THREATSCAN_SIGNING_KEY` (base64 32-byte seed).
-- **Still to do before any v6 release:** run `go run ./scripts/keygen PATH`
+- Signing key generated 2026-09-28; public key committed in `pubkeys.go`.
+  **Still to do:** put the seed in the `THREATSCAN_SIGNING_KEY` secret and an
+  offline backup. (Original step: run `go run ./scripts/keygen PATH`
   (PATH outside the repo), paste the printed public key into
   `internal/update/pubkeys.go`, store the seed in the `THREATSCAN_SIGNING_KEY`
   secret and an offline backup. With the list empty, every self-update is
