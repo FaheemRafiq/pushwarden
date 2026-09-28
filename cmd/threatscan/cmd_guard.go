@@ -32,6 +32,10 @@ func init() {
 // guardHooks is filled in by later phases (real-time watcher, updates).
 var guardHooks guard.Hooks
 
+// guardPreStart runs before a long-running guard's first pass; returning true
+// means this process must exit (e.g. it rolled back and restarted the guard).
+var guardPreStart func(c *ctx, g *guard.Guard) bool
+
 func cmdGuard(args []string) int {
 	fs := newFlags("guard", "[--once] [--dry-run] [--verbose]")
 	once := fs.Bool("once", false, "one full pass, then exit")
@@ -47,5 +51,8 @@ func cmdGuard(args []string) int {
 		return 2
 	}
 	g.Hooks = guardHooks
+	if !*once && guardPreStart != nil && guardPreStart(c, g) {
+		return 0
+	}
 	return g.Run()
 }

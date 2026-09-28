@@ -12,6 +12,7 @@ package service
 import (
 	"bytes"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -507,4 +508,73 @@ func (m *Manager) Status() string {
 		return "not installed"
 	}
 	return "unknown"
+}
+
+// ── restart (after an update or a rollback) ─────────────────────────────────
+
+// Restart asks the service manager to restart the guard with the binary now on
+// disk. For use from the CLI, not from inside the guard (see RestartFromGuard).
+func (m *Manager) Restart() (bool, string) {
+	switch {
+	case m.P.IsLinux():
+		if _, err := os.Stat(m.UnitPath()); err != nil {
+			return false, "guard service not installed"
+		}
+		if rc, _, e := m.run("systemctl", "--user", "--no-block", "restart", ServiceName+".service"); rc != 0 {
+			return false, "systemctl restart failed: " + firstLine(e, 200)
+		}
+	case m.P.IsMac():
+		if _, err := os.Stat(m.UnitPath()); err != nil {
+			return false, "guard service not installed"
+		}
+		if rc, _, e := m.run("launchctl", "kickstart", "-k", "gui/"+strconv.Itoa(os.Getuid())+"/"+LaunchdLabel); rc != 0 {
+			return false, "launchctl kickstart failed: " + firstLine(e, 200)
+		}
+	case m.P.IsWindows():
+		m.stopWindows()
+		if rc, _, _ := m.run("schtasks", "/Run", "/TN", WinTask); rc != 0 {
+			if _, err := os.Stat(m.UnitPath()); err != nil {
+				return false, "guard service not installed"
+			}
+			c := exec.Command("wscript.exe", m.UnitPath())
+			platform.Detach(c)
+			if err := c.Start(); err != nil {
+				return false, err.Error()
+			}
+			go c.Wait()
+		}
+	default:
+		return false, "unsupported platform"
+	}
+	return true, "guard restarted"
+}
+
+// underServiceManager reports whether this process was started by our unit/agent.
+func underServiceManager(p *platform.Info) bool {
+	switch {
+	case p.IsLinux():
+		return os.Getenv("INVOCATION_ID") != ""
+	case p.IsMac():
+		return os.Getenv("XPC_SERVICE_NAME") == LaunchdLabel
+	}
+	return false
+}
+
+// RestartFromGuard is called by a running guard that must restart itself.
+// Under systemd/launchd the service manager restarts it; otherwise (Windows,
+// or a guard in a terminal) a new detached guard is started. Either way the
+// caller must stop afterwards.
+func (m *Manager) RestartFromGuard(exe string) error {
+	if underServiceManager(m.P) {
+		if ok, msg := m.Restart(); !ok {
+			return errors.New(msg)
+		}
+		return nil
+	}
+	c := exec.Command(exe, "guard")
+	platform.Detach(c)
+	if err := c.Start(); err != nil {
+		return err
+	}
+	return c.Process.Release()
 }

@@ -189,7 +189,34 @@ CI: add a `go` job to `.github/workflows/ci.yml` on ubuntu, macos-latest,
 macos-13, windows-latest and the Fedora containers: `go vet ./...`,
 `go test -race ./...`, `go build` with Go 1.24, plus the parity script on Linux.
 
-## P6. Updates: `internal/update`
+## P6. Updates: `internal/update` (done, except the signing key)
+
+- `update-iocs [--url]` and the guard's 24 h indicator refresh use `update.UpdateIOCs`.
+- Program update: `update [--check]`; in the guard, a `self-update` periodic task
+  (off for `-dev` builds and when the guard does not run from `InstallDir`) and an
+  `update-confirm` task (every minute; announces the update and deletes `.old`
+  once the new version has written a heartbeat).
+- Rollback: `cmdGuard` calls `guardPreStart` before `Run`. `update-state.json`
+  counts starts of the new version; a second start within 2 minutes with no
+  heartbeat from it means the first run crashed, so `.old` is swapped back,
+  the version is added to `failed` and never offered again.
+- A 404 from `releases/latest` means "no release yet", not an error.
+- Signature format: `checksums.txt.sig` is base64 of the ed25519 signature
+  over the exact bytes of `checksums.txt`. `go run ./scripts/sign FILE` makes
+  it from `$THREATSCAN_SIGNING_KEY` (base64 32-byte seed).
+- **Still to do before any v6 release:** run `go run ./scripts/keygen PATH`
+  (PATH outside the repo), paste the printed public key into
+  `internal/update/pubkeys.go`, store the seed in the `THREATSCAN_SIGNING_KEY`
+  secret and an offline backup. With the list empty, every self-update is
+  refused, so a release shipped without a key can never update itself.
+- Windows risk to check in the P7 smoke test: after an update the guard starts
+  the new exe detached and exits. If Task Scheduler's job object kills child
+  processes when the task's process exits, the guard stays down until the
+  next sign-in.
+- Rollback only works if the new binary gets as far as `guardPreStart`; step 4
+  (`version` must run) is what guards against a binary that cannot start at all.
+
+### Original P6 specification
 
 **Indicators** (do first, it is a straight port of `threatscan/updater.py`):
 `UpdateIOCs(dataDir, current, cfg)`: GET `cfg.IOCUpdateURL` or the default
