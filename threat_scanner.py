@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ThreatScan v4.0 — Cross-Platform PolinRider / Contagious Interview Detector
+ThreatScan v4.1 — Cross-Platform PolinRider / Contagious Interview Detector
 
 Detects the DPRK (Lazarus Group) supply-chain campaign tracked as PolinRider,
 including every signature rotation documented through September 2026:
@@ -8,8 +8,11 @@ including every signature rotation documented through September 2026:
   * Config-file payload injection (postcss/next/vue/tailwind/eslint/...)
   * Rotated obfuscation signatures  (rmcej%otb% -> Cot%3t=shtP, _$_1e42 -> MDy)
   * Blockchain dead-drop loaders     (TRON / Aptos / BSC RPC + XOR keys)
-  * Fake font-file loader            (fa-solid-400.woff2, SHA-256 verified)
+  * Fake font-file loader            (fa-solid-400/500.woff2, SHA-256 + magic-byte verified)
+  * Disguised payloads               (JS hidden in font/image files behind whitespace padding)
   * VS Code folderOpen autorun       (.vscode/tasks.json stage-1 entry point)
+  * VS Code autorun enablers         (.vscode/settings.json task.allowAutomaticTasks)
+  * Payloads buried in git history   (commits re-adding the loader under decoy messages)
   * Git history rewriting            (temp_auto_push.bat, forged committer dates)
   * runtimedev-link RAT              (VSCodeUpdater disguise, systemd/cron/launchd)
   * Known compromised packages       (npm / Go / Packagist)
@@ -60,7 +63,7 @@ from typing import Optional, List, Tuple
 from enum import IntEnum
 from datetime import datetime, timezone
 
-VERSION = "4.0"
+VERSION = "4.1"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # INDICATORS OF COMPROMISE
@@ -159,13 +162,37 @@ TELEGRAM_INDICATORS = [
 FAKE_FONT_SHA256 = {
     "53abf37710d6f2e35694fbe7cfaf1108127cbc001ce3e6bf994d0486cae5a0e8",
     "13e9a3c41e038bf9d8fcb0831305819819e4f7f4452bc20a04b9bf2756ee22e8",
+    # Live samples recovered from an infected monorepo's git history, Sept 2026
+    "3287f2de563bd76465d353bd22b4d07c2af1cda9dd45efcb0da49e3ca49f7639",  # fa-solid-400.woff2, A10-*010
+    "c98f2703db7e8b73b296e686cc8dee89d1b1643a90c3e89ef90b6a75805421aa",  # fa-solid-400.woff2, A10-*020
+    "9e286f7a54f071e5a4e9f09de84abca872d8347cbb7059c966c7db54a7e4dcba",  # fa-solid-500.woff2, A10-*050
 }
-FAKE_FONT_NAMES = ["fa-solid-400.woff2", "fa-solid-400.woff", "fa-regular-400.woff2"]
+FAKE_FONT_NAMES = ["fa-solid-400.woff2", "fa-solid-400.woff", "fa-regular-400.woff2",
+                   "fa-solid-500.woff2"]
+
+# ─── Magic bytes for binary assets that loaders masquerade as ─────────────────
+# (offset, signature) pairs; any match means the header is genuine.
+FONT_EXTENSIONS = {".woff", ".woff2", ".ttf", ".otf", ".eot"}
+ASSET_MAGIC = {
+    ".woff2": [(0, b"wOF2")],
+    ".woff": [(0, b"wOFF")],
+    ".ttf": [(0, b"\x00\x01\x00\x00"), (0, b"true"), (0, b"OTTO"), (0, b"ttcf")],
+    ".otf": [(0, b"OTTO"), (0, b"\x00\x01\x00\x00")],
+    ".eot": [(34, b"LP")],
+    ".png": [(0, b"\x89PNG")],
+    ".jpg": [(0, b"\xff\xd8\xff")],
+    ".jpeg": [(0, b"\xff\xd8\xff")],
+    ".gif": [(0, b"GIF87a"), (0, b"GIF89a")],
+    ".ico": [(0, b"\x00\x00\x01\x00"), (0, b"\x00\x00\x02\x00")],
+    ".webp": [(0, b"RIFF")],
+}
 
 # ─── Marker regex (generalised across all A#- versions) ───────────────────────
 MARKER_REGEX = re.compile(
-    r"""global\[['"]![ '"]\]\s*=\s*['"][A0-9-]{4,}['"]"""
-    r"""|global\[['"]_V['"]\]\s*=\s*['"][A0-9-]{4,}['"]"""
+    r"""global\[['"]![ '"]\]\s*=\s*['"][A0-9*-]{4,}['"]"""
+    r"""|global\[['"]_V['"]\]\s*=\s*['"][A0-9*-]{4,}['"]"""
+    r"""|global(?:\.i|\[['"]i['"]\])\s*=\s*['"]A\d+-\*?\d+['"]"""
+    r"""|global\.r\s*=\s*require\b"""
     r"""|_\$_1e42"""
     r"""|\bMDy\s*\("""
     r"""|global\[['"]r['"]\]\s*=\s*require"""
@@ -205,6 +232,19 @@ PROPAGATION_SCRIPTS = [
     "temp_auto_push.bat", "temp_interactive_push.bat",
     "config.bat", "auto_push.bat", "temp_auto_push.sh", "auto_push.sh",
 ]
+
+# ─── .gitignore entries the propagator adds to hide its own artefacts ─────────
+# ".gitignore" ignoring itself keeps the tampering out of `git status`;
+# "nul" is left behind when the Windows orchestrator's >nul redirect runs under bash.
+GITIGNORE_IOCS = [".gitignore", "branch_structure.json", "nul"]
+
+# ─── git log -G pattern (POSIX ERE) for payloads committed anywhere in history ─
+HISTORY_PAYLOAD_REGEX = (
+    r"global(\.i|\[.i.\]) ?= ?.A[0-9]+-\*?[0-9]+"
+    r"|global\[.(!|_V).\] ?= ?.A?[0-9]+-"
+    r"|_\$_1e42|Cot%3t=shtP|rmcej%otb%"
+    r"|node \./[^ )]+\.(woff2?|ttf|otf|eot|png|jpe?g|gif|ico)"
+)
 
 # ─── Known compromised packages ───────────────────────────────────────────────
 COMPROMISED_NPM = {
@@ -266,7 +306,9 @@ MALICIOUS_PROCESS_PATTERNS = [
     re.compile(r"--token\s+https?://[^\s]+\|", re.I),
     re.compile(r"font[-_]?updater", re.I),
     re.compile(r"\.cache/font", re.I),
-    re.compile(r"fa-solid-400\.woff2", re.I),
+    re.compile(r"fa-solid-[45]00\.woff2", re.I),
+    re.compile(r"global\.i\s*=\s*['\"]A\d+-\*", re.I),
+    re.compile(r"\bnode\s+\S+\.(woff2?|ttf|otf|eot|png|jpe?g|gif|ico)\b", re.I),
     re.compile(r"/tmp/\.[a-z]", re.I),
 ]
 
@@ -724,22 +766,48 @@ def read_text(path: Path, limit_bytes=20 * 1024 * 1024) -> str:
         return ""
 
 
-def is_real_font(path: Path) -> Optional[bool]:
-    """True = valid font magic, False = definitely not a font, None = unreadable."""
+CODE_MARKERS = (b"<html", b"<!doc", b"<script", b"require(", b"global[", b"global.", b"function",
+                b"eval(", b"const ", b"var ", b"let ", b"#!/", b"process.env", b"=>")
+
+
+def asset_verdict(path: Path) -> Tuple[str, str]:
+    """Classify a font/image file by content.
+
+    Returns (verdict, detail) where verdict is:
+      "real"    - header matches the extension's magic bytes
+      "code"    - file is script/markup (loader payload)
+      "text"    - plain text where a binary is expected
+      "unknown" - unreadable or an unrecognised binary
+    Leading whitespace is skipped before looking for code: PolinRider pads its
+    loader with hundreds of spaces so the first bytes look blank.
+    """
     try:
         with open(path, "rb") as fh:
-            head = fh.read(64)
+            head = fh.read(8192)
     except Exception:
-        return None
+        return "unknown", ""
     if not head:
-        return False
-    if head[:4] in (b"wOFF", b"wOF2", b"OTTO", b"\x00\x01\x00\x00", b"true", b"ttcf"):
-        return True
-    low = head.lower()
-    if any(m in low for m in (b"<html", b"<!doc", b"require(", b"global[", b"function", b"eval(",
-                               b"const ", b"var ", b"let ", b"#!/", b"process.env")):
-        return False
-    return None
+        return "text", "file is empty"
+    for offset, sig in ASSET_MAGIC.get(path.suffix.lower(), []):
+        if head[offset:offset + len(sig)] == sig:
+            return "real", ""
+    if head.startswith(b"version https://git-lfs"):
+        return "real", ""
+    body = head.lstrip()
+    pad = len(head) - len(body)
+    pad_note = f" after {pad} bytes of whitespace padding" if pad >= 32 else ""
+    low = body[:2048].lower()
+    if any(m in low for m in CODE_MARKERS):
+        marker = MARKER_REGEX.search(body.decode("latin-1"))
+        return "code", (f"JavaScript/HTML{pad_note}" +
+                        (f"; campaign marker: {marker.group(0)[:60]}" if marker else ""))
+    if b"\x00" not in head:
+        try:
+            head.decode("utf-8")
+            return "text", f"plain text{pad_note}"
+        except UnicodeDecodeError:
+            pass
+    return "unknown", ""
 
 
 def skip_dir(name: str) -> bool:
@@ -771,9 +839,10 @@ class RepoScanner:
     # ── Discovery ────────────────────────────────────────────────────────────
     def find_repos(self) -> List[Path]:
         repos = []
-        for root, dirs, _ in os.walk(self.scan_dir):
+        for root, dirs, files in os.walk(self.scan_dir):
             dirs[:] = [d for d in dirs if not skip_dir(d) or d == ".git"]
-            if ".git" in dirs:
+            # .git is a file (not a dir) in worktrees and submodules
+            if ".git" in dirs or ".git" in files:
                 repos.append(Path(root))
                 dirs[:] = [d for d in dirs if d != ".git"]
         return repos
@@ -901,6 +970,13 @@ class RepoScanner:
                         f".gitignore hides {name}", str(gi),
                         "PolinRider adds its orchestrator to .gitignore so it never shows in git status.",
                         f"Remove '{name}' from {gi}."))
+            # Only meaningful in a git repo; tool-generated dirs (e.g. .opencode/) self-ignore legitimately
+            for name in GITIGNORE_IOCS if (repo / ".git").exists() else []:
+                if re.search(rf"^\s*/?{re.escape(name)}\s*$", content, re.M):
+                    out.append(Finding(Severity.HIGH, "gitignore_tampering",
+                        f".gitignore hides {name}", str(gi),
+                        "PolinRider ignores its own artefacts (and .gitignore itself) to hide the tampering.",
+                        f"Remove '{name}' from {gi}, then run: git status --ignored"))
         return out
 
     def check_vscode_tasks(self, repo: Path) -> List[Finding]:
@@ -912,7 +988,8 @@ class RepoScanner:
         if "folderOpen" in content:
             sev = Severity.CRITICAL
             details = "runOptions.runOn=folderOpen executes the moment the folder opens in VS Code/Cursor/GitHub Desktop.\n"
-            if any(k in content for k in ("woff2", "node -e", "curl", "wget", "powershell", "cmd /c", ".bat")):
+            loader = re.search(r"\bnode\s+\S+\.(woff2?|ttf|otf|eot|png|jpe?g|gif|ico)\b", content, re.I)
+            if loader or any(k in content for k in ("woff2", "node -e", "curl", "wget", "powershell", "cmd /c", ".bat")):
                 details += "Task body references a loader/font/shell — this is the PolinRider stage-1 entry point."
             else:
                 details += "No obvious loader in the task body, but folderOpen autorun is itself the PolinRider signature."
@@ -922,31 +999,55 @@ class RepoScanner:
                 f"Delete {tasks} unless you wrote it.\n  In VS Code: Task > Allow Automatic Tasks in Folder = off."))
         return out
 
-    def check_fake_fonts(self, repo: Path) -> List[Finding]:
+    def check_vscode_settings(self, repo: Path) -> List[Finding]:
+        settings = repo / ".vscode" / "settings.json"
+        if not settings.is_file():
+            return []
+        content = read_text(settings)
+        if not re.search(r'"task\.allowAutomaticTasks"\s*:\s*(true|"on")', content):
+            return []
+        extras = [k for k in ('"terminal.integrated.hideOnStartup"', '"runOn": "folderOpen"', '"debug.openDebug"')
+                  if k in content]
+        return [Finding(Severity.HIGH, "vscode_autorun",
+            "VS Code settings force automatic tasks on", str(settings),
+            "task.allowAutomaticTasks suppresses the 'allow automatic tasks?' prompt, so a folderOpen "
+            "task runs silently." + (f"\nAlso sets: {', '.join(extras)}" if extras else ""),
+            f"Remove task.allowAutomaticTasks from {settings} unless you added it.")]
+
+    def check_disguised_assets(self, repo: Path) -> List[Finding]:
+        """Font/image files whose content is not what the extension claims."""
         out = []
-        font_ext = {".woff", ".woff2", ".ttf", ".otf", ".eot"}
         for root, dirs, files in os.walk(repo):
             dirs[:] = [d for d in dirs if not skip_dir(d)]
             for fn in files:
                 p = Path(root) / fn
-                if p.suffix.lower() not in font_ext:
+                ext = p.suffix.lower()
+                if ext not in ASSET_MAGIC:
                     continue
                 self.files_checked += 1
+                is_font = ext in FONT_EXTENSIONS
+                category = "fake_font_loader" if is_font else "disguised_payload"
+                kind = "Font" if is_font else "Image"
                 digest = sha256_of(p)
                 if digest in FAKE_FONT_SHA256:
-                    out.append(Finding(Severity.CRITICAL, "fake_font_loader",
+                    out.append(Finding(Severity.CRITICAL, category,
                         f"PolinRider loader (hash match): {fn}", str(p),
-                        f"SHA-256 {digest} matches the fa-solid-400.woff2 loader confirmed across 18 packages.",
+                        f"SHA-256 {digest} matches a confirmed PolinRider font-disguised loader.",
                         f"Delete {p}. Search the repo for what references it (tasks.json, package.json scripts)."))
                     continue
-                verdict = is_real_font(p)
-                if verdict is False:
-                    out.append(Finding(Severity.CRITICAL, "fake_font_loader",
-                        f"Font file contains code: {fn}", str(p),
-                        "File has a font extension but its header is JavaScript/HTML, not font magic.",
-                        f"Delete {p} and find what loads it."))
-                elif fn in FAKE_FONT_NAMES and verdict is None:
-                    out.append(Finding(Severity.WARNING, "fake_font_loader",
+                verdict, detail = asset_verdict(p)
+                if verdict == "code":
+                    out.append(Finding(Severity.CRITICAL, category,
+                        f"{kind} file contains code: {fn}", str(p),
+                        f"Has a {ext} extension but the content is {detail}, not {ext[1:]} magic bytes.",
+                        f"Delete {p} and find what loads it (grep -r '{fn}' .vscode package.json)."))
+                elif verdict == "text":
+                    out.append(Finding(Severity.HIGH if fn in FAKE_FONT_NAMES else Severity.WARNING, category,
+                        f"{kind} file is not binary: {fn}", str(p),
+                        f"Has a {ext} extension but the content is {detail}.",
+                        f"Run: file {p}  — then open it in a text editor and check what it contains."))
+                elif verdict == "unknown" and fn in FAKE_FONT_NAMES:
+                    out.append(Finding(Severity.WARNING, category,
                         f"Unverifiable font with PolinRider filename: {fn}", str(p),
                         "Name matches the campaign loader but header is inconclusive.",
                         f"Run: file {p}  — it should say 'Web Open Font Format'."))
@@ -994,6 +1095,30 @@ class RepoScanner:
                 "\nPolinRider sets GIT_COMMITTER_DATE to hide when the backdoor was really pushed.",
                 f"git -C {repo} log --format='%h %ad %cd %s' --date=iso   # compare author vs committer dates"))
         return out
+
+    def check_history_payloads(self, repo: Path) -> List[Finding]:
+        """Commits that added or removed payload code, on any branch.
+
+        Reported as WARNING: the working tree may be clean, but the payload is
+        still one checkout away, and the commits show when it was injected.
+        PolinRider re-adds its loader under decoy messages like 'rm malware'.
+        """
+        try:
+            log = subprocess.run(
+                ["git", "-C", str(repo), "log", "--all", "-n", "1000", "--text", "-E",
+                 "-G", HISTORY_PAYLOAD_REGEX, "--format=%h|%ad|%s", "--date=short"],
+                capture_output=True, text=True, timeout=60).stdout
+        except Exception:
+            return []
+        commits = [line.split("|", 2) for line in log.strip().split("\n") if line.count("|") >= 2]
+        if not commits:
+            return []
+        listing = "\n".join(f"{h} {d} {s[:60]}" for h, d, s in commits[:10])
+        return [Finding(Severity.WARNING, "history_payload",
+            f"{len(commits)} commit(s) in {repo.name} history touch PolinRider payload code", str(repo / ".git"),
+            listing + ("\n…" if len(commits) > 10 else "") +
+            "\nCheck each one: commit messages are often decoys that add the loader rather than remove it.",
+            f"git -C {repo} show --stat <commit>   # then audit every branch that contains it")]
 
     def check_package_json(self, repo: Path) -> List[Finding]:
         out = []
@@ -1119,13 +1244,15 @@ class RepoScanner:
 
         f += self.check_propagation_scripts(repo)
         f += self.check_vscode_tasks(repo)
-        f += self.check_fake_fonts(repo)
+        f += self.check_vscode_settings(repo)
+        f += self.check_disguised_assets(repo)
         f += self.check_package_json(repo)
         f += self.check_lockfiles(repo)
         f += self.check_go_mod(repo)
         f += self.check_composer(repo)
         if is_git:
             f += self.check_git_history(repo)
+            f += self.check_history_payloads(repo)
         if any(x.severity >= Severity.HIGH for x in f):
             f += self.check_env_files(repo)
         return f
@@ -1564,7 +1691,12 @@ def main() -> int:
             ui.err(f"Could not write JSON: {e}")
             return 2
 
-    return 1 if (stats.critical or stats.high) else 0
+    if stats.critical or stats.high:
+        return 1
+    if args.no_system and not repos_total:
+        ui.err("Nothing was scanned: no git repositories or projects found.")
+        return 2
+    return 0
 
 
 if __name__ == "__main__":

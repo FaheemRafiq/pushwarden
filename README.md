@@ -1,4 +1,4 @@
-# ThreatScan v4.0
+# ThreatScan v4.1
 
 **PolinRider / Contagious Interview Malware Detector**
 
@@ -16,13 +16,17 @@ Cross-platform (Linux / macOS / Windows) scanner for the **Lazarus Group (DPRK)*
 |-----------|-------------|----------|
 | `global['_V']='A#-####'` | Campaign obfuscation marker | **CRITICAL** |
 | `global['!']='#-####'` | Alternate marker family | **CRITICAL** |
+| `global.i='A10-*050'` / `global.r=require` | Dot-notation marker family (Sept 2026 rotation) | **CRITICAL** |
 | `_$_1e42` / `MDy(` | Decoder function names (March + July rotations) | **CRITICAL** |
 | `Cot%3t=shtP` | Rotated code signature (July 2026+) | **CRITICAL** |
 | Hidden payloads | Malicious code after ~280 spaces on export lines | **HIGH** |
 | `temp_auto_push.bat` | Git history rewriter + force-pusher | **CRITICAL** |
-| `.gitignore` hiding `.bat` | Config tampering evidence | **HIGH** |
+| `.gitignore` hiding `.bat`, itself, `branch_structure.json`, `nul` | Config tampering evidence | **HIGH** |
 | `.vscode/tasks.json` `folderOpen` | VS Code stage-1 autorun (bypasses npm v12 lifecycle script protections) | **CRITICAL** |
-| `fa-solid-400.woff2` | Fake font loader (SHA-256 verified against 18 confirmed cases) | **CRITICAL** |
+| `fa-solid-400.woff2` / `fa-solid-500.woff2` | Fake font loader (SHA-256 verified against 18 confirmed cases + 3 Sept 2026 samples) | **CRITICAL** |
+| Disguised assets | Font/image file (`.woff2`, `.ttf`, `.eot`, `.png`, `.jpg`, …) whose content is JS/HTML instead of its magic bytes — including payloads padded with leading whitespace | **CRITICAL** |
+| `.vscode/settings.json` `task.allowAutomaticTasks` | Suppresses VS Code's automatic-task prompt so the `folderOpen` task runs silently | **HIGH** |
+| Payload commits in history | Commits on any branch that add/remove loader code — often under decoy messages like `rm malware` | **WARNING** |
 | Forged committer dates | Git commits with `%ct < %at - 7 days` (timestamp forgery detection) | **HIGH** |
 | XOR keys | `2[gWfGj;<:-93Z^C`, `ThZG+0jfXE6VAGOJ`, `q4FZkxX{!h,Sr3=@` | **CRITICAL** |
 | Blockchain RPC refs | `api.trongrid.io`, `fullnode.mainnet.aptoslabs.com`, `bsc-dataseed.binance.org` **+ campaign marker** | **CRITICAL** |
@@ -124,7 +128,7 @@ python3 threat_scanner.py --ci ~/projects
 **Write JSON report (for parsing/alerting systems):**
 ```bash
 python3 threat_scanner.py --json report.json ~/projects
-# Creates: {"version":"4.0", "stats":{...}, "findings":[...]}
+# Creates: {"version":"4.1", "stats":{...}, "findings":[...]}
 ```
 
 ### Full Example (Post-Incident Recovery)
@@ -193,6 +197,17 @@ fi
 ```
 
 ---
+
+## What's New in v4.1
+
+- ✅ **Disguised-asset detection**: fonts *and* images are checked against their magic bytes; leading-whitespace padding no longer hides the JS payload (v4.0 read only the first 64 bytes, so a padded `fa-solid-500.woff2` passed as clean)
+- ✅ New marker family `global.i='A10-*NNN'` and `global.r=require` (dot notation)
+- ✅ 3 new loader SHA-256s and the `fa-solid-500.woff2` filename
+- ✅ `.vscode/settings.json` `task.allowAutomaticTasks` detection
+- ✅ `.gitignore` self-ignore, `branch_structure.json`, `nul` entries
+- ✅ Git history scan (`git log --all -G`) lists commits that touched payload code
+- ✅ Worktrees and submodules (`.git` file) are now detected as repositories
+- ✅ `--no-system` scan that finds no repository exits `2` instead of reporting clean
 
 ## What's New in v4.0
 
