@@ -98,6 +98,9 @@ threatscan uninstall [--unblock] [--purge]
 `threatscan [dirs]` is short for `threatscan scan [dirs]`. Every script file is scanned by default;
 `--configs-only` restores the v4 "known config names only" scope.
 
+The full command-line reference, with every option, the configuration keys, file locations and
+recipes for CI, hooks and webhooks, is in [docs/CLI.md](docs/CLI.md).
+
 ### Clean every GitHub repository and branch you own
 
 PolinRider force-pushes the backdoor to every branch of every repo the stolen token can reach.
