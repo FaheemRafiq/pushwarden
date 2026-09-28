@@ -10,31 +10,6 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        python: ["3.8", "3.12"]
-        exclude:
-          - os: macos-latest
-            python: "3.8"
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-      - run: python -m pip install -e ".[dev]"
-      - run: python -m pytest -q
-      - name: Smoke-test CLI on this OS
-        run: |
-          threatscan --version
-          threatscan scan --ci --no-report --no-system .
-          threatscan install --dry-run --no-harden
-          threatscan status
-        shell: bash
-
   go:
     name: go (${{ matrix.os }})
     strategy:
@@ -52,16 +27,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24.13"
-      - uses: actions/setup-python@v5
-        if: runner.os == 'Linux'
-        with:
-          python-version: "3.12"
       - run: go vet ./...
       - run: go test -race ./...
       - run: go build -o dist/ ./cmd/threatscan
-      - name: Parity with the Python v5 scanner
-        if: runner.os == 'Linux'
-        run: scripts/parity.sh
       - name: Smoke-test install, guard and uninstall
         # GitHub's Linux runners have no systemd user session; macOS and Windows do.
         continue-on-error: ${{ runner.os == 'Linux' }}
@@ -90,7 +58,7 @@ jobs:
       GOTOOLCHAIN: local
     steps:
       - name: Install system packages
-        run: dnf install -y -q git gcc tar gzip python3
+        run: dnf install -y -q git gcc tar gzip
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
@@ -98,7 +66,6 @@ jobs:
       - run: go vet ./...
       - run: go test -race ./...
       - run: go build -o dist/ ./cmd/threatscan
-      - run: scripts/parity.sh
       - name: Smoke-test CLI (no systemd in a container)
         run: |
           dist/threatscan --version
@@ -106,36 +73,11 @@ jobs:
           dist/threatscan install --dry-run --no-harden
           dist/threatscan status
 
-  fedora:
-    name: test (fedora ${{ matrix.release }})
+  falco-rules:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        release: ["latest", "42"]
-    container:
-      image: fedora:${{ matrix.release }}
     steps:
-      - name: Install system packages
-        run: dnf install -y -q python3 python3-pip git zenity jq iptables python3-pyyaml
       - uses: actions/checkout@v4
-      - name: Install with the colleague installer (CLI only; no systemd in a container)
-        run: THREATSCAN_NO_INSTALL=1 sh installers/v5/install.sh
-        env:
-          HOME: /root
-      - name: Run test suite
-        run: |
-          /root/.threatscan/venv/bin/python -m pip install -q pytest
-          /root/.threatscan/venv/bin/python -m pytest -q
-      - name: Smoke-test CLI, zipapp and self-scan
-        run: |
-          export PATH="/root/.local/bin:$PATH"
-          threatscan --version
-          threatscan scan --ci --no-report --no-system --no-prompt .
-          threatscan install --dry-run --no-harden
-          threatscan status
-          sh installers/build-pyz.sh
-          python3 dist/threatscan.pyz --version
+      - run: python3 -m pip install -q pyyaml
       - name: Validate Falco rule set
         run: |
           python3 - <<'PY'
@@ -149,9 +91,3 @@ jobs:
               if "rule" in r:
                   assert r.get("condition") and r.get("output") and r.get("priority"), r["rule"]
           PY
-      - name: Firewall blocking (iptables in container)
-        run: |
-          export PATH="/root/.local/bin:$PATH"
-          threatscan protect --block-c2 || echo "iptables unavailable in this container (expected on some runners)"
-          threatscan protect --status
-          threatscan protect --unblock || true

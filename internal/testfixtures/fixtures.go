@@ -54,7 +54,7 @@ func Infected(t testing.TB, dir string) string { return infected(testWriter(t), 
 // Clean creates <dir>/clean with a genuine-looking project.
 func Clean(t testing.TB, dir string) string { return clean(testWriter(t), dir) }
 
-// Build writes both fixtures under dir, for scripts (see scripts/parity.sh).
+// Build writes both fixtures under dir, for scripts: go run ./scripts/fixtures DIR.
 func Build(dir string) error {
 	var first error
 	w := func(path string, data []byte) {

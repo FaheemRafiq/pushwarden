@@ -1,5 +1,5 @@
 <!-- threatscan:allow-signatures -->
-# ThreatScan v5
+# ThreatScan
 
 **Real-time protection against the PolinRider / Contagious Interview supply-chain malware, for developer machines.**
 Linux, macOS and Windows. One install command. Behaves like Windows Defender: a malicious file is caught the
@@ -73,7 +73,8 @@ Firewall blocking of the C2 addresses needs admin rights, so it is a separate st
 
 Updates can be turned off with `threatscan config --set auto_update=false`; check by hand with `threatscan update --check`.
 
-The v5 (Python) installers remain in `installers/v5/install.sh` and `installers/install.ps1`.
+ThreatScan v6 is a single Go program. The Python v5 code is archived on the
+[`archive/python-v5`](https://github.com/FaheemRafiq/threatscan/tree/archive/python-v5) branch.
 
 ---
 
@@ -92,8 +93,8 @@ sudo threatscan protect --block-c2   # firewall + hosts sinkhole for all known C
 threatscan uninstall [--unblock] [--purge]
 ```
 
-Legacy invocation still works: `python3 threat_scanner.py --ci .` behaves like v4 (`--configs-only` restores
-the v4 "known config names only" scope; v5 scans every script file by default).
+`threatscan [dirs]` is short for `threatscan scan [dirs]`. Every script file is scanned by default;
+`--configs-only` restores the v4 "known config names only" scope.
 
 ### Exit codes
 
@@ -255,33 +256,44 @@ The full checklist is in [`analysis/remediation-checklist.md`](analysis/remediat
 
 ## Development
 
+Go 1.24 (kept at 1.24 so the binaries run on macOS 11, Windows 10 and older Linux kernels):
+
 ```sh
 git clone https://github.com/FaheemRafiq/threatscan && cd threatscan
-python3 -m venv .venv && . .venv/bin/activate
-pip install -e ".[dev]" && pytest -q
-sh installers/build-pyz.sh                 # dist/threatscan.pyz
-THREATSCAN_HOME=/tmp/ts threatscan guard --once --dry-run --verbose
+export GOTOOLCHAIN=go1.24.13
+go test -race ./...
+for os in linux windows darwin; do GOOS=$os go vet ./...; done
+go build -o threatscan ./cmd/threatscan
+THREATSCAN_HOME=/tmp/ts ./threatscan guard --once --dry-run --verbose
+scripts/release.sh v0.0.0-dev dist          # every release asset, as CI builds them
 ```
 
 Layout:
 
 ```
-threatscan/
-  iocs.json          all indicators (data only, hot-updatable)
-  iocs.py            loader + validation
-  scanner/repo.py    repository checks          scanner/system.py   host checks
-  protect.py         kill / quarantine / strip / persistence removal / firewall
-  guard.py           background loop + policy   realtime.py         inotify / kqueue / RDCW watcher
-  prompt.py          native dialogs, threat names service.py         systemd / launchd / schtasks
-  hardening.py       editor + npm settings      notify.py           desktop + webhook
-  cli.py             commands                   report.py, config.py, updater.py
-installers/          install.sh (v6), windows/ (Inno Setup), macos/ (pkg), linux/ (nfpm), v5/, install.ps1, build-pyz.sh
-falco/               Linux runtime rules + response handler
-analysis/            sandbox, deobfuscator, YARA, sample notes (do not run samples)
-tests/               inert fixtures that mimic the artefacts' shape
+cmd/threatscan/        commands (scan, guard, status, history, install, update, ...)
+threatscan/iocs.json   all indicators (data only, hot-updatable; embedded into the binary)
+internal/
+  iocs/                loader + validation          scan/        repository and host checks
+  protect/             kill / quarantine / strip / persistence removal / firewall
+  guard/               background loop + policy     realtime/    inotify / kqueue / RDCW watcher
+  prompt/              native dialogs, threat names  service/     systemd / launchd / Task Scheduler
+  harden/              editor + npm settings         notify/      desktop + webhook
+  update/              indicator + signed program updates, rollback
+  config/, report/, ui/, platform/, helpers/, findings/, testfixtures/
+installers/            install.sh, windows/ (Inno Setup), macos/ (pkg), linux/ (nfpm)
+scripts/               release.sh, sign/, keygen/, fixtures/
+falco/                 Linux runtime rules + response handler
+analysis/              sandbox, deobfuscator, YARA, sample notes (do not run samples)
+docs/                  download page (GitHub Pages), Go port handoff notes
 ```
 
-Tests never touch `~/.threatscan`; they run under a temporary `THREATSCAN_HOME`.
+Tests never touch `~/.threatscan`; they run under a temporary `THREATSCAN_HOME`, and the malware
+fixtures are inert files that only mimic the artefacts' shape.
+
+Releases: push a tag `vX.Y.Z` (a hyphen, as in `v6.1.0-rc1`, makes a pre-release). The Release workflow
+builds every asset, installs it on Windows, macOS and Linux until the guard reports alive, then publishes
+with a signed `checksums.txt`. Installed copies pick the release up within 6 hours.
 
 ---
 

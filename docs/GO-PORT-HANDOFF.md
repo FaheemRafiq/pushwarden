@@ -45,8 +45,8 @@ file is the plan.
 | `internal/service` | `service.py` | P4: `Manager` with `Preview`, `PlaceBinary`, `Install`, `Uninstall`, `Status`, `LinkCLI`/`UnlinkCLI`; Windows PATH edits in `path_windows.go` |
 | `cmd/threatscan` | `cli.py` | scan, guard, status, history, restore, harden, protect, config, check-staged, version, install, uninstall |
 
-Tests: `GOTOOLCHAIN=go1.24.13 go test -race ./...` passes. Python tests
-(`pytest -q`, 24 cases) still pass and must keep passing.
+Tests: `GOTOOLCHAIN=go1.24.13 go test -race ./...` passes. The Python v5 code and
+its tests now live only on the `archive/python-v5` branch (see P8).
 
 ## Extension points you plug into (do not restructure them)
 
@@ -143,7 +143,7 @@ real `install` on a Linux box shows `Guard: alive` in `threatscan status`.
   already a default skip dir and would pass without `Exclude`.
 - `testfixtures.Build(dir)` writes the fixtures without a `testing.TB`;
   `go run ./scripts/fixtures DIR` exposes it to scripts.
-- `scripts/parity.sh [DIR ...]`: fixtures match exactly. `~/Coding` on the
+- `scripts/parity.sh [DIR ...]` (removed with the Python code; see commit `7d947b5`): fixtures match exactly. `~/Coding` on the
   author's machine: 20 common findings, one known difference (below).
 - CI: `go` job (ubuntu, macos-latest, macos-13, windows-latest) and `go-fedora`
   (latest, 42). The go job also smoke-tests a real `install --unattended` until
@@ -268,8 +268,8 @@ Files: `scripts/release.sh`, `installers/linux/{nfpm.yaml,postinstall.sh}`,
 `installers/windows/threatscan.iss`, `installers/macos/{build-pkg.sh,distribution.xml,scripts/postinstall}`,
 `installers/install.sh` (v6; the v5 one moved to `installers/v5/install.sh`),
 `docs/index.html`, `.github/workflows/release.yml` (Go, tags `v6+`) and
-`release-v5.yml` (the old PyInstaller workflow, now only for `v5.*` tags so P8's
-v5.2 can still ship).
+`release-v5.yml` (since removed from `main` with the Python code; the old
+PyInstaller `release.yml` is on `archive/python-v5`).
 
 Verified locally: `release.sh v6.0.0-rc1` builds all six binaries and four
 packages (rpm version `6.0.0~rc1`); `install.sh` installs from a `file://`
@@ -331,16 +331,36 @@ Smoke tests in CI: `ThreatScan-Setup.exe /VERYSILENT` on windows-latest,
 `install.sh` in the Fedora container; each must end with `threatscan status`
 showing `Guard: alive`.
 
-## P8. v5.2 migration (Python)
+## P8. v5.2 migration (Python) -- on the `archive/python-v5` branch
 
-In `threatscan/guard.py`, extend `maybe_update_iocs` (daily) to also check the
-releases API for a stable `v6.*`; download the Go binary for this OS/arch,
-verify SHA-256 against `checksums.txt` (and the ed25519 signature: use the
-same public key, `cryptography` is not a dependency, so ship a tiny pure-Python
-ed25519 verify or skip signature and rely on HTTPS + hash for this one-time
-step, documented), run it with `install --unattended`, then call
-`ServiceManager.uninstall()` and exit. Release as v5.2. Wait for the rc to be
-confirmed, then tag `v6.0.0`.
+Status 2026-09-28: v6.0.0 is released and `main` is the Go code. The Python v5
+package was removed from `main` and lives on `archive/python-v5` (the last
+v5 commit, `b0988c6`). `threatscan/iocs.json` stays on `main` at the same path
+because v5 guards in the field download indicator updates from
+`main/threatscan/iocs.json`; keep that file there as long as v5 installs exist.
+
+Do P8 on `archive/python-v5` and tag `v5.2.0` from that branch (a tag runs the
+workflow files of the commit it points at, i.e. the old PyInstaller
+`release.yml` on that branch).
+
+**Two corrections to the original plan below:**
+1. **Do not call `ServiceManager.uninstall()` after running v6.** v6 registers
+   the same unit, LaunchAgent and task names as v5, so `install --unattended`
+   already replaces the v5 service in place (and restarts it, which stops the
+   v5 guard). Uninstalling afterwards would remove the v6 service. The v5.2
+   guard should run v6's `install --unattended` and then just exit.
+2. **Publish v5.2.0 with `make_latest: false`** (softprops/action-gh-release
+   input). If v5.2.0 becomes the "latest" release, every
+   `releases/latest/download/...` link (download page, install.sh, Setup.exe,
+   the reusable scan workflow) points at v5 assets and breaks.
+
+Original plan: in `threatscan/guard.py`, extend `maybe_update_iocs` (daily) to
+also check the releases API for a stable `v6.*`; download the Go binary for this
+OS/arch, verify SHA-256 against `checksums.txt` (and the ed25519 signature: use
+the same public key, `cryptography` is not a dependency, so ship a tiny
+pure-Python ed25519 verify or skip signature and rely on HTTPS + hash for this
+one-time step, documented), run it with `install --unattended`, then ~~call
+`ServiceManager.uninstall()` and~~ exit. Release as v5.2.
 
 ## Pitfalls already met
 
