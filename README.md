@@ -21,7 +21,7 @@ September 2026. Sources are listed at the bottom.
 
 ---
 
-## Install (colleagues start here)
+## Install
 
 **Linux / macOS**
 
