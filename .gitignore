@@ -18,3 +18,8 @@ venv/
 *.bak
 analysis/samples/*.js
 analysis/output/
+
+# Go build output
+/threatscan-*
+/cmd/threatscan/threatscan
+*.exe
