@@ -11,3 +11,8 @@ build/
 venv/
 
 
+
+# threatscan runtime data
+.threatscan/
+*.pyz
+*.bak

@@ -1,0 +1,287 @@
+{
+  "schema": 1,
+  "version": "2026.09.28",
+  "updated": "2026-09-28",
+  "sources": [
+    "https://github.com/OpenSourceMalware/PolinRider",
+    "https://opensourcemalware.com/blog/polinrider-is-a-b-testing-its-way-past-your-detections",
+    "https://opensourcemalware.com/blog/developer-guide-getting-over-polinrider",
+    "https://github.com/orgs/community/discussions/188732",
+    "https://socprime.com/active-threats/dprk-polinrider-campaign-shows-hands-on-keyboard-supply-chain-activity/",
+    "https://research.jfrog.com/post/hijacked-npm-vscode-tasks-blockchain/",
+    "https://socket.dev/blog/joyfill-npm-beta-releases-compromised",
+    "https://thehackernews.com/2026/07/north-korean-hackers-publish-108.html"
+  ],
+
+  "literal_signatures": [
+    "(\"rmcej%otb%\",2857687)",
+    "global['!']='8-270-2';var $_1e42=",
+    "global['!']='4-1928'",
+    "global['_V']='A4-1928'",
+    "global['!']='10-83-10'",
+    "global['!']='A10-010'",
+    "global['!']='A10-2340'",
+    "Cot%3t=shtP",
+    "global['_V']='A8-4032-1'",
+    "global['_t_s']=",
+    "global['_t_u']=",
+    "/verify-human/",
+    "/0x/clb",
+    "/0x/cb",
+    "/0x/cls",
+    "/0x/ls",
+    "/$/boot",
+    "'Sec-V'",
+    "\"Sec-V\"",
+    "X-Payload-B64",
+    "/*RS260605*/",
+    "C260521A",
+    "e9b53a7c-2342-4b15-b02d-bd8b8f6a03f9"
+  ],
+
+  "xor_keys": [
+    "2[gWfGj;<:-93Z^C",
+    "ThZG+0jfXE6VAGOJ",
+    "q4FZkxX{!h,Sr3=@",
+    "m6:tTh^D)cBz?NM]"
+  ],
+
+  "marker_regexes": [
+    "global\\[['\"]![ '\"]\\]\\s*=\\s*['\"][A-Za-z0-9*-]{3,}['\"]",
+    "global\\[['\"]_V['\"]\\]\\s*=\\s*['\"][A-Za-z0-9*-]{3,}['\"]",
+    "global(?:\\.i|\\[['\"]i['\"]\\])\\s*=\\s*['\"]A\\d+-\\*?\\d+['\"]",
+    "global\\.r\\s*=\\s*require\\b",
+    "_\\$_1e42",
+    "\\bMDy\\s*\\(",
+    "global\\[['\"]r['\"]\\]\\s*=\\s*require",
+    "global\\[['\"]_t_[su]['\"]\\]",
+    "global\\[['\"]_H2?['\"]\\]\\s*=",
+    "atob\\s*\\(\\s*process\\.env",
+    "eval\\s*\\(\\s*atob",
+    "['\"]Sec-V['\"]\\s*:",
+    "Sec-V['\"]\\s*,",
+    "await\\s+eval\\s*\\(",
+    "Function\\s*\\(\\s*['\"]retur['\"]\\s*\\+",
+    "require\\s*\\(\\s*['\"]child['\"]\\s*\\+\\s*['\"]_proc['\"]",
+    "process\\.env\\.AUTH_API_KEY"
+  ],
+
+  "history_payload_regex": "global(\\.i|\\[.i.\\]) ?= ?.A[0-9]+-\\*?[0-9]+|global\\[.(!|_V).\\] ?= ?.A?[0-9a-z]+-|_\\$_1e42|Cot%3t=shtP|rmcej%otb%|node \\./[^ )]+\\.(woff2?|ttf|otf|eot|png|jpe?g|gif|ico|dict)",
+
+  "blockchain_rpc_hosts": [
+    "api.trongrid.io",
+    "fullnode.mainnet.aptoslabs.com",
+    "bsc-dataseed.binance.org",
+    "bsc-rpc.publicnode.com",
+    "ethereum-rpc.publicnode.com",
+    "rpc.ankr.com/eth",
+    "eth.drpc.org",
+    "1rpc.io/eth"
+  ],
+
+  "wallets": [
+    "TMfKQEd7TJJa5xNZJZ2Lep838vrzrs7mAP",
+    "TXfxHUet9pJVU1BgVkBAbrES4YUc1nGzcG",
+    "TA48dct6rFW8BXsiLAtjFaVFoSuryMjD3v",
+    "TCqf6ZkaQD84vYsC2cuu1jRwB6JveTaRrF",
+    "0xbe037400670fbf1c32364f762975908dc43eeb38759263e7dfcdabc76380811e",
+    "0x3f0e5781d0855fb460661ac63257376db1941b2bb522499e4757ecb3ebd5dce3",
+    "0x533b2dbcaeff19cd1f799234a27b578d713d8fcaa341b7501e4526106483e0b1",
+    "0xa322e5f3d311d3080e6f0121063e9adc2490ef1a"
+  ],
+
+  "malicious_ips": [
+    "166.88.134.62", "23.27.13.43", "23.27.13.135", "198.105.127.210", "23.27.202.27",
+    "193.247.144.38", "194.11.226.41",
+    "166.88.54.158", "154.91.0.103", "136.0.9.8", "166.88.4.2",
+    "23.27.120.142", "202.155.8.173", "166.88.134.82", "188.43.33.249",
+    "181.214.149.148", "150.251.113.223"
+  ],
+
+  "malicious_hosts": [
+    "default-configuration.vercel.app",
+    "260120.vercel.app",
+    "vscode-settings-bootstrap.vercel.app",
+    "vscode-settings-config.vercel.app",
+    "vscode-bootstrapper.vercel.app",
+    "vscode-load-config.vercel.app",
+    "auth-confirm-lemon-alpha.vercel.app",
+    "dns.catbox.moe"
+  ],
+
+  "c2_url_paths": [
+    "/$/boot", "/verify-human/", "/snv", "/u/e", "/u/f",
+    "/d/python.zip", "/d/python.7z", "/d/7zr.exe",
+    "/0x/clb", "/0x/cb", "/0x/js", "/0x/cls", "/0x/ls",
+    "/api/telemetry/poll-command",
+    "/api/telemetry/report",
+    "/api/telemetry/command-result",
+    "/api/telemetry/upload-download",
+    "/settings/mac?flag=", "/settings/linux?flag=", "/settings/win?flag="
+  ],
+
+  "telegram_indicators": ["7870147428:AAGbYG", "7699029999"],
+
+  "fake_font_sha256": [
+    "53abf37710d6f2e35694fbe7cfaf1108127cbc001ce3e6bf994d0486cae5a0e8",
+    "13e9a3c41e038bf9d8fcb0831305819819e4f7f4452bc20a04b9bf2756ee22e8",
+    "3287f2de563bd76465d353bd22b4d07c2af1cda9dd45efcb0da49e3ca49f7639",
+    "c98f2703db7e8b73b296e686cc8dee89d1b1643a90c3e89ef90b6a75805421aa",
+    "9e286f7a54f071e5a4e9f09de84abca872d8347cbb7059c966c7db54a7e4dcba",
+    "1a21bad1df69b51efebfd2fae849ac27722b0dfac7b1cb459cf81d38b36f9705"
+  ],
+  "fake_font_names": [
+    "fa-solid-400.woff2", "fa-solid-400.woff", "fa-regular-400.woff2",
+    "fa-solid-500.woff2", "fa-solid-900.woff2", "fa-brands-400.woff2",
+    "spellright.dict"
+  ],
+
+  "config_files": [
+    "postcss.config.mjs", "postcss.config.js", "postcss.config.cjs", "postcss.config.ts",
+    "tailwind.config.js", "tailwind.config.mjs", "tailwind.config.ts", "tailwind.config.cjs",
+    "eslint.config.mjs", "eslint.config.js", "eslint.config.cjs", "eslint.config.ts",
+    "next.config.mjs", "next.config.js", "next.config.ts",
+    "vue.config.js", "vue.config.mjs",
+    "astro.config.mjs", "astro.config.js", "astro.config.ts",
+    "babel.config.js", "babel.config.mjs", "babel.config.cjs",
+    "jest.config.js", "jest.config.mjs", "jest.config.ts",
+    "vite.config.js", "vite.config.mjs", "vite.config.ts",
+    "vitest.config.ts", "vitest.config.js",
+    "webpack.config.js", "webpack.config.mjs",
+    "svelte.config.js",
+    "nuxt.config.js", "nuxt.config.ts",
+    "prettier.config.js", "prettier.config.mjs",
+    "rollup.config.js", "rollup.config.mjs",
+    "tsup.config.ts", "drizzle.config.ts", "prisma.config.ts",
+    "gridsome.config.js", "truffle.js", "truffle-config.js",
+    "hardhat.config.js", "hardhat.config.ts",
+    "App.js", "app.js"
+  ],
+
+  "entry_files": [
+    "main.ts", "main.js", "index.ts", "index.js", "app.ts", "app.js",
+    "server.ts", "server.js", "src/main.ts", "src/main.js", "src/index.ts",
+    "src/index.js", "src/app.ts", "src/app.js", "src/server.ts", "src/server.js",
+    "src/main.tsx", "src/index.tsx", "src/App.tsx", "app/layout.tsx"
+  ],
+
+  "propagation_scripts": [
+    "temp_auto_push.bat", "temp_interactive_push.bat",
+    "config.bat", "auto_push.bat", "temp_auto_push.sh", "auto_push.sh"
+  ],
+  "gitignore_iocs": [".gitignore", "branch_structure.json", "nul"],
+
+  "compromised_npm": {
+    "html-to-gutenberg": ["4.2.11"],
+    "fetch-page-assets": ["1.2.9"],
+    "@joyfill/components": ["4.0.0-rc24-2773-beta.4"],
+    "@joyfill/layouts": ["0.1.2-2773.beta.0"],
+    "runtimedev-link": ["*"],
+    "tailwindcss-style-animate": ["*"],
+    "tailwind-mainanimation": ["*"],
+    "tailwind-autoanimation": ["*"],
+    "tailwind-animationbased": ["*"],
+    "tailwindcss-typography-style": ["*"],
+    "tailwindcss-style-modify": ["*"],
+    "tailwindcss-animate-style": ["*"]
+  },
+  "compromised_go": [
+    "github.com/Barsu5489/commerce",
+    "github.com/Setsu548/Logistic",
+    "github.com/amantsehay/a2sv-go-course",
+    "github.com/anatoli-derese/a2sv-excercise",
+    "github.com/bm-197/chill",
+    "github.com/dexbotsdev/uniswap-v2-v3-arbitrage",
+    "github.com/glacialspring/go-winsparkle",
+    "github.com/glacialspring/static",
+    "github.com/hngi/Team-Fierce-Backend-Golang",
+    "github.com/lambda-platform/dan",
+    "github.com/lambda-platform/ebarimt-rest-api",
+    "github.com/lambda-platform/lambda",
+    "github.com/naol7/dist-task-scheduler",
+    "github.com/reauheau/goaubio",
+    "github.com/rickt/slack-weather-bot",
+    "github.com/zainirfan13/graphql-client"
+  ],
+  "compromised_packagist": ["roberts/leads"],
+
+  "rat_dir_names": ["VSCodeUpdater", "vscode-updater", "VSCode-Updater", "runtimedev-link", "runtimedev", "MicrosoftCLROptimization"],
+  "rat_service_names": ["runtimedev-link", "com.runtimedev.link", "MicrosoftCLROptimization"],
+  "rat_env_keys": ["SSTAR_API_BASE", "SSTAR_DEPLOYMENT_HASH", "NODE_LINK_API_BASE", "NODE_LINK_HASH"],
+  "rat_files": ["SvcHostUpdate.py", "tg14xq.js", "agent.env"],
+
+  "process_regexes": [
+    "global\\[['\"]_V['\"]\\]",
+    "global\\[['\"]!['\"]\\]",
+    "global\\[['\"]_t_[su]['\"]\\]",
+    "_\\$_1e42",
+    "\\bMDy\\s*\\(",
+    "Cot%3t=shtP",
+    "rmcej%otb%",
+    "Sec-V",
+    "X-Payload-B64",
+    "/verify-human/",
+    "/0x/c(l)?b",
+    "/0x/c?ls\\b",
+    "/\\$/boot",
+    "node\\s+-e\\s+.*eval\\(atob",
+    "node\\s+-e\\s+.*await\\s+eval",
+    "python[3]?\\s+-c\\s+.*(exec|eval)\\(",
+    "python[3]?\\s+-c\\s+.*base64",
+    "VSCodeUpdater",
+    "runtimedev-link",
+    "SvcHostUpdate\\.py",
+    "MicrosoftCLROptimization",
+    "--token\\s+https?://[^\\s]+\\|",
+    "font[-_]?updater",
+    "\\.cache/font",
+    "fa-solid-[4589]00\\.woff2",
+    "spellright\\.dict",
+    "global\\.i\\s*=\\s*['\"]A\\d+-\\*",
+    "\\bnode\\s+\\S+\\.(woff2?|ttf|otf|eot|png|jpe?g|gif|ico|dict)\\b",
+    "/tmp/\\.[a-z]",
+    "\\.vercel\\.app/settings/(mac|linux|win)"
+  ],
+  "process_kill_regexes": [
+    "global\\[['\"]_V['\"]\\]\\s*=",
+    "global\\[['\"]!['\"]\\]\\s*=",
+    "global\\[['\"]_t_[su]['\"]\\]",
+    "_\\$_1e42",
+    "Cot%3t=shtP",
+    "rmcej%otb%",
+    "/verify-human/",
+    "/0x/c(l)?b",
+    "/\\$/boot",
+    "X-Payload-B64",
+    "VSCodeUpdater",
+    "runtimedev-link",
+    "SvcHostUpdate\\.py",
+    "MicrosoftCLROptimization",
+    "\\bnode\\s+\\S*fa-solid-[4589]00\\.woff2?\\b",
+    "\\bnode\\s+\\S*spellright\\.dict\\b",
+    "\\.vercel\\.app/settings/(mac|linux|win)\\?flag="
+  ],
+
+  "shell_regexes": [
+    "curl\\s+[^|\\n]*\\|\\s*(bash|sh|python[3]?)",
+    "wget\\s+[^|\\n]*\\|\\s*(bash|sh|python[3]?)",
+    "eval\\s*\\(\\s*base64",
+    "eval\\s*\\(\\s*atob",
+    "python[3]?\\s+-c\\s+.*import\\s+socket",
+    "node\\s+-e\\s+.*child_process",
+    "global\\[['\"]!['\"]\\]",
+    "global\\[['\"]_V['\"]\\]",
+    "VSCodeUpdater|runtimedev-link|SvcHostUpdate"
+  ],
+
+  "scheduled_task_keywords": [
+    "runtimedev", "vscodeupdater", "microsoftclroptimization", "svchostupdate",
+    "font", "cache", "updater", "temp", ".tmp",
+    "node -e", "python -c", "wscript", "//B", "curl", "wget"
+  ],
+  "scheduled_task_critical": ["runtimedev", "vscodeupdater", "microsoftclroptimization", "svchostupdate", "node -e", "python -c"],
+
+  "ci_evasion_hostnames": ["github-runner", "buildbot", "buildkitsandbox", "microsoft-standard-WSL2"],
+
+  "tasks_json_loader_keywords": ["woff2", "woff", ".dict", "node -e", "curl", "wget", "powershell", "cmd /c", ".bat", "vercel.app", "flag="]
+}

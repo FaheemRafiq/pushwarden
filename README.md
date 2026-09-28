@@ -1,449 +1,256 @@
-# ThreatScan v4.1
+# ThreatScan v5
 
-**PolinRider / Contagious Interview Malware Detector**
+**Detect, remove and block the PolinRider / Contagious Interview supply-chain malware on developer machines.**
+Linux, macOS and Windows. One install command. Keeps watching in the background.
 
-Cross-platform (Linux / macOS / Windows) scanner for the **Lazarus Group (DPRK)** supply-chain campaign tracked as **PolinRider** and **Contagious Interview**. Detects obfuscated JavaScript payloads injected into framework config files, blockchain dead-drop loaders, git history rewriting, RAT persistence, compromised dependencies, and active C2 connections.
+PolinRider is the DPRK (Lazarus) campaign that hides obfuscated JavaScript loaders in framework config files
+(`postcss.config.mjs`, `eslint.config.mjs`, `next.config.js` ...), fake font files (`fa-solid-400/500/900.woff2`)
+and `.vscode/tasks.json` autorun tasks, then steals credentials, rewrites git history and force-pushes the
+backdoor to every branch you can reach. Over 2,000 GitHub owners and 4,000 repos were hit between March and
+September 2026. Sources are listed at the bottom.
 
-**Current as of: September 2026** — includes rotated signatures (March → July), live samples from production infections, and all indicators documented by OpenSourceMalware.com, JFrog, Socket, Nextron, and Checkmarx.
-
----
-
-## What It Detects
-
-### Repository Indicators
-
-| Indicator | Description | Severity |
-|-----------|-------------|----------|
-| `global['_V']='A#-####'` | Campaign obfuscation marker | **CRITICAL** |
-| `global['!']='#-####'` | Alternate marker family | **CRITICAL** |
-| `global.i='A10-*050'` / `global.r=require` | Dot-notation marker family (Sept 2026 rotation) | **CRITICAL** |
-| `_$_1e42` / `MDy(` | Decoder function names (March + July rotations) | **CRITICAL** |
-| `Cot%3t=shtP` | Rotated code signature (July 2026+) | **CRITICAL** |
-| Hidden payloads | Malicious code after ~280 spaces on export lines | **HIGH** |
-| `temp_auto_push.bat` | Git history rewriter + force-pusher | **CRITICAL** |
-| `.gitignore` hiding `.bat`, itself, `branch_structure.json`, `nul` | Config tampering evidence | **HIGH** |
-| `.vscode/tasks.json` `folderOpen` | VS Code stage-1 autorun (bypasses npm v12 lifecycle script protections) | **CRITICAL** |
-| `fa-solid-400.woff2` / `fa-solid-500.woff2` | Fake font loader (SHA-256 verified against 18 confirmed cases + 3 Sept 2026 samples) | **CRITICAL** |
-| Disguised assets | Font/image file (`.woff2`, `.ttf`, `.eot`, `.png`, `.jpg`, …) whose content is JS/HTML instead of its magic bytes — including payloads padded with leading whitespace | **CRITICAL** |
-| `.vscode/settings.json` `task.allowAutomaticTasks` | Suppresses VS Code's automatic-task prompt so the `folderOpen` task runs silently | **HIGH** |
-| Payload commits in history | Commits on any branch that add/remove loader code — often under decoy messages like `rm malware` | **WARNING** |
-| Forged committer dates | Git commits with `%ct < %at - 7 days` (timestamp forgery detection) | **HIGH** |
-| XOR keys | `2[gWfGj;<:-93Z^C`, `ThZG+0jfXE6VAGOJ`, `q4FZkxX{!h,Sr3=@` | **CRITICAL** |
-| Blockchain RPC refs | `api.trongrid.io`, `fullnode.mainnet.aptoslabs.com`, `bsc-dataseed.binance.org` **+ campaign marker** | **CRITICAL** |
-| TRON wallets | `TMfKQEd7TJJa5xNZJZ2Lep838vrzrs7mAP`, `TXfxHUet9pJVU1BgVkBAbrES4YUc1nGzcG`, `TA48dct6rFW8...` | **CRITICAL** |
-| C2 IPs & paths | 14 C2 servers, 15 URL paths including `/$/boot`, `/verify-human/`, `/api/telemetry/*` | **CRITICAL** |
-| Telegram exfil | Bot token `7870147428:AAGbYG...`, chat ID `7699029999` | **CRITICAL** |
-
-### Package Indicators
-
-| Type | Details | Severity |
-|------|---------|----------|
-| npm compromised | `html-to-gutenberg@4.2.11`, `fetch-page-assets@1.2.9`, `@joyfill/*` | **CRITICAL** |
-| Go modules | 16 poisoned modules (bm-197/chill, lambda-platform/*, etc.) | **CRITICAL** |
-| Packagist | `roberts/leads` (shares C2 23.27.202.27) | **CRITICAL** |
-| Lifecycle scripts | `preinstall`/`postinstall`/`prepare` with `node -e`, `curl\|bash`, `.woff2` refs | **HIGH** |
-
-### System Indicators
-
-| Check | What It Looks For | Severity |
-|-------|-------------------|----------|
-| **Live processes** | `global['_V']`, `/verify-human/`, `/0x/clb`, `Sec-V`, runtimedev-link markers in cmdlines | **CRITICAL** |
-| **Network C2** | Connections to 14 known malicious IPs (193.247.144.38, 194.11.226.41, etc.) | **CRITICAL** |
-| **RAT footprint** | Directories: `VSCodeUpdater`, `runtimedev-link`; files: `agent.env`, `tg14xq.js`, `*.log` | **CRITICAL** |
-| **Cron/Scheduling** | PolinRider keywords in crontab, `/etc/cron.d`, Windows schtasks | **CRITICAL** / **HIGH** |
-| **Systemd (Linux)** | `~/.config/systemd/user/*.service` with `runtimedev-link`, `VSCodeUpdater`, `node -e` | **CRITICAL** |
-| **XDG Autostart (Linux)** | `~/.config/autostart/*.desktop` with malware indicators | **CRITICAL** |
-| **Launchd (macOS)** | `~/Library/LaunchAgents/*.plist` with rat names or env vars | **CRITICAL** |
-| **Shell startup** | `.bashrc`, `.zshrc`, `.profile` with `curl\|bash`, `eval(atob)`, malware markers | **HIGH** |
-| **Credentials exposed** | `.npmrc`, `.git-credentials`, `.netrc`, `~/.ssh/`, `gh/hosts.yml` present on infected host | **WARNING** (HIGH if infected) |
-| **SSH keys** | Multiple private keys indicate widespread compromise | **WARNING** |
-| **Editor injection** | Payloads in VS Code, Cursor, Discord, GitHub Desktop extension dirs or global npm | **CRITICAL** |
-| **/etc/hosts tampering** | Redirects to npm, GitHub, PyPI registries | **HIGH** |
-| **Portable Python (Windows)** | `%LOCALAPPDATA%\Programs\Python\Python3127\` (stage-4 OmniStealer runtime) | **HIGH** |
-
----
-
-## Installation
-
-```bash
-# Download the scanner
-curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/threat_scanner.py -o threat_scanner.py
-chmod +x threat_scanner.py
-
-# Python 3.8+ required
-python3 --version
+```
+                  ┌────────────────────────────────────────────────────────┐
+  threatscan      │  scan     one-off audit of repos + host (read-only)     │
+                  │  guard    background service: 60 s / 6 h / 24 h passes  │
+                  │  protect  kill, quarantine, strip payloads, block C2    │
+                  │  harden   VS Code / Cursor / npm settings that stop     │
+                  │           stage 1 from ever running                     │
+                  └────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Local Usage
+## Install (colleagues start here)
 
-### Basic Scan (Current Directory)
-```bash
-python3 threat_scanner.py
+**Linux / macOS**
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/installers/install.sh | sh
 ```
 
-### Scan Specific Directory
-```bash
-python3 threat_scanner.py /path/to/projects
-python3 threat_scanner.py ~/Documents ~/code
+**Windows** (PowerShell, no admin needed)
+
+```powershell
+irm https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/installers/install.ps1 | iex
 ```
 
-### Common Scenarios
+The installer
 
-**Scan home directory + auto-discover project folders:**
-```bash
-python3 threat_scanner.py --home
-# Automatically scans: ~/projects, ~/dev, ~/code, ~/work, ~/Developer, etc.
+1. finds or installs Python 3.8+ (winget / brew / apt / dnf),
+2. installs the package into its own virtualenv under `~/.threatscan/venv` and puts `threatscan` on your PATH,
+3. hardens every VS Code-family editor it finds (`task.allowAutomaticTasks = off`, workspace trust on),
+4. registers the background guard as a **user** service (systemd `--user`, LaunchAgent, or a Scheduled Task),
+5. runs a first full scan and cleans anything CRITICAL it finds (originals go to quarantine).
+
+Optional environment variables for the one-liners:
+
+| Variable | Effect |
+|---|---|
+| `THREATSCAN_WEBHOOK=https://hooks.slack.com/...` | send alerts from this machine to a Slack/Discord/Teams/custom webhook |
+| `THREATSCAN_ROOTS="~/code ~/work"` (`;`-separated on Windows) | which project directories to watch (default: auto-discover) |
+| `THREATSCAN_BLOCK_C2=1` | also add firewall rules for the C2 IPs (asks for sudo / needs elevated PowerShell) |
+| `THREATSCAN_NO_INSTALL=1` | install the CLI only, no guard |
+
+No Python and no admin? Download the single-file binary for your OS from the
+[Releases](https://github.com/FaheemRafiq/threatscan/releases) page and run `threatscan install`.
+There is also `threatscan.pyz`, a zero-dependency file that runs with any `python3`.
+
+---
+
+## Day-to-day
+
+```sh
+threatscan status                 # guard alive? last sweep? editors hardened? firewall?
+threatscan scan --home            # audit now (read-only)
+threatscan scan --home --fix      # audit and remove CRITICAL findings (originals kept)
+threatscan scan --dry-run ~/proj  # show what --fix would do
+threatscan restore --list         # everything the guard quarantined or stripped
+threatscan restore /path/to/file  # put an original back (it is still malicious!)
+threatscan update-iocs            # pull the latest indicator file
+sudo threatscan protect --block-c2   # firewall + hosts sinkhole for all known C2
+threatscan uninstall [--unblock] [--purge]
 ```
 
-**Verbose output (see every repo scanned, including clean ones):**
-```bash
-python3 threat_scanner.py --verbose ~/projects
+Legacy invocation still works: `python3 threat_scanner.py --ci .` behaves like v4.
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| 0 | clean |
+| 1 | HIGH or CRITICAL findings |
+| 2 | error / nothing scanned |
+
+---
+
+## What the guard does
+
+| Cadence | Work | Cost |
+|---|---|---|
+| every 60 s | process command lines, established sockets to C2 IPs, and any tracked file (config files, `.vscode/tasks.json`, propagation scripts, known loader names) whose mtime changed | a few ms |
+| every 6 h | full sweep: every repo under the watched roots plus host persistence, RAT footprint, editor injection, credentials | seconds to a minute |
+| every 24 h | download `iocs.json` from this repo; validated (schema, regex compile, size) before use | one HTTPS request |
+
+Response policy (both switchable with `threatscan config --set auto_kill=false auto_clean=false`):
+
+| Finding | Response |
+|---|---|
+| process whose command line carries a **strict** campaign marker, or a socket to a C2 IP | `kill -9` / `taskkill /F` |
+| config or entry file with a signature / marker / XOR key | payload **stripped by byte offset**, legitimate export kept, original quarantined |
+| font/image/dict file that is really code, hash-matched loader, `temp_auto_push.bat`, `tasks.json` with a loader | quarantined |
+| RAT systemd unit / LaunchAgent / scheduled task / crontab line / RAT directory | disabled and quarantined |
+| HIGH and WARNING findings | alert only |
+
+Everything is written to `~/.threatscan/quarantine/index.jsonl` and reversible with `threatscan restore`.
+Alerts go to the desktop (notify-send / Notification Center / Windows toast), `~/.threatscan/alerts.log`,
+and the webhook if configured. Reports land in `~/.threatscan/reports/`.
+
+Broad heuristics (`node -e`, `python -c`, oversized configs) are **never** auto-killed or auto-cleaned.
+
+---
+
+## What it detects
+
+**Repositories**
+
+| Indicator | Severity |
+|---|---|
+| `global['_V']=`, `global['!']=`, `global.i='A10-*NNN'`, `8-stNN` build tags, `_$_1e42`, `MDy(`, `Cot%3t=shtP`, `rmcej%otb%` | CRITICAL |
+| XOR keys (4 known), TRON / Aptos / Ethereum dead-drop wallets, RPC hosts co-located with a marker | CRITICAL |
+| C2 IPs (17), Vercel stage-1 hosts (7), C2 paths (`/$/boot`, `/verify-human/`, `/0x/cls`, `/api/telemetry/*` ...), `X-Payload-B64` | CRITICAL |
+| Font / image / `.dict` files whose bytes are code (with or without whitespace padding), 6 known loader hashes | CRITICAL |
+| `.vscode/tasks.json` with `runOn: folderOpen` (+ loader / C2 host), `task.allowAutomaticTasks` forced on | CRITICAL / HIGH |
+| `temp_auto_push.bat`, `config.bat`, `.gitignore` hiding them or itself, `branch_structure.json`, `nul` | CRITICAL / HIGH |
+| Malicious git hooks, `core.fsmonitor` running node | CRITICAL |
+| Compromised packages: 12 npm (incl. the `tailwind*` typosquats), 16 Go modules, 1 Packagist; suspicious lifecycle scripts | CRITICAL / HIGH |
+| Backdated commits, force-push reflog, commits touching payload code on any branch | HIGH / WARNING |
+
+**Host**
+
+| Check | Severity |
+|---|---|
+| Live processes with campaign markers, `SvcHostUpdate.py`, `VSCodeUpdater`, `runtimedev-link`, `MicrosoftCLROptimization` | CRITICAL |
+| Sockets to known C2 IPs | CRITICAL |
+| RAT dirs/files, `agent.env`, `SSTAR_*` env vars, portable Node/Python runtimes | CRITICAL / HIGH |
+| cron, systemd `--user`, XDG autostart, LaunchAgents, schtasks, Startup folder, HKCU Run | CRITICAL / HIGH |
+| Shell rc / PowerShell profile injection | HIGH |
+| VS Code / Cursor / VSCodium / Windsurf / Discord / GitHub Desktop injection, backdoored or oversized global `npm/lib/cli.js` | CRITICAL / HIGH |
+| Hosts-file redirects of registries | HIGH |
+| Plain-text tokens (`.npmrc`, `.git-credentials`, gh, aws, docker) and SSH keys on an infected host | HIGH |
+
+All indicators live in [`threatscan/iocs.json`](threatscan/iocs.json). Add new ones there; no code change needed.
+
+---
+
+## Hardening (what actually stops stage 1)
+
+`threatscan harden` (run automatically by `install`) writes into each editor's user `settings.json`:
+
+```json
+"task.allowAutomaticTasks": "off",
+"security.workspace.trust.enabled": true,
+"security.workspace.trust.startupPrompt": "always",
+"security.workspace.trust.untrustedFiles": "prompt"
 ```
 
-**Scan every .js/.ts/.mjs file (not just known config names):**
-```bash
-python3 threat_scanner.py --js-all ~/projects
-# Warning: slower; produces more false positives on unrelated code
-```
+A backup of the previous file is left next to it. Opt-ins:
 
-**Skip system checks (repos only):**
-```bash
-python3 threat_scanner.py --no-repos --ci ~/projects
-# Fast repo-focused scan; no network/process/persistence checks
-```
-
-**Skip repository checks (system-only):**
-```bash
-python3 threat_scanner.py --no-repos
-# Check for active infections, C2 connections, RAT persistence, cron jobs, etc.
-```
-
-**CI / non-interactive mode (no colour, compact output):**
-```bash
-python3 threat_scanner.py --ci ~/projects
-```
-
-**Write JSON report (for parsing/alerting systems):**
-```bash
-python3 threat_scanner.py --json report.json ~/projects
-# Creates: {"version":"4.1", "stats":{...}, "findings":[...]}
-```
-
-### Full Example (Post-Incident Recovery)
-```bash
-# Scan everything on a potentially-infected host
-python3 threat_scanner.py --home --verbose --json incident-report.json
-
-# Exit codes:
-#   0 = clean
-#   1 = HIGH or CRITICAL findings detected
-#   2 = error (bad path, permission denied, etc.)
-
-if [ $? -eq 1 ]; then
-  echo "Infections detected. See incident-report.json for details."
-fi
+```sh
+threatscan harden --npm-ignore-scripts        # ignore-scripts=true in ~/.npmrc (pnpm v10 does this by default)
+threatscan harden --pre-commit ~/code/repo1   # pre-commit hook that refuses PolinRider indicators
 ```
 
 ---
 
-## Output Example
+## Team setup
 
-### Infected Repo
+1. Fork or use this repo. Colleagues run the one-liner above with `THREATSCAN_WEBHOOK` set to a channel you watch.
+2. Every alert arrives as JSON with hostname, platform, findings and the action taken.
+3. When a new variant appears, edit `threatscan/iocs.json`, bump `"version"`, push. Every guard picks it up within 24 h
+   (`threatscan update-iocs` forces it).
+4. Add the reusable GitHub Actions workflow to your repos:
 
-```
-  SCAN SUMMARY
-══════════════════════════════════════════════════════════════════════
-  Platform:                      Linux 6.18.44-fc-v37
-  Duration:                      0.5s
-  Repos scanned:                 1
-  Repos infected:                1
-  Files checked:                 5
-
-  CRITICAL:                      8
-  HIGH:                          3
-  WARNING:                       1
-  INFO:                          0
-
-  Status:                        INFECTIONS DETECTED
-══════════════════════════════════════════════════════════════════════
-
-  ✖ [CRITICAL] PolinRider signature in postcss.config.mjs
-      Path: /home/faheem/projects/web-app/postcss.config.mjs
-      Literal: global['_V']='A8-4032-1';
-      Remove everything after the legitimate config in:
-        /home/faheem/projects/web-app/postcss.config.mjs
-
-  ✖ [CRITICAL] VS Code folderOpen autorun task
-      Path: /home/faheem/projects/web-app/.vscode/tasks.json
-      Delete .vscode/tasks.json unless you wrote it.
-
-  ✖ [CRITICAL] Propagation script: temp_auto_push.bat
-      Path: /home/faheem/projects/web-app/temp_auto_push.bat
-      Delete immediately and audit every branch this repo pushed to.
-```
-
-### Clean Repo
-
-```
-✔ Clean: /home/faheem/projects/documentation
-✔ Clean: /home/faheem/projects/landing-page
-
-  SCAN SUMMARY
-══════════════════════════════════════════════════════════════════════
-  Status:                        CLEAN
-══════════════════════════════════════════════════════════════════════
-```
-
----
-
-## What's New in v4.1
-
-- ✅ **Disguised-asset detection**: fonts *and* images are checked against their magic bytes; leading-whitespace padding no longer hides the JS payload (v4.0 read only the first 64 bytes, so a padded `fa-solid-500.woff2` passed as clean)
-- ✅ New marker family `global.i='A10-*NNN'` and `global.r=require` (dot notation)
-- ✅ 3 new loader SHA-256s and the `fa-solid-500.woff2` filename
-- ✅ `.vscode/settings.json` `task.allowAutomaticTasks` detection
-- ✅ `.gitignore` self-ignore, `branch_structure.json`, `nul` entries
-- ✅ Git history scan (`git log --all -G`) lists commits that touched payload code
-- ✅ Worktrees and submodules (`.git` file) are now detected as repositories
-- ✅ `--no-system` scan that finds no repository exits `2` instead of reporting clean
-
-## What's New in v4.0
-
-### Signatures & IOCs
-- ✅ Rotated signatures: `Cot%3t=shtP`, `MDy(`, `global['_t_s']`, `global['_t_u']`
-- ✅ All 3 XOR keys (March original + July rotation + live Sept 2026 sample)
-- ✅ 14 C2 IPs including your host's attackers (193.247.144.38, 194.11.226.41)
-- ✅ 3 TRON wallets, 3 Aptos addresses, 15 C2 URL paths
-- ✅ Telegram exfiltration bot indicators
-
-### New Detection Modules
-- ✅ **runtimedev-link RAT**: dirs, `agent.env`, systemd `--user`, XDG autostart, launchd, schtasks
-- ✅ **VS Code folderOpen autorun** (`.vscode/tasks.json` stage 1)
-- ✅ **Fake font SHA-256 validation** (OmniStealer loader)
-- ✅ **Git history tampering** (forged committer dates, `%ct < %at`)
-- ✅ **Compromised packages**: 4 npm, 16 Go modules, 1 Packagist package
-- ✅ **Lifecycle script inspection** (`package.json` preinstall/postinstall)
-- ✅ **Credential exposure**: `.npmrc`, `.git-credentials`, `.netrc`, `.ssh/`, gh, docker, aws
-- ✅ **Editor/app injection**: VS Code, Cursor, Discord, GitHub Desktop, global npm CLI
-- ✅ **Linux systemd `--user` units** & XDG autostart
-- ✅ **Windows portable Python** stage-4 detector
-- ✅ **Non-git projects**: scans `package.json`, `go.mod`, `composer.json` even without `.git`
-
-### Usability
-- ✅ `--json` report output (for CI/alerting systems)
-- ✅ `--ci` mode (no colour, compact output)
-- ✅ `--no-repos` / `--no-system` (skip respective scans)
-- ✅ `--home` auto-discovery of project directories
-- ✅ `--js-all` for comprehensive file scanning
-- ✅ Exit codes `0/1/2` compatible with `polinrider-scanner.sh`
-- ✅ Multiple directory arguments
-- ✅ CI-evasion hostname detection (warns if payload would stay dormant)
-
----
-
-## Known False Positives
-
-### Browser Extensions (FIXED in v4.0)
-
-**TronLink, MetaMask, Uniswap, and other legitimate crypto wallet extensions** reference blockchain RPCs (`api.trongrid.io`, `fullnode.mainnet.aptoslabs.com`). The scanner now:
-
-- ✅ Skips browser profile directories entirely during walks
-- ✅ Only flags blockchain refs if co-located with campaign markers, XOR keys, or wallet addresses
-- ✅ Never flags bare `eval()` + RPC hostname without additional indicators
-
-If you see findings in `~/.config/google-chrome/Profile 1/Extensions/`, verify:
-```bash
-# Check if it's from Chrome Web Store
-chrome://extensions → Click the extension → "Offered by Chrome Web Store"
-
-# If yes, it's safe (Google vets these)
-# If no or it's a fork/clone, delete it
-```
-
----
-
-## Incident Response Workflow
-
-### If Infections Are Found
-
-**1. Kill live processes:**
-```bash
-# Find and kill malware
-ps aux | grep -E "global\['_V'\]|/verify-human|runtimedev-link|VSCodeUpdater"
-kill -9 <PID>
-```
-
-**2. Block C2 IPs:**
-```bash
-# Linux
-sudo iptables -A OUTPUT -d 193.247.144.38 -j DROP
-sudo iptables -A OUTPUT -d 194.11.226.41 -j DROP
-sudo iptables-save | sudo tee /etc/iptables/rules.v4
-
-# macOS
-echo "block drop out to 193.247.144.38" | sudo pfctl -f -
-
-# Windows
-netsh advfirewall firewall add rule name="Block PolinRider" dir=out action=block remoteip=193.247.144.38
-```
-
-**3. Remove persistence:**
-```bash
-# Cron
-crontab -e  # Remove entries
-
-# Systemd --user (Linux)
-systemctl --user disable --now runtimedev-link.service
-rm ~/.config/systemd/user/runtimedev-link.service
-
-# XDG Autostart (Linux)
-rm ~/.config/autostart/runtimedev-link.desktop
-
-# Launchd (macOS)
-launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.runtimedev.link.plist
-
-# Scheduled tasks (Windows)
-schtasks /Delete /TN "runtimedev-link" /F
-```
-
-**4. Clean repositories:**
-```bash
-# For each infected repo
-cd /path/to/repo
-git log --all --oneline | head -20  # Find last good commit
-
-# Reset all branches to the good commit (before Sept 8, 2026)
-git reset --hard <good-commit-sha>
-git push origin --all -f  # Force-push clean history
-git push origin --tags -f
-```
-
-**5. Rotate credentials:**
-```
-- GitHub: Settings → Developer Settings → Personal access tokens (revoke all)
-- npm: npm profile set password (or revoke tokens at npmjs.com)
-- SSH: Delete ~/.ssh/id_* and generate new keys
-- Git: Update ~/.git-credentials or use ssh-agent
-- Cloud: Rotate API keys for Vercel, Netlify, AWS, etc.
-- 2FA: Enable hardware-backed 2FA on GitHub and npm
-```
-
-**6. Report:**
-```
-https://opensourcemalware.com/report
-Subject: PolinRider infection
-Include: exit code 1 scan results, any custom IOCs, timelines
-```
-
----
-
-## Exit Codes
-
-| Code | Meaning | Use In CI |
-|------|---------|----------|
-| `0` | No findings, system clean | Success ✓ |
-| `1` | HIGH or CRITICAL findings detected | Fail (block PR/merge) ✗ |
-| `2` | Error (invalid path, permission denied) | Retry/investigate |
-
----
-
-## CI/CD Integration (GitHub Actions)
-
-### Minimal Setup
-
-Add to any repo:
-
-**.github/workflows/malware-scan.yml:**
 ```yaml
+# .github/workflows/malware-scan.yml
 name: Malware Scan
 on: [push, pull_request]
 jobs:
   scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-      - run: |
-          curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/threat_scanner.py -o threat_scanner.py
-          chmod +x threat_scanner.py
-          python3 threat_scanner.py --no-system --ci --json report.json .
-      - name: Upload report
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: threat-scan-report
-          path: report.json
-```
-
-### With Branch Protection
-
-Repo Settings → Branches → Branch Protection Rules:
-```
-☑ Require status checks to pass
-  → Select "Malware Scan"
-☑ Require branches to be up to date
-☑ Require code reviews
-☑ Block automatic merges if malware scan fails
+    uses: FaheemRafiq/threatscan/.github/workflows/malware-scan.yml@main
 ```
 
 ---
 
-## Comparison: Local Scanner vs Falco Runtime Monitor
+## Falco add-on (Linux, optional)
 
-| Feature | `threat_scanner.py` | Falco |
-|---------|:-------------------:|:-----:|
-| Repository scanning | ✅ | ❌ |
-| Point-in-time audit | ✅ | ❌ |
-| Post-incident forensics | ✅ | ❌ |
-| Live process detection | ✅ | ✅ |
-| C2 connection blocking | ⚠️ (reports only) | ✅ (auto-kills) |
-| Continuous monitoring | ❌ | ✅ |
-| Zero-day detection | ❌ | ✅ (heuristic) |
-| CI/CD integration | ✅ | ❌ |
+For kernel-level blocking on Linux workstations and CI runners, `falco/` ships the rule set that runs on the
+author's machines: Tier-1 rules (tagged `kill`) terminate `node -e` payloads with campaign markers, node reading
+`fa-solid-*.woff2`, `temp_auto_push.bat`, curl to the Vercel stage-1 hosts; Tier-2 rules alert on
+`folderOpen` task writes, automated `git commit --amend` / `push --force`, node spawning shells, download pipes.
 
-**Use both:** Falco catches active infections; ThreatScan catches dormant code before it runs.
+```sh
+sudo bash falco/install-falco.sh     # needs Falco + jq installed
+```
 
 ---
 
-## Attribution
+## If something is found
 
-**Campaign:** Lazarus Group (DPRK) — "Contagious Interview" / "PolinRider"  
-**Active:** March 2026 – September 2026+ (ongoing)  
-**Victims:** Developers across npm, Go, PHP, PyPI ecosystems  
-**Entry vectors:** Fake job interviews, lure repos, typosquatted packages  
-**Goals:** Credential theft, source code exfiltration, cryptocurrency wallet compromise, lateral movement
+1. Do not `git pull`; the remote may re-infect you. Clean via the GitHub web editor first.
+2. Kill processes and remove persistence (the guard has already done the CRITICAL ones; check `threatscan status`).
+3. Rotate **everything**: GitHub password, PATs, SSH keys, OAuth apps, npm token, Vercel/Netlify/AWS tokens, every value in `.env`, browser sessions, password-manager vault if it was unlocked.
+4. Audit every repo you can push to for force-pushes ("X force pushed the branch") and unverified commits.
+5. Reinstall Node/npm from nodejs.org if `npm/lib/cli.js` was touched.
+6. Report at https://opensourcemalware.com. Windows Defender names the family `Trojan:JS/PolinRider.DB!MTB`.
 
-**Sources:**
-- https://opensourcemalware.com/blog/polinrider-caused-dozens-of-npm-and-go-compromises (July 2026)
-- https://research.jfrog.com/post/hijacked-npm-vscode-tasks-blockchain/ (June 2026)
-- https://socket.dev/blog/joyfill-npm-beta-releases-compromised (June 2026)
-- https://github.com/OpenSourceMalware/PolinRider (March–September 2026)
+The full checklist is in [`analysis/remediation-checklist.md`](analysis/remediation-checklist.md).
 
 ---
+
+## Development
+
+```sh
+git clone https://github.com/FaheemRafiq/threatscan && cd threatscan
+python3 -m venv .venv && . .venv/bin/activate
+pip install -e ".[dev]" && pytest -q
+sh installers/build-pyz.sh                 # dist/threatscan.pyz
+THREATSCAN_HOME=/tmp/ts threatscan guard --once --dry-run --verbose
+```
+
+Layout:
+
+```
+threatscan/
+  iocs.json          all indicators (data only, hot-updatable)
+  iocs.py            loader + validation
+  scanner/repo.py    repository checks          scanner/system.py   host checks
+  protect.py         kill / quarantine / strip / persistence removal / firewall
+  guard.py           background loop            service.py          systemd / launchd / schtasks
+  hardening.py       editor + npm settings      notify.py           desktop + webhook
+  cli.py             commands                   report.py, config.py, updater.py
+installers/          install.sh, install.ps1, build-pyz.sh
+falco/               Linux runtime rules + response handler
+analysis/            sandbox, deobfuscator, YARA, sample notes (do not run samples)
+tests/               inert fixtures that mimic the artefacts' shape
+```
+
+Tests never touch `~/.threatscan`; they run under a temporary `THREATSCAN_HOME`.
+
+---
+
+## Sources
+
+- https://github.com/OpenSourceMalware/PolinRider
+- https://opensourcemalware.com/blog/polinrider-is-a-b-testing-its-way-past-your-detections
+- https://opensourcemalware.com/blog/developer-guide-getting-over-polinrider
+- https://opensourcemalware.com/blog/malware-abuses-vscode-lifecycle-scripts
+- https://github.com/orgs/community/discussions/188732
+- https://socprime.com/active-threats/dprk-polinrider-campaign-shows-hands-on-keyboard-supply-chain-activity/
+- https://research.jfrog.com/post/hijacked-npm-vscode-tasks-blockchain/
+- https://socket.dev/blog/joyfill-npm-beta-releases-compromised
+- https://thehackernews.com/2026/07/north-korean-hackers-publish-108.html
 
 ## License
 
 MIT
-
-## Contributing
-
-Report false positives, new IOCs, or missing detection categories via GitHub Issues.
-
----
-
-## Support
-
-```bash
-# Get help
-python3 threat_scanner.py --help
-
-# Report a finding
-https://opensourcemalware.com
-
-# Check your host
-python3 threat_scanner.py --home --verbose
-```
-
-**Stay safe.** 🛡️

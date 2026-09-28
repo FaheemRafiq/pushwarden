@@ -1,0 +1,356 @@
+# threatscan/falco/polinrider.rules.yaml  (installed as /etc/falco/rules.d/threatscan-polinrider.yaml)
+#
+# PolinRider / "Contagious Interview" DPRK supply-chain campaign detection.
+# Attribution confirmed: DPRK Lazarus Group, active March–September 2026+.
+#
+# Sources:
+#   - OpenSourceMalware.com: PolinRider campaign analysis
+#   - JFrog: hijacked npm vscode-tasks + blockchain dead-drops
+#   - Socket: Joyfill beta compromise
+#   - Nextron: 16 Go modules with matching fa-solid-400.woff2 SHA-256
+#   - Live malware on this system: PID 8165, erstech account
+#
+# TIERING:
+#   TIER 1 (kill-eligible): narrow, named in KILL_ELIGIBLE_RULES in the script
+#   TIER 2 (alert-only):    broad heuristics, visibility only, never auto-killed
+
+# ---------------------------------------------------------------------------
+# Shared macros
+# ---------------------------------------------------------------------------
+
+- macro: node_process
+  condition: proc.name in (node, nodejs)
+
+- macro: js_framework_config
+  condition: >
+    (fd.name endswith "postcss.config.mjs" or fd.name endswith "postcss.config.js"
+     or fd.name endswith "next.config.js"   or fd.name endswith "next.config.mjs"
+     or fd.name endswith "vue.config.js"    or fd.name endswith "astro.config.mjs"
+     or fd.name endswith "astro.config.js"
+     or fd.name endswith "jest.config.js"   or fd.name endswith "jest.config.mjs"
+     or fd.name endswith "eslint.config.mjs" or fd.name endswith "eslint.config.js"
+     or fd.name endswith "tailwind.config.js")
+
+- macro: campaign_markers
+  condition: >
+    (proc.cmdline contains "global['_V']"
+     or proc.cmdline contains "global['!']"
+     or proc.cmdline contains "_$_1e42"
+     or proc.cmdline contains "MDy("
+     or proc.cmdline contains "Cot%3t=shtP"
+     or proc.cmdline contains "rmcej%otb%"
+     or proc.cmdline contains "trongrid"
+     or proc.cmdline contains "aptoslabs.com"
+     or proc.cmdline contains "bsc-dataseed"
+     or proc.cmdline contains "bsc-rpc.publicnode"
+     or proc.cmdline contains "ThZG+0jfXE6VAGOJ"
+     or proc.cmdline contains "2[gWfGj;<:-93Z"
+     or proc.cmdline contains "193.247.144.38"
+     or proc.cmdline contains "194.11.226.41"
+     or proc.cmdline contains "166.88.134.62"
+     or proc.cmdline contains "23.27.13.43"
+     or proc.cmdline contains "198.105.127.210"
+     or proc.cmdline contains "23.27.202.27"
+     or proc.cmdline contains "/0x/clb"
+     or proc.cmdline contains "/0x/cb"
+     or proc.cmdline contains "/$/boot"
+     or proc.cmdline contains "verify-human"
+     or proc.cmdline contains "Sec-V"
+     or proc.cmdline contains "fa-solid-400"
+     or proc.cmdline contains "fa-solid-500"
+     or proc.cmdline contains "fa-solid-900"
+     or proc.cmdline contains "spellright.dict"
+     or proc.cmdline contains "X-Payload-B64"
+     or proc.cmdline contains "/0x/cls"
+     or proc.cmdline contains "default-configuration.vercel.app"
+     or proc.cmdline contains "vscode-settings-bootstrap.vercel.app"
+     or proc.cmdline contains "vscode-bootstrapper.vercel.app"
+     or proc.cmdline contains "vscode-load-config.vercel.app"
+     or proc.cmdline contains "auth-confirm-lemon-alpha.vercel.app"
+     or proc.cmdline contains "181.214.149.148"
+     or proc.cmdline contains "23.27.13.135"
+     or proc.cmdline contains "150.251.113.223"
+     or proc.cmdline contains "SvcHostUpdate.py"
+     or proc.cmdline contains "MicrosoftCLROptimization")
+
+- macro: trusted_ancestry
+  condition: >
+    (proc.aname[1] in (dnf, dnf5, rpm, packagekitd, systemd, ansible-playbook, snapd)
+     or proc.pname in (dnf, dnf5, rpm, packagekitd, ansible-playbook))
+
+- macro: legit_node_binary_invocation
+  condition: >
+    (proc.cmdline contains "/node_modules/.bin/"
+     or proc.cmdline contains "/dist/bin/next"
+     or proc.cmdline contains "/bin/next "
+     or proc.cmdline contains "/bin/vite"
+     or proc.cmdline contains "/bin/webpack"
+     or proc.cmdline contains "/bin/nodemon"
+     or proc.cmdline contains "/bin/ts-node")
+
+# ---------------------------------------------------------------------------
+# TIER 1 — kill-eligible
+# ---------------------------------------------------------------------------
+
+- rule: Blockchain C2 Node Payload
+  desc: >
+    Node inline eval containing PolinRider campaign markers: obfuscation
+    signatures, XOR keys, C2 IPs, blockchain RPC endpoints, or rotated
+    code signatures (original rmcej%otb%, rotated Cot%3t=shtP,
+    decoder rotated from _$_1e42 to MDy). Covers both March and July
+    signature rotations documented by OpenSourceMalware.
+  condition: >
+    spawned_process
+    and node_process
+    and (proc.cmdline contains " -e " or proc.cmdline contains " --eval ")
+    and campaign_markers
+  output: >
+    BLOCKCHAIN C2 NODE PAYLOAD pid=%proc.pid ppid=%proc.ppid user=%user.name
+    command=%proc.cmdline parent=%proc.pname
+  priority: CRITICAL
+  tags: [node, malware, polinrider, kill]
+
+- rule: Suspicious Node Eval Confirmed
+  desc: >
+    Node inline eval spawned as a child of another node process.
+    Matches the self-spawned second-stage loader pattern.
+  condition: >
+    spawned_process
+    and node_process
+    and (proc.cmdline contains " -e " or proc.cmdline contains " --eval ")
+    and proc.pname in (node, nodejs)
+    and not trusted_ancestry
+    and not legit_node_binary_invocation
+  output: >
+    SUSPICIOUS NODE EVAL (node-spawned-node) pid=%proc.pid ppid=%proc.ppid
+    user=%user.name command=%proc.cmdline parent=%proc.pname
+  priority: CRITICAL
+  tags: [node, malware, kill]
+
+- rule: Suspicious Python Inline Execution Confirmed
+  desc: >
+    Python -c spawned as child of node/npm/npx. Matches OmniStealer
+    bootstrap pattern (stage 4: portable Python installer).
+  condition: >
+    spawned_process
+    and proc.name in (python, python3)
+    and proc.cmdline contains " -c "
+    and proc.pname in (node, nodejs, npm, npx)
+    and not trusted_ancestry
+  output: >
+    SUSPICIOUS PYTHON INLINE EXEC (node-spawned) pid=%proc.pid ppid=%proc.ppid
+    user=%user.name command=%proc.cmdline parent=%proc.pname
+  priority: CRITICAL
+  tags: [python, malware, kill]
+
+- rule: PolinRider Fake Font Loader Executed
+  desc: >
+    Node reading fa-solid-400/500/900.woff2 or spellright.dict as a script. This file is PolinRider's
+    stage-2 loader disguised as a web font. SHA-256 confirmed by Nextron
+    across 16 Go modules and 2 npm packages. Not a font — pure JavaScript
+    that fetches XOR-encrypted payloads from TRON/Aptos/BSC blockchain RPCs.
+    SHA-256: 53abf37710d6f2e35694fbe7cfaf1108127cbc001ce3e6bf994d0486cae5a0e8
+             13e9a3c41e038bf9d8fcb0831305819819e4f7f4452bc20a04b9bf2756ee22e8
+  condition: >
+    open_read
+    and (fd.name contains "fa-solid-400.woff2" or fd.name contains "fa-solid-500.woff2"
+         or fd.name contains "fa-solid-900.woff2" or fd.name contains "spellright.dict")
+    and node_process
+  output: >
+    POLINRIDER FAKE FONT LOADER pid=%proc.pid file=%fd.name user=%user.name
+    command=%proc.cmdline parent=%proc.pname
+  priority: CRITICAL
+  tags: [polinrider, loader, malware, kill]
+
+- rule: PolinRider Git Propagation Script
+  desc: >
+    temp_auto_push.bat or config.bat executed — the git history-rewriting
+    propagation scripts PolinRider uses to silently backdoor repos.
+    Backdates commits using GIT_COMMITTER_DATE to match original timestamps
+    so git log shows nothing out of place. Confirmed across 43 of 64 Go
+    modules in OpenSourceMalware's tracking dataset.
+  condition: >
+    spawned_process
+    and (proc.cmdline contains "temp_auto_push"
+         or proc.cmdline contains "config.bat")
+    and proc.name in (bash, sh, node, nodejs, python, python3)
+  output: >
+    POLINRIDER PROPAGATION SCRIPT pid=%proc.pid ppid=%proc.ppid
+    user=%user.name command=%proc.cmdline parent=%proc.pname
+  priority: CRITICAL
+  tags: [polinrider, git, propagation, kill]
+
+- rule: PolinRider Python Bootstrap Download
+  desc: >
+    curl/wget fetching from bootstrap.pypa.io — PolinRider stage 4
+    installs a portable Python interpreter here before dropping OmniStealer.
+    Legitimate pip bootstrapping never originates from a node/npm process.
+  condition: >
+    spawned_process
+    and proc.name in (curl, wget)
+    and proc.cmdline contains "bootstrap.pypa.io"
+    and proc.pname in (node, nodejs, npm, npx, sh, bash)
+  output: >
+    POLINRIDER PYTHON BOOTSTRAP pid=%proc.pid ppid=%proc.ppid
+    user=%user.name command=%proc.cmdline parent=%proc.pname
+  priority: CRITICAL
+  tags: [polinrider, python, download, kill]
+
+# ---------------------------------------------------------------------------
+# TIER 2 — alert-only
+# ---------------------------------------------------------------------------
+
+- rule: VSCode FolderOpen Task Written
+  desc: >
+    A tasks.json file was written containing "folderOpen" — the VS Code
+    auto-execution trigger PolinRider uses as stage 1. Fires when the
+    malicious tasks.json is being dropped. Legitimate tasks.json files
+    virtually never use runOn:folderOpen; it's PolinRider's signature
+    entry point bypassing npm v12 lifecycle-script protections.
+  condition: >
+    open_write
+    and fd.name endswith "/.vscode/tasks.json"
+  output: >
+    VSCODE TASKS JSON WRITTEN (alert-only) pid=%proc.pid file=%fd.name
+    user=%user.name command=%proc.cmdline parent=%proc.pname
+  priority: CRITICAL
+  tags: [polinrider, vscode, persistence, alert-only]
+
+- rule: Git Commit Amend By Automated Process
+  desc: >
+    git commit --amend spawned by a non-interactive process (node, python,
+    npm, or a shell that is itself a child of one of these). This is the
+    mechanism behind PolinRider's timestamp forgery in Go modules —
+    amending commits with backdated GIT_COMMITTER_DATE so git log shows
+    nothing out of place.
+  condition: >
+    spawned_process
+    and proc.name = git
+    and proc.cmdline contains "commit"
+    and proc.cmdline contains "amend"
+    and proc.pname in (node, nodejs, npm, npx, python, python3, sh, bash)
+    and not trusted_ancestry
+  output: >
+    GIT AMEND BY AUTOMATED PROCESS (alert-only) pid=%proc.pid
+    user=%user.name command=%proc.cmdline parent=%proc.pname
+  priority: CRITICAL
+  tags: [polinrider, git, propagation, alert-only]
+
+- rule: Git Force Push By Automated Process
+  desc: >
+    git push --force spawned by a non-interactive process. Used alongside
+    git commit --amend in temp_auto_push.bat to silently overwrite repo
+    history without triggering a force-push detection on GitHub
+    (the amended commit's parent is still the original last commit,
+    so GitHub doesn't see it as a force push in most configs).
+  condition: >
+    spawned_process
+    and proc.name = git
+    and (proc.cmdline contains " -f " or proc.cmdline contains " --force"
+         or proc.cmdline contains " --force-with-lease")
+    and proc.cmdline contains "push"
+    and proc.pname in (node, nodejs, npm, npx, python, python3, sh, bash)
+    and not trusted_ancestry
+  output: >
+    GIT FORCE PUSH BY AUTOMATED PROCESS (alert-only) pid=%proc.pid
+    user=%user.name command=%proc.cmdline parent=%proc.pname
+  priority: CRITICAL
+  tags: [polinrider, git, propagation, alert-only]
+
+- rule: Any Node Inline Eval
+  desc: Broad detector for any node -e/--eval. Alert only due to false positives.
+  condition: >
+    spawned_process
+    and node_process
+    and (proc.cmdline contains " -e " or proc.cmdline contains " --eval "
+         or (proc.cmdline contains " -p " and not legit_node_binary_invocation))
+  output: >
+    NODE INLINE EVAL (alert-only) pid=%proc.pid ppid=%proc.ppid user=%user.name
+    command=%proc.cmdline parent=%proc.pname
+  priority: WARNING
+  tags: [node, malware, alert-only]
+
+- rule: Any Python Inline Execution
+  desc: Broad detector for any python -c. Alert only (dnf, ansible false positives).
+  condition: >
+    spawned_process
+    and proc.name in (python, python3)
+    and proc.cmdline contains " -c "
+    and not trusted_ancestry
+  output: >
+    PYTHON INLINE EXEC (alert-only) pid=%proc.pid ppid=%proc.ppid user=%user.name
+    command=%proc.cmdline parent=%proc.pname
+  priority: WARNING
+  tags: [python, malware, alert-only]
+
+- rule: JS Framework Config Written By Node
+  desc: >
+    Node writing to a framework config file — the primary infection vector
+    for the postcss/next.config variant of this campaign.
+  condition: open_write and js_framework_config and node_process
+  output: >
+    JS FRAMEWORK CONFIG WRITE pid=%proc.pid file=%fd.name user=%user.name
+    command=%proc.cmdline parent=%proc.pname
+  priority: CRITICAL
+  tags: [supplychain, malware, alert-only]
+
+- rule: Git Push From Node Descendant
+  desc: git push initiated under a node process tree.
+  condition: >
+    spawned_process and proc.name = git and proc.cmdline contains "push"
+    and (proc.aname[2] in (node, nodejs) or proc.aname[3] in (node, nodejs))
+  output: >
+    GIT PUSH UNDER NODE pid=%proc.pid command=%proc.cmdline parent=%proc.pname
+    user=%user.name
+  priority: CRITICAL
+  tags: [supplychain, git, alert-only]
+
+- rule: Node Spawns Shell
+  desc: Node spawning an interactive shell.
+  condition: >
+    spawned_process and proc.name in (bash, sh, zsh)
+    and proc.pname in (node, nodejs)
+  output: >
+    NODE SPAWNED SHELL pid=%proc.pid ppid=%proc.ppid user=%user.name
+    command=%proc.cmdline parent=%proc.pname
+  priority: WARNING
+  tags: [node, shell, malware, alert-only]
+
+- rule: Python Spawns Shell
+  desc: Python spawning an interactive shell.
+  condition: >
+    spawned_process and proc.name in (bash, sh, zsh)
+    and proc.pname in (python, python3)
+  output: >
+    PYTHON SPAWNED SHELL pid=%proc.pid ppid=%proc.ppid user=%user.name
+    command=%proc.cmdline parent=%proc.pname
+  priority: WARNING
+  tags: [python, shell, malware, alert-only]
+
+- rule: Shell Download Pipe
+  desc: curl/wget piped directly into a shell.
+  condition: >
+    spawned_process and proc.name in (sh, bash)
+    and (proc.cmdline contains "curl" or proc.cmdline contains "wget")
+    and (proc.cmdline contains "| sh" or proc.cmdline contains "| bash"
+         or proc.cmdline contains "|sh"  or proc.cmdline contains "|bash")
+  output: >
+    SUSPICIOUS DOWNLOAD PIPE pid=%proc.pid ppid=%proc.ppid user=%user.name
+    command=%proc.cmdline parent=%proc.pname
+  priority: CRITICAL
+  tags: [download, shell, malware, alert-only]
+
+- rule: PolinRider Stage-1 Bootstrap Download
+  desc: >
+    curl/wget fetching /settings/(mac|linux|win)?flag= from a vercel.app host.
+    This is the TaskJacker stage-1 downloader launched by .vscode/tasks.json.
+  condition: >
+    spawned_process
+    and proc.name in (curl, wget)
+    and proc.cmdline contains ".vercel.app/settings/"
+    and proc.cmdline contains "flag="
+  output: >
+    POLINRIDER STAGE-1 DOWNLOAD pid=%proc.pid ppid=%proc.ppid user=%user.name
+    command=%proc.cmdline parent=%proc.pname
+  priority: CRITICAL
+  tags: [polinrider, download, kill]
