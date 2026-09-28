@@ -32,16 +32,23 @@ September 2026. Sources are listed at the bottom.
 
 Download page: https://faheemrafiq.github.io/threatscan/ (picks the right file for your system).
 
-- **Windows 10/11:** [ThreatScan-Setup.exe](https://github.com/FaheemRafiq/threatscan/releases/latest/download/ThreatScan-Setup.exe)
-- **macOS 11+:** [ThreatScan.pkg](https://github.com/FaheemRafiq/threatscan/releases/latest/download/ThreatScan.pkg)
-- **Linux** (no sudo):
+**macOS 11+ and Linux:** paste into Terminal (no sudo, no password):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/installers/install.sh | sh
 ```
 
-or a `.deb` / `.rpm` (`threatscan-linux-amd64.deb`, `-arm64.rpm`, ...) from the
-[latest release](https://github.com/FaheemRafiq/threatscan/releases/latest).
+**Windows 10/11:** [ThreatScan-Setup.exe](https://github.com/FaheemRafiq/threatscan/releases/latest/download/ThreatScan-Setup.exe).
+It is not code-signed yet: if SmartScreen appears, choose *More info*, then *Run anyway*.
+
+Other downloads on the [latest release](https://github.com/FaheemRafiq/threatscan/releases/latest):
+
+- **macOS package:** `ThreatScan.pkg`. It is not notarized yet, so macOS blocks it as coming from an
+  "unidentified developer": try to open it once, then *System Settings, Privacy & Security, Open Anyway*;
+  or install it from Terminal with `installer -pkg ~/Downloads/ThreatScan.pkg -target CurrentUserHomeDirectory`.
+  The Terminal one-liner above avoids this entirely.
+- **Linux packages:** `threatscan-linux-amd64.deb`, `threatscan-linux-amd64.rpm` (and `-arm64`), installed with sudo;
+  they set ThreatScan up for the user who ran sudo.
 
 Everything installs for your user only; no administrator password. The installer
 
@@ -52,7 +59,7 @@ Everything installs for your user only; no administrator password. The installer
 5. keeps ThreatScan up to date: new releases are verified (ed25519 signature + SHA-256) before they replace
    the program, and a release that fails to start is rolled back.
 
-Options for the Linux one-liner:
+Options for the one-liner:
 
 | Variable | Effect |
 |---|---|

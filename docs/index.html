@@ -68,8 +68,13 @@
 
     <section class="card" id="macos">
       <h2>macOS 11 or later (Intel and Apple silicon)</h2>
-      <p><a href="https://github.com/FaheemRafiq/threatscan/releases/latest/download/ThreatScan.pkg">ThreatScan.pkg</a></p>
-      <p class="note">The package is not notarized yet. If macOS blocks it, open System Settings, Privacy &amp; Security, and choose <em>Open Anyway</em>.</p>
+      <p>Open Terminal (Applications, Utilities, Terminal), paste this and press Return. No password needed:</p>
+      <pre><code>curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/installers/install.sh | sh</code></pre>
+      <p class="note">It downloads ThreatScan, checks its SHA-256 against the published list, and sets it up for your user.</p>
+      <p>Prefer an installer? <a href="https://github.com/FaheemRafiq/threatscan/releases/latest/download/ThreatScan.pkg">ThreatScan.pkg</a></p>
+      <p class="note">The package is not notarized yet, so macOS blocks it the first time ("unidentified developer").
+        Try to open it once, then go to System Settings, Privacy &amp; Security, and click <em>Open Anyway</em> (it appears for about an hour).
+        Or install it from Terminal: <code>installer -pkg ~/Downloads/ThreatScan.pkg -target CurrentUserHomeDirectory</code></p>
     </section>
 
     <section class="card" id="linux">
@@ -107,16 +112,14 @@
       button.href = base + "ThreatScan-Setup.exe";
       button.textContent = "Download ThreatScan-Setup.exe";
       note.textContent = "Open the file and follow the prompts. No administrator password needed.";
-    } else if (os === "macos") {
-      title.textContent = "Download for macOS";
-      button.href = base + "ThreatScan.pkg";
-      button.textContent = "Download ThreatScan.pkg";
-      note.textContent = "Open the package and choose “Install for me only”.";
-    } else if (os === "linux") {
-      title.textContent = "Install on Linux";
+    } else if (os === "macos" || os === "linux") {
+      // Terminal install: files fetched by curl are not blocked by Gatekeeper
+      title.textContent = os === "macos" ? "Install on macOS" : "Install on Linux";
       button.parentNode.hidden = true;
       document.getElementById("primary-cmd").hidden = false;
-      note.textContent = "Paste this into a terminal. It verifies the download before installing.";
+      note.textContent = os === "macos"
+        ? "Open Terminal (Applications, Utilities, Terminal), paste this and press Return. It verifies the download before installing. No password needed."
+        : "Paste this into a terminal. It verifies the download before installing.";
     }
     if (os) {
       var own = document.getElementById(os);
