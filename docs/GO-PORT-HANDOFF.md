@@ -204,13 +204,10 @@ macos-13, windows-latest and the Fedora containers: `go vet ./...`,
 - Signature format: `checksums.txt.sig` is base64 of the ed25519 signature
   over the exact bytes of `checksums.txt`. `go run ./scripts/sign FILE` makes
   it from `$THREATSCAN_SIGNING_KEY` (base64 32-byte seed).
-- Signing key generated 2026-09-28; public key committed in `pubkeys.go`.
-  **Still to do:** put the seed in the `THREATSCAN_SIGNING_KEY` secret and an
-  offline backup. (Original step: run `go run ./scripts/keygen PATH`
-  (PATH outside the repo), paste the printed public key into
-  `internal/update/pubkeys.go`, store the seed in the `THREATSCAN_SIGNING_KEY`
-  secret and an offline backup. With the list empty, every self-update is
-  refused, so a release shipped without a key can never update itself.
+- Signing key generated 2026-09-28 with `go run ./scripts/keygen PATH`; the
+  public key is in `pubkeys.go`. **Still to do:** put the seed in the
+  `THREATSCAN_SIGNING_KEY` secret and an offline backup. Rotate by adding a
+  new key to the slice, releasing with it, then removing the old one.
 - Windows risk to check in the P7 smoke test: after an update the guard starts
   the new exe detached and exits. If Task Scheduler's job object kills child
   processes when the task's process exits, the guard stays down until the
