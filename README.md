@@ -93,6 +93,7 @@ threatscan history                # protection history (restore / allow / remove
 threatscan update-iocs            # pull the latest indicator file
 sudo threatscan protect --block-c2   # firewall + hosts sinkhole for all known C2
 threatscan uninstall [--unblock] [--purge]
+threatscan help <command>         # full documentation for any command, offline
 ```
 
 `threatscan [dirs]` is short for `threatscan scan [dirs]`. Every script file is scanned by default;

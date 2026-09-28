@@ -48,6 +48,7 @@ func newFlags(name, usage string) *flag.FlagSet {
 	fs.Usage = func() {
 		fmt.Fprintf(fs.Output(), "Usage: threatscan %s %s\n\nOptions:\n", name, usage)
 		fs.PrintDefaults()
+		fmt.Fprintf(fs.Output(), "\nFull documentation: threatscan help %s\n", name)
 	}
 	return fs
 }

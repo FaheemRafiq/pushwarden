@@ -21,7 +21,7 @@ one-liner and a description of the threat, see the [README](../README.md).
   - [guard](#guard) · [install](#install) · [uninstall](#uninstall)
   - [update](#update) · [update-iocs](#update-iocs)
   - [harden](#harden) · [protect](#protect) · [config](#config)
-  - [check-staged](#check-staged) · [version](#version)
+  - [check-staged](#check-staged) · [version](#version) · [help](#help)
 - [Configuration keys](#configuration-keys)
 - [Files and directories](#files-and-directories)
 - [Environment variables](#environment-variables)
@@ -36,7 +36,8 @@ one-liner and a description of the threat, see the [README](../README.md).
 - **Flags** accept one or two dashes: `-fix` and `--fix` are the same. Flags may come before or
   after positional arguments.
 - **`threatscan [dirs]`** with no command is short for `threatscan scan [dirs]`.
-- **`threatscan <command> -h`** prints that command's options.
+- **`threatscan <command> -h`** prints that command's options. **`threatscan help <command>`**
+  prints this documentation for it, in the terminal, offline.
 - **Exit codes** follow one rule everywhere: `0` clean or done, `1` threats found or not fully
   fixed, `2` usage error, nothing scanned, or an internal failure. Commands that only display
   information return `0`.
@@ -412,6 +413,21 @@ threatscan --version
 
 Prints the version. Release builds print the release number; development builds end in `-dev`.
 
+### help
+
+Show this documentation in the terminal.
+
+```
+threatscan help                  # command list
+threatscan help <command>        # one command, for example: threatscan help install
+threatscan help <topic>          # config-keys, files, environment, severities, recipes, troubleshooting
+threatscan help all              # the whole reference
+```
+
+The text is embedded in the binary, so it always matches the installed version and works
+offline. Long pages go through `$PAGER` (default `less`); set `THREATSCAN_NO_PAGER=1` to print
+straight to the terminal.
+
 ---
 
 ## Configuration keys
@@ -480,6 +496,7 @@ with a link in `~/.local/bin` (override with `THREATSCAN_INSTALL_DIR`).
 | `THREATSCAN_INSTALL_DIR` | `install`, `update` | where the binary is installed |
 | `GITHUB_TOKEN`, `GH_TOKEN` | `github-clean` | token when `--token` is not given |
 | `NO_COLOR` | every command | disable coloured output |
+| `PAGER`, `THREATSCAN_NO_PAGER` | `help` | pager for long pages; set the second to disable paging |
 | `THREATSCAN_ROOTS` | install script | space-separated project directories to watch |
 | `THREATSCAN_WEBHOOK` | install script | webhook URL |
 | `THREATSCAN_VERSION` | install script | install this release instead of the latest |

@@ -42,7 +42,8 @@ func usage() {
 	for _, c := range sorted {
 		fmt.Printf("  %-13s %s\n", c.name, c.help)
 	}
-	fmt.Println("\nRun `threatscan <command> -h` for options.  `threatscan [dirs]` is short for `threatscan scan [dirs]`.")
+	fmt.Println("\nRun `threatscan <command> -h` for options, `threatscan help <command>` for the full documentation.")
+	fmt.Println("`threatscan [dirs]` is short for `threatscan scan [dirs]`.")
 }
 
 func main() { os.Exit(run(os.Args[1:])) }
@@ -53,8 +54,7 @@ func run(args []string) int {
 		case "__askpass": // git credential helper used by github-clean; not a user command
 			return askpass(args[1:])
 		case "-h", "--help", "help":
-			usage()
-			return 0
+			return cmdHelp(args[1:])
 		case "--version", "-version":
 			args[0] = "version"
 		}
