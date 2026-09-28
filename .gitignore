@@ -16,3 +16,5 @@ venv/
 .threatscan/
 *.pyz
 *.bak
+analysis/samples/*.js
+analysis/output/

@@ -22,6 +22,16 @@ ASSET_MAGIC = {
 # .dict files (spellright) are plain word lists; anything with code markers is a loader.
 TEXT_ASSET_EXTENSIONS = {".dict"}
 
+# Every text file type the campaign has used to carry or launch a payload.
+SCRIPT_EXTENSIONS = {".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".mts", ".cts",
+                     ".json", ".jsonc", ".py", ".sh", ".bash", ".zsh", ".bat", ".cmd", ".ps1", ".vbs",
+                     ".html", ".htm", ".env", ".yml", ".yaml", ".toml", ".txt", ".md"}
+
+# Files that legitimately contain campaign strings (signature databases, tests,
+# detection rules) declare it with this token in their first 512 bytes.  It is
+# never honoured for framework config files, entry files or binary assets.
+ALLOW_TOKEN = "threatscan:allow-signatures"
+
 CODE_MARKERS = (b"<html", b"<!doc", b"<script", b"require(", b"global[", b"global.", b"function",
                 b"eval(", b"const ", b"var ", b"let ", b"#!/", b"process.env", b"=>")
 
@@ -36,6 +46,22 @@ SKIP_DIRS = {"node_modules", ".git", ".hg", ".svn", "vendor", "__pycache__",
 
 def skip_dir(name: str) -> bool:
     return name in SKIP_DIRS
+
+
+def is_under(path: Path, roots) -> bool:
+    """True if path equals or lies inside any of roots (path-component aware)."""
+    try:
+        p = Path(path).resolve()
+    except Exception:
+        p = Path(path)
+    for r in roots:
+        try:
+            r = Path(r).expanduser().resolve()
+        except Exception:
+            r = Path(r).expanduser()
+        if p == r or r in p.parents:
+            return True
+    return False
 
 
 def sha256_of(path: Path, limit_bytes=50 * 1024 * 1024) -> str:
@@ -111,6 +137,64 @@ def asset_verdict(path: Path, marker_regex) -> Tuple[str, str]:
         except UnicodeDecodeError:
             pass
     return "unknown", ""
+
+
+JS_EXTENSIONS = {".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".mts", ".cts", ".html", ".htm"}
+
+
+def is_allowlisted(path: Path, iocs) -> bool:
+    if path.name in iocs.config_files or path.name in iocs.entry_files or path.name in iocs.fake_font_names:
+        return False
+    ext = path.suffix.lower()
+    if ext in ASSET_MAGIC or ext in TEXT_ASSET_EXTENSIONS or ext in JS_EXTENSIONS:
+        return False
+    try:
+        with open(path, "rb") as fh:
+            return ALLOW_TOKEN.encode() in fh.read(512)
+    except Exception:
+        return False
+
+
+def evidence(content: str, iocs, limit=12) -> list:
+    """Human-readable list of the concrete indicators found in `content`."""
+    ev = []
+    for sig in iocs.literal_signatures:
+        if sig in content:
+            ev.append(f"literal signature {sig!r}")
+    for m in iocs.marker_regex.finditer(content):
+        snippet = m.group(0)[:60]
+        ev.append(f"campaign marker {snippet!r} at offset {m.start()}")
+        if len(ev) >= limit:
+            break
+    for k in iocs.xor_keys:
+        if k in content:
+            ev.append(f"payload XOR key {k!r}")
+    low = content.lower()
+    for w in iocs.wallets:
+        if w.lower() in low:
+            ev.append(f"dead-drop wallet {w[:14]}...")
+    for h in iocs.malicious_hosts:
+        if h in content:
+            ev.append(f"C2 host {h}")
+    for ip in iocs.malicious_ips:
+        if ip in content:
+            ev.append(f"C2 IP {ip}")
+    for p in iocs.c2_url_paths:
+        if p in content and "http" in content:
+            ev.append(f"C2 path {p}")
+    for t in iocs.telegram_indicators:
+        if t in content:
+            ev.append("Telegram exfiltration bot id")
+    pad = re.search(r"[ \t]{40,}\S", content)
+    if pad:
+        ev.append(f"{len(pad.group(0)) - 1} whitespace characters hiding code on one line")
+    # de-dup, keep order
+    seen, out = set(), []
+    for e in ev:
+        if e not in seen:
+            seen.add(e)
+            out.append(e)
+    return out[:limit]
 
 
 def find_payload_cut(content: str, iocs) -> int:

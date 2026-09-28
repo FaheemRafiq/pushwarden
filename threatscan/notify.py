@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import List
 
 from .findings import Finding, Severity
+from .prompt import threat_name
 
 _SEV = {"INFO": Severity.INFO, "WARNING": Severity.WARNING, "HIGH": Severity.HIGH, "CRITICAL": Severity.CRITICAL}
 
@@ -29,10 +30,20 @@ class Notifier:
             return
         self._log(findings, context)
         top = max(f.severity for f in findings)
-        title = f"ThreatScan: {top.name} - {len(findings)} finding(s)"
-        lines = [f"[{f.severity.name}] {f.title}" + (f" -> {f.action}" if f.action else "") for f in findings[:5]]
+        acted = [f for f in findings if f.action and not f.action.startswith("kept")]
+        if acted and all(f.action for f in findings if f.severity >= Severity.CRITICAL):
+            title = "Threats found - actions taken"
+        elif top >= Severity.CRITICAL:
+            title = "Threats found - action needed"
+        else:
+            title = f"ThreatScan: {top.name} - review recommended"
+        lines = []
+        for f in findings[:5]:
+            name = threat_name(f) if f.severity >= Severity.CRITICAL else f.severity.name
+            where = (f.path.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]) if f.path else f.title
+            lines.append(f"{name}: {where}" + (f" - {f.action}" if f.action else ""))
         if len(findings) > 5:
-            lines.append(f"... and {len(findings) - 5} more (see threatscan report)")
+            lines.append(f"... and {len(findings) - 5} more (threatscan history)")
         body = "\n".join(lines)
         if self.cfg.notify_desktop and top >= sev_from_name(self.cfg.notify_min_severity):
             self.desktop(title, body)

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# threatscan:allow-signatures
 """
 Cross-platform Lazarus C2 IP Blocker
 Supports: Linux (iptables), macOS (pf), Windows (netsh)

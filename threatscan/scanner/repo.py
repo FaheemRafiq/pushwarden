@@ -1,3 +1,4 @@
+# threatscan:allow-signatures
 """Repository / project scanner (read-only)."""
 
 import json
@@ -9,22 +10,28 @@ from pathlib import Path
 from typing import List, Tuple
 
 from ..findings import Finding, Severity
-from ..helpers import ASSET_MAGIC, FONT_EXTENSIONS, TEXT_ASSET_EXTENSIONS, asset_verdict, read_text, sha256_of, skip_dir
+from ..helpers import (ASSET_MAGIC, FONT_EXTENSIONS, SCRIPT_EXTENSIONS, TEXT_ASSET_EXTENSIONS, asset_verdict,
+                       evidence, is_allowlisted, is_under, read_text, sha256_of, skip_dir)
 
 
 class RepoScanner:
-    def __init__(self, scan_dir: Path, ui, iocs, js_all=False, verbose=False, exclude=None):
+    def __init__(self, scan_dir: Path, ui, iocs, js_all=True, verbose=False, exclude=None, deep=False):
         self.scan_dir = scan_dir.resolve()
         self.ui = ui
         self.iocs = iocs
         self.js_all = js_all
+        self.deep = deep
         self.verbose = verbose
-        self.exclude = [str(Path(e).expanduser()) for e in (exclude or [])]
+        self.exclude = [Path(e).expanduser() for e in (exclude or [])]
         self.files_checked = 0
 
     def _excluded(self, p: Path) -> bool:
-        s = str(p)
-        return any(s.startswith(e) for e in self.exclude)
+        return is_under(p, self.exclude)
+
+    def _skip(self, d: str) -> bool:
+        if self.deep and d in ("node_modules", "vendor"):
+            return False
+        return skip_dir(d)
 
     # ── Discovery ────────────────────────────────────────────────────────────
     def find_repos(self) -> List[Path]:
@@ -45,14 +52,20 @@ class RepoScanner:
             if self._excluded(Path(root)):
                 dirs[:] = []
                 continue
-            dirs[:] = [d for d in dirs if not skip_dir(d)]
-            if ".git" in os.listdir(root) if os.path.isdir(root) else False:
+            if ".git" in dirs or ".git" in files:
                 dirs[:] = []
                 continue
+            dirs[:] = [d for d in dirs if not skip_dir(d)]
             if "package.json" in files or "go.mod" in files or "composer.json" in files:
                 projects.append(Path(root))
                 dirs[:] = []
         return projects
+
+    def discover(self) -> Tuple[List[Path], List[Path]]:
+        """(git repos, non-git projects) under scan_dir, one walk each."""
+        repos = self.find_repos()
+        projects = [p for p in self.find_non_git_projects() if p not in repos]
+        return repos, projects
 
     # ── File-level checks ────────────────────────────────────────────────────
     def check_signatures(self, fp: Path) -> List[Finding]:
@@ -62,10 +75,22 @@ class RepoScanner:
             return out
         self.files_checked += 1
         I = self.iocs
+        if is_allowlisted(fp, I):
+            return out
+        ev = None
+
+        def with_ev(f: Finding) -> Finding:
+            nonlocal ev
+            if ev is None:
+                ev = evidence(content, I)
+            f.meta["evidence"] = ev
+            f.details = (f.details + "\n" if f.details else "") + "\n".join(f"- {e}" for e in ev[:6])
+            out.append(f)
+            return f
 
         for sig in I.literal_signatures:
             if sig in content:
-                out.append(Finding(Severity.CRITICAL, "config_injection",
+                with_ev(Finding(Severity.CRITICAL, "config_injection",
                     f"PolinRider signature in {fp.name}", str(fp),
                     f"Literal: {sig[:70]}",
                     f"Remove everything after the legitimate config in:\n  {fp}\n"
@@ -74,7 +99,7 @@ class RepoScanner:
                 break
 
         if not out and I.marker_regex.search(content):
-            out.append(Finding(Severity.CRITICAL, "config_injection",
+            with_ev(Finding(Severity.CRITICAL, "config_injection",
                 f"PolinRider marker regex in {fp.name}", str(fp),
                 "Generalised campaign marker matched (covers all A#- / 8-stN rotations).",
                 f"Inspect and strip the obfuscated block from:\n  {fp}",
@@ -82,7 +107,7 @@ class RepoScanner:
 
         for key in I.xor_keys:
             if key in content:
-                out.append(Finding(Severity.CRITICAL, "xor_key",
+                with_ev(Finding(Severity.CRITICAL, "xor_key",
                     f"PolinRider XOR key in {fp.name}", str(fp),
                     f"Key: {key}",
                     f"This file contains the payload decryption key. Delete or clean:\n  {fp}",
@@ -94,7 +119,7 @@ class RepoScanner:
         hosts = [h for h in I.blockchain_rpc_hosts if h in content]
         wallets = [w for w in I.wallets if w.lower() in content.lower()]
         if wallets or (hosts and I.has_marker(content)):
-            out.append(Finding(Severity.CRITICAL, "blockchain_c2",
+            with_ev(Finding(Severity.CRITICAL, "blockchain_c2",
                 f"Blockchain dead-drop indicators in {fp.name}", str(fp),
                 f"RPC hosts: {', '.join(hosts) or '-'}\nWallets: {', '.join(wallets) or '-'}",
                 f"File references PolinRider dead-drop wallets/RPCs. Clean or delete:\n  {fp}"))
@@ -103,14 +128,14 @@ class RepoScanner:
         ips = [ip for ip in I.malicious_ips if ip in content]
         c2hosts = [h for h in I.malicious_hosts if h in content]
         if ips or c2hosts or (c2paths and ("http" in content)):
-            out.append(Finding(Severity.CRITICAL, "c2_reference",
+            with_ev(Finding(Severity.CRITICAL, "c2_reference",
                 f"C2 reference in {fp.name}", str(fp),
                 f"IPs: {', '.join(ips) or '-'}\nHosts: {', '.join(c2hosts) or '-'}\nPaths: {', '.join(c2paths) or '-'}",
                 f"Hard-coded C2 infrastructure. Clean or delete:\n  {fp}"))
 
         tg = [t for t in I.telegram_indicators if t in content]
         if tg:
-            out.append(Finding(Severity.CRITICAL, "telegram_exfil",
+            with_ev(Finding(Severity.CRITICAL, "telegram_exfil",
                 f"Telegram exfiltration bot in {fp.name}", str(fp),
                 f"Indicator: {tg[0]}", f"OmniStealer exfil channel. Delete:\n  {fp}"))
         return out
@@ -139,11 +164,13 @@ class RepoScanner:
 
     def check_entry_hook(self, fp: Path) -> List[Finding]:
         content = read_text(fp)
-        if re.search(r"atob\s*\(\s*process\.env", content) or re.search(r"eval\s*\(\s*atob", content):
+        m = re.search(r"atob\s*\(\s*process\.env[^)]*\)?", content) or re.search(r"eval\s*\(\s*atob[^)]*\)?", content)
+        if m:
+            ev = [f"stage-1 hook {m.group(0)[:50]!r} at offset {m.start()}"] + evidence(content, self.iocs, limit=6)
             return [Finding(Severity.CRITICAL, "entry_hook",
                 f"Malicious entry hook in {fp.name}", str(fp),
                 "atob(process.env...)/eval(atob...) decodes a base64 URL from env and evals the response.",
-                f"Remove the injected async IIFE from:\n  {fp}", meta={"cleanable": True})]
+                f"Remove the injected async IIFE from:\n  {fp}", meta={"cleanable": True, "evidence": ev})]
         return []
 
     # ── Repo-level checks ────────────────────────────────────────────────────
@@ -157,7 +184,10 @@ class RepoScanner:
                     f"Propagation script: {name}", str(p),
                     "Rewrites git history with forged GIT_COMMITTER_DATE and force-pushes.",
                     f"Delete {p}. Then audit every branch this repo pushed to.",
-                    meta={"quarantine": True}))
+                    meta={"quarantine": True,
+                          "evidence": [f"file name {name!r} is the PolinRider git-rewrite orchestrator"] +
+                                      [f"contains {k!r}" for k in ("--amend", "GIT_COMMITTER_DATE", "--force", "--no-verify")
+                                       if k in read_text(p, limit_bytes=1024 * 1024)]}))
         gi = repo / ".gitignore"
         if gi.is_file():
             content = read_text(gi)
@@ -189,7 +219,14 @@ class RepoScanner:
             c2host = any(h in content for h in I.malicious_hosts)
             if loader or c2host or any(k in content for k in I.tasks_json_loader_keywords):
                 details += "Task body references a loader/font/shell/C2 host: this is the PolinRider stage-1 entry point."
-                meta = {"quarantine": True}
+                ev = ['"runOn": "folderOpen" (runs when the folder is opened)']
+                if loader:
+                    ev.append(f"node executes a non-script file: {loader.group(0)[:60]!r}")
+                ev += [f"C2 host {h}" for h in I.malicious_hosts if h in content]
+                ev += [f"loader keyword {k!r}" for k in I.tasks_json_loader_keywords if k in content][:4]
+                if '"reveal": "never"' in content or '"echo": false' in content:
+                    ev.append("terminal output hidden (reveal: never / echo: false)")
+                meta = {"quarantine": True, "evidence": ev}
             else:
                 details += "No obvious loader in the task body, but folderOpen autorun is itself the PolinRider signature."
                 sev = Severity.HIGH
@@ -202,7 +239,7 @@ class RepoScanner:
             out.append(Finding(Severity.CRITICAL, "vscode_autorun",
                 "VS Code task references PolinRider C2 host", str(tasks),
                 "tasks.json downloads from a known stage-1 host.", f"Delete {tasks}.",
-                meta={"quarantine": True}))
+                meta={"quarantine": True, "evidence": [f"C2 host {h}" for h in I.malicious_hosts if h in content]}))
         return out
 
     def check_vscode_settings(self, repo: Path) -> List[Finding]:
@@ -226,7 +263,7 @@ class RepoScanner:
         I = self.iocs
         exts = set(ASSET_MAGIC) | TEXT_ASSET_EXTENSIONS
         for root, dirs, files in os.walk(repo):
-            dirs[:] = [d for d in dirs if not skip_dir(d)]
+            dirs[:] = [d for d in dirs if not self._skip(d)]
             for fn in files:
                 p = Path(root) / fn
                 ext = p.suffix.lower()
@@ -242,15 +279,18 @@ class RepoScanner:
                         f"PolinRider loader (hash match): {fn}", str(p),
                         f"SHA-256 {digest} matches a confirmed PolinRider font-disguised loader.",
                         f"Delete {p}. Search the repo for what references it (tasks.json, package.json scripts).",
-                        meta={"quarantine": True}))
+                        meta={"quarantine": True,
+                              "evidence": [f"SHA-256 {digest[:16]}... is a confirmed PolinRider loader"]}))
                     continue
                 verdict, detail = asset_verdict(p, I.marker_regex)
                 if verdict == "code":
+                    ev = [f"{ext} extension but no {ext[1:]} magic bytes; content is {detail}"]
+                    ev += evidence(read_text(p, limit_bytes=2 * 1024 * 1024), I, limit=6)
                     out.append(Finding(Severity.CRITICAL, category,
                         f"{kind} file contains code: {fn}", str(p),
                         f"Has a {ext} extension but the content is {detail}, not {ext[1:]} data.",
                         f"Delete {p} and find what loads it (grep -r '{fn}' .vscode package.json).",
-                        meta={"quarantine": True}))
+                        meta={"quarantine": True, "evidence": ev}))
                 elif verdict == "text":
                     out.append(Finding(Severity.HIGH if fn in I.fake_font_names else Severity.WARNING, category,
                         f"{kind} file is not binary: {fn}", str(p),
@@ -456,11 +496,14 @@ class RepoScanner:
             digest = sha256_of(fp)
             if digest in self.iocs.fake_font_sha256:
                 return [Finding(Severity.CRITICAL, "fake_font_loader", f"PolinRider loader (hash match): {name}",
-                                str(fp), f"SHA-256 {digest}", f"Delete {fp}", meta={"quarantine": True})]
+                                str(fp), f"SHA-256 {digest}", f"Delete {fp}",
+                                meta={"quarantine": True, "evidence": [f"SHA-256 {digest[:16]}... is a confirmed loader"]})]
             verdict, detail = asset_verdict(fp, self.iocs.marker_regex)
             if verdict == "code":
+                ev = [f"{fp.suffix} extension but content is {detail}"] + \
+                    evidence(read_text(fp, limit_bytes=2 * 1024 * 1024), self.iocs, limit=6)
                 return [Finding(Severity.CRITICAL, "fake_font_loader", f"Font/asset file contains code: {name}",
-                                str(fp), detail, f"Delete {fp}", meta={"quarantine": True})]
+                                str(fp), detail, f"Delete {fp}", meta={"quarantine": True, "evidence": ev})]
             return f
         f += self.check_signatures(fp)
         if name in self.iocs.config_files:
@@ -484,11 +527,19 @@ class RepoScanner:
                 f += self.check_entry_hook(fp)
                 f += self.check_signatures(fp)
         if self.js_all:
+            done = {repo / n for n in list(I.config_files) + list(I.entry_files)}
             for root, dirs, files in os.walk(repo):
-                dirs[:] = [d for d in dirs if not skip_dir(d)]
+                dirs[:] = [d for d in dirs if not self._skip(d)]
                 for fn in files:
-                    if fn.endswith((".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx")):
-                        f += self.check_signatures(Path(root) / fn)
+                    p = Path(root) / fn
+                    if p in done or Path(fn).suffix.lower() not in SCRIPT_EXTENSIONS:
+                        continue
+                    try:
+                        if p.stat().st_size > 8 * 1024 * 1024:
+                            continue
+                    except OSError:
+                        continue
+                    f += self.check_signatures(p)
         f += self.check_propagation_scripts(repo)
         f += self.check_vscode_tasks(repo)
         f += self.check_vscode_settings(repo)
@@ -511,10 +562,10 @@ class RepoScanner:
                 uniq.append(x)
         return uniq
 
-    def scan_all(self) -> Tuple[List[Finding], int, int]:
+    def scan_all(self, repos=None, projects=None) -> Tuple[List[Finding], int, int]:
         findings: List[Finding] = []
-        repos = self.find_repos()
-        projects = [p for p in self.find_non_git_projects() if p not in repos]
+        if repos is None or projects is None:
+            repos, projects = self.discover()
         total = len(repos) + len(projects)
         if not total:
             self.ui.info(f"No repositories or projects under {self.scan_dir}")

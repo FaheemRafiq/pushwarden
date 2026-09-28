@@ -20,11 +20,67 @@ EDITOR_SETTINGS = {
 
 
 def _strip_json_comments(text: str) -> str:
-    # settings.json is JSONC; remove // and /* */ comments and trailing commas.
-    text = re.sub(r"(?m)^\s*//.*$", "", text)
-    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-    text = re.sub(r",(\s*[}\]])", r"\1", text)
-    return text
+    """settings.json is JSONC. Remove // and /* */ comments and trailing commas
+    without touching string contents (globs like "**/*.pyc" must survive)."""
+    out, i, n = [], 0, len(text)
+    in_str = False
+    while i < n:
+        c = text[i]
+        if in_str:
+            out.append(c)
+            if c == "\\" and i + 1 < n:
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if c == '"':
+                in_str = False
+            i += 1
+            continue
+        if c == '"':
+            in_str = True
+            out.append(c)
+            i += 1
+        elif text.startswith("//", i):
+            j = text.find("\n", i)
+            i = n if j == -1 else j
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            i = n if j == -1 else j + 2
+        else:
+            out.append(c)
+            i += 1
+    cleaned = "".join(out)
+    # trailing commas (outside strings now, since comments are gone and we only
+    # touch ", }" / ", ]" sequences that cannot occur inside a JSON string value
+    # without an escaped quote before them)
+    return _strip_trailing_commas(cleaned)
+
+
+def _strip_trailing_commas(text: str) -> str:
+    out, i, n = [], 0, len(text)
+    in_str = False
+    while i < n:
+        c = text[i]
+        if in_str:
+            out.append(c)
+            if c == "\\" and i + 1 < n:
+                out.append(text[i + 1]); i += 2; continue
+            if c == '"':
+                in_str = False
+            i += 1
+            continue
+        if c == '"':
+            in_str = True
+        elif c == ",":
+            j = i + 1
+            while j < n and text[j] in " \t\r\n":
+                j += 1
+            if j < n and text[j] in "}]":
+                i += 1
+                continue
+        out.append(c)
+        i += 1
+    return "".join(out)
 
 
 def harden_editor(settings_path: Path, dry_run=False) -> Tuple[bool, List[str]]:

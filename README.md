@@ -1,7 +1,10 @@
+<!-- threatscan:allow-signatures -->
 # ThreatScan v5
 
-**Detect, remove and block the PolinRider / Contagious Interview supply-chain malware on developer machines.**
-Linux, macOS and Windows. One install command. Keeps watching in the background.
+**Real-time protection against the PolinRider / Contagious Interview supply-chain malware, for developer machines.**
+Linux, macOS and Windows. One install command. Behaves like Windows Defender: a malicious file is caught the
+moment it is written, quarantined before it can run, named, and you decide from a native dialog whether to
+remove it for good or restore and allow it.
 
 PolinRider is the DPRK (Lazarus) campaign that hides obfuscated JavaScript loaders in framework config files
 (`postcss.config.mjs`, `eslint.config.mjs`, `next.config.js` ...), fake font files (`fa-solid-400/500/900.woff2`)
@@ -10,13 +13,17 @@ backdoor to every branch you can reach. Over 2,000 GitHub owners and 4,000 repos
 September 2026. Sources are listed at the bottom.
 
 ```
-                  ┌────────────────────────────────────────────────────────┐
-  threatscan      │  scan     one-off audit of repos + host (read-only)     │
-                  │  guard    background service: 60 s / 6 h / 24 h passes  │
-                  │  protect  kill, quarantine, strip payloads, block C2    │
-                  │  harden   VS Code / Cursor / npm settings that stop     │
-                  │           stage 1 from ever running                     │
-                  └────────────────────────────────────────────────────────┘
+  file written ──► real-time watcher ──► scan (evidence) ──► quarantine ──► notification
+  (inotify / kqueue / ReadDirectoryChangesW)                     │            "Threats found:
+                                                                 │             Trojan:JS/PolinRider.FakeFont"
+                                                                 ▼
+                                                   native dialog: [Remove]  [Restore & allow]
+                                                                 │
+                                                                 ▼
+                                                   threatscan history  (restore / allow / remove)
+
+  every 5 s   processes + sockets to C2  ──► kill          every 6 h  full sweep of every repo + host
+  every 24 h  indicator refresh                            always     VS Code / Cursor hardening
 ```
 
 ---
@@ -61,18 +68,20 @@ There is also `threatscan.pyz`, a zero-dependency file that runs with any `pytho
 ## Day-to-day
 
 ```sh
-threatscan status                 # guard alive? last sweep? editors hardened? firewall?
-threatscan scan --home            # audit now (read-only)
-threatscan scan --home --fix      # audit and remove CRITICAL findings (originals kept)
-threatscan scan --dry-run ~/proj  # show what --fix would do
-threatscan restore --list         # everything the guard quarantined or stripped
-threatscan restore /path/to/file  # put an original back (it is still malicious!)
+threatscan status                 # guard alive? real-time backend? editors hardened? firewall?
+threatscan scan --home            # audit now; asks in the terminal before touching a file
+threatscan scan --home --gui      # same, but asks through the native dialog
+threatscan scan --home --no-prompt   # report only
+threatscan scan --home --fix      # act without asking (quarantine / strip, reversible)
+threatscan scan --deep ~/proj     # also descend into node_modules / vendor
+threatscan history                # protection history (restore / allow / remove)
 threatscan update-iocs            # pull the latest indicator file
 sudo threatscan protect --block-c2   # firewall + hosts sinkhole for all known C2
 threatscan uninstall [--unblock] [--purge]
 ```
 
-Legacy invocation still works: `python3 threat_scanner.py --ci .` behaves like v4.
+Legacy invocation still works: `python3 threat_scanner.py --ci .` behaves like v4 (`--configs-only` restores
+the v4 "known config names only" scope; v5 scans every script file by default).
 
 ### Exit codes
 
@@ -84,29 +93,50 @@ Legacy invocation still works: `python3 threat_scanner.py --ci .` behaves like v
 
 ---
 
-## What the guard does
+## What the guard does (Defender-style)
 
-| Cadence | Work | Cost |
+| Layer | Work | Latency / cost |
 |---|---|---|
-| every 60 s | process command lines, established sockets to C2 IPs, and any tracked file (config files, `.vscode/tasks.json`, propagation scripts, known loader names) whose mtime changed | a few ms |
-| every 6 h | full sweep: every repo under the watched roots plus host persistence, RAT footprint, editor injection, credentials | seconds to a minute |
-| every 24 h | download `iocs.json` from this repo; validated (schema, regex compile, size) before use | one HTTPS request |
+| **real-time** | native file-system watcher (inotify on Linux, kqueue on macOS, ReadDirectoryChangesW on Windows, polling fallback) over your project dirs, `~/Downloads` and `~/Desktop`; every written script, config, font, image or `.vscode/*.json` file is scanned as it lands | under 1 s, idle otherwise |
+| **behaviour** | every 5 s: process command lines and sockets to C2 IPs | a few ms |
+| **scheduled** | every 6 h: full sweep of every repo (all script files, not only known config names) plus host persistence, RAT footprint, editor injection, credentials | seconds to a minute |
+| **definitions** | every 24 h: `iocs.json` downloaded from this repo and validated before use | one HTTPS request |
 
-Response policy (both switchable with `threatscan config --set auto_kill=false auto_clean=false`):
+What happens when a file has strong evidence (`threatscan config --set action=...`):
+
+| `action` | Behaviour |
+|---|---|
+| `quarantine` (default) | file is quarantined **immediately**, a notification names the threat, then a native dialog shows the evidence with **Remove** (permanent) or **Restore & allow** (restores the exact file and stops flagging it). No answer within 3 minutes: it stays in quarantine. |
+| `ask` | dialog first, nothing is touched until you answer; no answer: quarantine |
+| `delete` | remove permanently without asking |
+| `report` | notify only |
+
+Strong evidence means a literal campaign signature or marker, a payload XOR key, a dead-drop wallet, a known
+loader hash, a font/image file whose bytes are code, `runOn: folderOpen` with a loader, or a propagation script.
+The dialog always lists the exact indicators found (string, offset, whitespace padding, C2 host ...).
+
+Other responses:
 
 | Finding | Response |
 |---|---|
-| process whose command line carries a **strict** campaign marker, or a socket to a C2 IP | `kill -9` / `taskkill /F` |
-| config or entry file with a signature / marker / XOR key | payload **stripped by byte offset**, legitimate export kept, original quarantined |
-| font/image/dict file that is really code, hash-matched loader, `temp_auto_push.bat`, `tasks.json` with a loader | quarantined |
-| RAT systemd unit / LaunchAgent / scheduled task / crontab line / RAT directory | disabled and quarantined |
-| HIGH and WARNING findings | alert only |
+| process whose command line carries a **strict** campaign marker, or a socket to a C2 IP | killed at once (`auto_kill`, no dialog: a running payload cannot wait) |
+| config or entry file with an appended payload | payload **stripped by byte offset**, legitimate export kept; prepended or mid-file injections quarantine the whole file instead of guessing |
+| RAT systemd unit / LaunchAgent / scheduled task / crontab line / RAT directory | disabled and quarantined (crontab backed up first) |
+| HIGH and WARNING findings (heuristics: `node -e`, oversized configs, backdated commits) | alert only, never auto-acted |
 
-Everything is written to `~/.threatscan/quarantine/index.jsonl` and reversible with `threatscan restore`.
-Alerts go to the desktop (notify-send / Notification Center / Windows toast), `~/.threatscan/alerts.log`,
-and the webhook if configured. Reports land in `~/.threatscan/reports/`.
+Threat names follow the Defender convention so alerts are recognisable at a glance: `Trojan:JS/PolinRider.FakeFont`,
+`Trojan:JS/PolinRider.ConfigInject`, `Trojan:Script/PolinRider.TaskJacker`, `Trojan:BAT/PolinRider.AutoPush`,
+`Behavior:Node/PolinRider.Payload`, `Backdoor:JS/RuntimeDevLink` ...
 
-Broad heuristics (`node -e`, `python -c`, oversized configs) are **never** auto-killed or auto-cleaned.
+Alerts go to the desktop (notify-send / Notification Center / Windows toast), `~/.threatscan/alerts.log`, and
+the webhook if configured. Every action is in the protection history:
+
+```sh
+threatscan history                       # what was quarantined / stripped / removed, with threat names
+threatscan history --restore <path>      # put the original back (still malicious)
+threatscan history --allow <path>        # restore and allow this exact content (30 days)
+threatscan history --remove <path>       # delete the quarantined copies for good
+```
 
 ---
 
@@ -120,6 +150,7 @@ Broad heuristics (`node -e`, `python -c`, oversized configs) are **never** auto-
 | XOR keys (4 known), TRON / Aptos / Ethereum dead-drop wallets, RPC hosts co-located with a marker | CRITICAL |
 | C2 IPs (17), Vercel stage-1 hosts (7), C2 paths (`/$/boot`, `/verify-human/`, `/0x/cls`, `/api/telemetry/*` ...), `X-Payload-B64` | CRITICAL |
 | Font / image / `.dict` files whose bytes are code (with or without whitespace padding), 6 known loader hashes | CRITICAL |
+| Any `.js/.ts/.json/.py/.sh/.bat/.ps1/...` file in the repo carrying a signature (not only known config names) | CRITICAL |
 | `.vscode/tasks.json` with `runOn: folderOpen` (+ loader / C2 host), `task.allowAutomaticTasks` forced on | CRITICAL / HIGH |
 | `temp_auto_push.bat`, `config.bat`, `.gitignore` hiding them or itself, `branch_structure.json`, `nul` | CRITICAL / HIGH |
 | Malicious git hooks, `core.fsmonitor` running node | CRITICAL |
@@ -140,6 +171,8 @@ Broad heuristics (`node -e`, `python -c`, oversized configs) are **never** auto-
 | Plain-text tokens (`.npmrc`, `.git-credentials`, gh, aws, docker) and SSH keys on an infected host | HIGH |
 
 All indicators live in [`threatscan/iocs.json`](threatscan/iocs.json). Add new ones there; no code change needed.
+Files that legitimately contain signature strings (rule sets, tests, indicator databases) opt out with the token
+`threatscan:allow-signatures` in their first 512 bytes; the token is never honoured for config, entry, asset or JavaScript/TypeScript files.
 
 ---
 
@@ -226,7 +259,8 @@ threatscan/
   iocs.py            loader + validation
   scanner/repo.py    repository checks          scanner/system.py   host checks
   protect.py         kill / quarantine / strip / persistence removal / firewall
-  guard.py           background loop            service.py          systemd / launchd / schtasks
+  guard.py           background loop + policy   realtime.py         inotify / kqueue / RDCW watcher
+  prompt.py          native dialogs, threat names service.py         systemd / launchd / schtasks
   hardening.py       editor + npm settings      notify.py           desktop + webhook
   cli.py             commands                   report.py, config.py, updater.py
 installers/          install.sh, install.ps1, build-pyz.sh

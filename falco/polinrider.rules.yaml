@@ -1,3 +1,4 @@
+# threatscan:allow-signatures
 # threatscan/falco/polinrider.rules.yaml  (installed as /etc/falco/rules.d/threatscan-polinrider.yaml)
 #
 # PolinRider / "Contagious Interview" DPRK supply-chain campaign detection.

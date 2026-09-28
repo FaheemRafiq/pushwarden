@@ -14,7 +14,8 @@ from pathlib import Path
 from typing import List, Optional
 
 from .findings import Finding, Severity
-from .helpers import find_payload_cut, read_bytes
+from .helpers import find_payload_cut, read_bytes, sha256_of
+from .prompt import DELETE, KEEP, TIMEOUT, UNAVAILABLE
 
 
 class Protector:
@@ -26,6 +27,8 @@ class Protector:
         self.qdir = data_dir / "quarantine"
         self.index = self.qdir / "index.jsonl"
         self.qdir.mkdir(parents=True, exist_ok=True)
+        self.decisions_path = data_dir / "decisions.json"
+        self.decisions = self._load_decisions()
 
     # ── bookkeeping ──────────────────────────────────────────────────────────
     def _record(self, entry: dict):
@@ -55,7 +58,72 @@ class Protector:
         if self.ui:
             self.ui.info(("[dry-run] " if self.dry_run else "") + msg)
 
+    # ── user decisions ("keep" is remembered until the file changes) ─────────
+    def _load_decisions(self) -> dict:
+        try:
+            return json.loads(self.decisions_path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+
+    def remember(self, f: Finding, decision: str):
+        if not f.path:
+            return
+        self.decisions[f.path] = {"decision": decision, "sha256": sha256_of(Path(f.path)),
+                                  "ts": time.time(), "title": f.title}
+        if not self.dry_run:
+            try:
+                self.decisions_path.write_text(json.dumps(self.decisions, indent=1), encoding="utf-8")
+            except Exception:
+                pass
+
+    def kept_by_user(self, f: Finding) -> bool:
+        d = self.decisions.get(f.path or "")
+        if not d or d.get("decision") != KEEP:
+            return False
+        if time.time() - d.get("ts", 0) > 30 * 86400:
+            return False
+        return sha256_of(Path(f.path)) == d.get("sha256")
+
+    @staticmethod
+    def action_word(f: Finding) -> str:
+        if f.meta.get("cleanable"):
+            return "Remove payload"
+        if f.category.startswith("persistence_") or f.category in ("rat_footprint", "stage4_runtime"):
+            return "Remove persistence"
+        return "Delete the file"
+
+    @staticmethod
+    def needs_decision(f: Finding) -> bool:
+        """Strong evidence about a *file* (not a live process)."""
+        return (f.severity == Severity.CRITICAL and bool(f.path)
+                and (f.meta.get("cleanable") or f.meta.get("quarantine")
+                     or f.category.startswith("persistence_") or f.category in ("rat_footprint", "stage4_runtime")))
+
     # ── actions ──────────────────────────────────────────────────────────────
+    def delete(self, f: Finding) -> bool:
+        """Permanent removal (user asked for it); only a record is kept."""
+        if not f.path:
+            return False
+        src = Path(f.path)
+        if not src.exists():
+            return False
+        digest = sha256_of(src) if src.is_file() else ""
+        if not self.dry_run:
+            try:
+                if src.is_dir():
+                    shutil.rmtree(src)
+                else:
+                    src.unlink()
+            except Exception as e:
+                f.action = f"delete failed: {e}"
+                return False
+        f.action = "deleted (user confirmed)"
+        from .prompt import threat_name
+        self._record({"type": "delete", "original": str(src), "sha256": digest, "title": f.title,
+                      "threat": threat_name(f), "evidence": f.meta.get("evidence", [])})
+        self._say(f"Deleted {src}")
+        return True
+
     def kill(self, f: Finding) -> bool:
         pid = int(f.meta.get("pid") or 0)
         if not pid or pid == os.getpid():
@@ -89,7 +157,9 @@ class Protector:
                 f.action = f"quarantine failed: {e}"
                 return False
         f.action = f"quarantined to {copy}"
-        self._record({"type": "quarantine", "original": str(src), "copy": str(copy), "title": f.title})
+        from .prompt import threat_name
+        self._record({"type": "quarantine", "original": str(src), "copy": str(copy), "title": f.title,
+                      "threat": threat_name(f), "evidence": f.meta.get("evidence", [])})
         self._say(f"Quarantined {src}")
         return True
 
@@ -103,9 +173,16 @@ class Protector:
             return False
         text = raw.decode("utf-8", "surrogateescape")
         cut = find_payload_cut(text, self.iocs)
-        if cut <= 0:
-            # Nothing legitimate before the payload: the whole file is malicious.
-            return self.quarantine(f)
+        tail = text[cut:].rstrip() if cut > 0 else ""
+        if cut <= 0 or "\n" in tail or not tail:
+            # PolinRider appends its payload as ONE long line at the end of the
+            # file.  Anything else (prepended or mid-file injection) cannot be
+            # stripped safely: quarantine the whole file instead of guessing.
+            f.meta["mid_file_injection"] = True
+            ok = self.quarantine(f)
+            if ok:
+                f.action = "payload is not a trailing append; whole file " + f.action
+            return ok
         cleaned = text[:cut].rstrip(" \t") 
         if not cleaned.endswith("\n"):
             cleaned += "\n"
@@ -122,8 +199,10 @@ class Protector:
                 return False
         f.action = f"removed {removed} bytes of payload (original in {copy})"
         f.meta["cut"] = cut
+        from .prompt import threat_name
         self._record({"type": "clean", "original": str(src), "copy": str(copy), "cut": cut,
-                      "removed_bytes": removed, "title": f.title})
+                      "removed_bytes": removed, "title": f.title, "threat": threat_name(f),
+                      "evidence": f.meta.get("evidence", [])})
         self._say(f"Stripped payload from {src}")
         return True
 
@@ -150,11 +229,21 @@ class Protector:
             self._record({"type": "schtask", "name": m["schtask"], "title": f.title})
             return True
         if "cron_line" in m and not self.plat.is_windows:
-            current = self.plat.run(["crontab", "-l"])
+            rc, current, err = self.plat.run_rc(["crontab", "-l"])
+            if rc != 0 or m["cron_line"].strip() not in current:
+                f.action = f"crontab could not be read safely; edit it by hand (rc={rc})"
+                return False
             new = "\n".join(l for l in current.split("\n") if l.strip() != m["cron_line"].strip())
             if not self.dry_run:
-                subprocess.run(["crontab", "-"], input=new + "\n", text=True, capture_output=True, timeout=20)
-            f.action = "removed crontab line"
+                backup = self.qdir / time.strftime("%Y%m%d-%H%M%S") / "crontab.bak"
+                backup.parent.mkdir(parents=True, exist_ok=True)
+                backup.write_text(current)
+                r = subprocess.run(["crontab", "-"], input=new.rstrip("\n") + "\n", text=True,
+                                   capture_output=True, timeout=20)
+                if r.returncode != 0:
+                    f.action = f"crontab rewrite failed: {r.stderr.strip()[:120]}"
+                    return False
+            f.action = "removed crontab line (backup in quarantine)"
             self._record({"type": "cron", "line": m["cron_line"], "title": f.title})
             return True
         if m.get("quarantine"):
@@ -162,8 +251,31 @@ class Protector:
         return False
 
     # ── policy ───────────────────────────────────────────────────────────────
-    def respond(self, findings: List[Finding], auto_kill=True, auto_clean=True) -> List[Finding]:
-        """Act on findings per policy; returns the ones that were acted on."""
+    def _reversible(self, f: Finding) -> bool:
+        if f.category.startswith("persistence_") or f.category in ("rat_footprint", "stage4_runtime"):
+            return self.remove_persistence(f)
+        if f.meta.get("cleanable"):
+            return self.clean_config(f)
+        if f.meta.get("quarantine"):
+            return self.quarantine(f)
+        return False
+
+    def _confirmed(self, f: Finding) -> bool:
+        """What 'Delete' means per finding type."""
+        if f.meta.get("cleanable"):
+            return self.clean_config(f)            # strip payload, keep the legit config
+        if f.category.startswith("persistence_") or f.category in ("rat_footprint", "stage4_runtime"):
+            return self.remove_persistence(f)
+        return self.delete(f)
+
+    def respond(self, findings: List[Finding], auto_kill=True, auto_clean=True, decide=None) -> List[Finding]:
+        """Act on findings per policy; returns the ones that were acted on.
+
+        decide(finding, action_word) -> "delete" | "keep" | "timeout" | "unavailable"
+        When given, strong-evidence file findings are put to the user first.
+        Live processes are never put to a vote: a running payload is killed
+        immediately when auto_kill is on.
+        """
         acted = []
         for f in findings:
             if f.severity < Severity.CRITICAL:
@@ -174,17 +286,31 @@ class Protector:
                         if self.kill(f):
                             acted.append(f)
                     continue
-                if not auto_clean:
+                if not self.needs_decision(f):
                     continue
-                if f.category.startswith("persistence_") or f.category in ("rat_footprint", "stage4_runtime"):
-                    if self.remove_persistence(f):
+                if self.kept_by_user(f):
+                    f.action = "kept (user decision, unchanged file)"
+                    continue
+                if decide is not None:
+                    verdict = decide(f, self.action_word(f))
+                    if verdict == DELETE:
+                        if self._confirmed(f):
+                            acted.append(f)
+                        continue
+                    if verdict == KEEP:
+                        self.remember(f, KEEP)
+                        f.action = "kept by user"
+                        continue
+                    # timeout / no dialog available: fall through to the reversible default
+                    if not auto_clean:
+                        f.action = f"no decision ({verdict}); left in place"
+                        continue
+                    if self._reversible(f):
+                        f.action = f"no decision ({verdict}); " + f.action
                         acted.append(f)
-                elif f.meta.get("cleanable"):
-                    if self.clean_config(f):
-                        acted.append(f)
-                elif f.meta.get("quarantine"):
-                    if self.quarantine(f):
-                        acted.append(f)
+                    continue
+                if auto_clean and self._reversible(f):
+                    acted.append(f)
             except Exception as e:
                 f.action = f"response failed: {e}"
             if self.dry_run and f.action and not f.action.startswith("would"):
@@ -202,6 +328,26 @@ class Protector:
             except Exception:
                 pass
         return out
+
+    def purge(self, original: str) -> int:
+        """Permanently delete the quarantined copies of `original`."""
+        n = 0
+        for e in self.entries():
+            if e.get("original") == original and e.get("copy") and not e.get("dry_run"):
+                c = Path(e["copy"])
+                try:
+                    if c.is_dir():
+                        shutil.rmtree(c)
+                    elif c.exists():
+                        c.unlink()
+                    else:
+                        continue
+                    n += 1
+                except Exception:
+                    pass
+        if n:
+            self._record({"type": "purge", "original": original, "copies": n, "title": "user removed from quarantine"})
+        return n
 
     def restore(self, original: str) -> bool:
         """Put a quarantined/cleaned file back exactly as it was.  Use with care."""

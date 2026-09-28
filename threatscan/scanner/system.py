@@ -1,3 +1,4 @@
+# threatscan:allow-signatures
 """Live host scanner: processes, sockets, persistence, RAT footprint, credentials."""
 
 import os
@@ -21,8 +22,12 @@ class SystemScanner:
         out = []
         self.ui.progress("Checking running processes")
         me = os.getpid()
+        own = {"zenity", "yad", "kdialog", "xmessage", "osascript", "notify-send"}
         for pid, name, cmd in self.plat.list_processes():
-            if pid == me or "threatscan" in cmd:
+            low = cmd.lower()
+            if pid == me or "threatscan" in low or name.lower() in own:
+                continue
+            if name.lower().startswith("powershell") and "threatscan" in low:
                 continue
             for pat in self.iocs.process_patterns:
                 if pat.search(cmd):

@@ -156,7 +156,7 @@ class PlatformInfo:
 
     def npm_global_root(self):
         cmd = ["npm.cmd", "root", "-g"] if self.is_windows else ["npm", "root", "-g"]
-        out = self.run(cmd).strip()
+        out = self.run(cmd, timeout=8).strip()
         return Path(out) if out else None
 
     def hosts_file(self):
@@ -168,7 +168,9 @@ class PlatformInfo:
         names = ["projects", "Projects", "dev", "Dev", "code", "Code", "work", "src", "repos",
                  "Documents/projects", "Documents/dev", "Documents/code", "Documents/GitHub",
                  "Desktop/projects", "Desktop/dev", "Developer", "Coding", "workspace", "www", "sites",
-                 "source", "source/repos", "git", "GitHub"]
+                 "source", "source/repos", "git", "GitHub",
+                 # take-home "coding tests" land here before they are opened in VS Code
+                 "Downloads", "Desktop"]
         return [self.home / n for n in names if (self.home / n).is_dir()]
 
     # ── Live system ──────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 #!/bin/bash
+# threatscan:allow-signatures
 # ThreatScan Pre-Commit Hook
 # Detects malware signatures before they're committed
 # Install: cp pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit

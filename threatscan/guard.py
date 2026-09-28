@@ -10,8 +10,10 @@ State lives in <data_dir>/guard/ : heartbeat.json, seen.json (alert dedup).
 
 import json
 import os
+import queue
 import signal
 import sys
+import threading
 import time
 import traceback
 from pathlib import Path
@@ -22,6 +24,9 @@ from .config import Config
 from .findings import Finding, ScanStats, Severity
 from .notify import Notifier
 from .protect import Protector
+from . import prompt
+from .helpers import ASSET_MAGIC, SCRIPT_EXTENSIONS, TEXT_ASSET_EXTENSIONS, is_under, skip_dir
+from .realtime import Watcher
 from .report import write_report
 from .scanner import RepoScanner, SystemScanner
 from .ui import TerminalUI
@@ -48,6 +53,9 @@ class Guard:
         self.last_full = 0.0
         self.running = True
         self.log_path = data_dir / "guard.log"
+        self.watcher = None
+        self._dialogs: "queue.Queue" = queue.Queue()
+        self._dialog_thread = None
 
     # ── utils ────────────────────────────────────────────────────────────────
     def _load_json(self, p: Path, default):
@@ -76,7 +84,8 @@ class Guard:
 
     def heartbeat(self, phase: str, extra=None):
         hb = {"ts": time.time(), "pid": os.getpid(), "phase": phase, "version": VERSION,
-              "iocs": self.iocs.version, "last_full": self.last_full, "repos": len(self.repos)}
+              "iocs": self.iocs.version, "last_full": self.last_full, "repos": len(self.repos),
+              "realtime": self.watcher.backend if self.watcher else "off", "action": self.cfg.action}
         if extra:
             hb.update(extra)
         self._save_json(self.state_dir / "heartbeat.json", hb)
@@ -85,13 +94,16 @@ class Guard:
         self.running = False
 
     # ── discovery ────────────────────────────────────────────────────────────
-    def refresh_targets(self):
-        roots = self.cfg.roots(self.plat)
+    def refresh_targets(self, discovered=None):
+        """discovered: {root: (repos, projects)} from a full pass, to avoid a second walk."""
         repos = []
-        for r in roots:
-            rs = RepoScanner(r, self.ui, self.iocs, exclude=self.cfg.exclude)
-            repos += rs.find_repos()
-            repos += [p for p in rs.find_non_git_projects() if p not in repos]
+        if discovered is None:
+            discovered = {}
+            for r in self.cfg.roots(self.plat):
+                rs = RepoScanner(r, self.ui, self.iocs, exclude=self.cfg.exclude, deep=self.cfg.deep)
+                discovered[r] = rs.discover()
+        for r, (rp, pj) in discovered.items():
+            repos += rp + [p for p in pj if p not in rp]
         self.repos = repos
         rs = RepoScanner(Path.home(), self.ui, self.iocs, exclude=self.cfg.exclude)
         self.tracked = rs.tracked_files(repos)
@@ -104,18 +116,72 @@ class Guard:
                 self.mtimes.pop(str(p), None)
 
     # ── response + alerting ──────────────────────────────────────────────────
+    def decide(self, f: Finding, action_word: str) -> str:
+        """Before-action dialog (policy "ask")."""
+        if not self.cfg.prompt:
+            return prompt.UNAVAILABLE
+        self.log(f"asking user about {f.path} ({action_word})")
+        verdict = prompt.ask(self.plat, f, action_word, timeout=self.cfg.prompt_timeout)
+        self.log(f"user decision for {f.path}: {verdict}")
+        return verdict
+
+    def _after_quarantine(self, f: Finding):
+        """Defender-style follow-up: file is already quarantined; Remove or Restore & allow."""
+        verdict = prompt.ask_quarantined(self.plat, f, timeout=self.cfg.prompt_timeout)
+        self.log(f"post-quarantine decision for {f.path}: {verdict}")
+        if verdict == prompt.DELETE:
+            n = self.protector.purge(f.path)
+            self.log(f"removed {n} quarantined cop(ies) of {f.path}")
+        elif verdict == prompt.KEEP:
+            if self.protector.restore(f.path):
+                self.protector.remember(f, prompt.KEEP)
+                self.log(f"restored and allowed {f.path}")
+        # timeout / unavailable: stays in quarantine (threatscan history to review)
+
+    def _dialog_worker(self):
+        while self.running:
+            try:
+                f = self._dialogs.get(timeout=1)
+            except queue.Empty:
+                continue
+            try:
+                self._after_quarantine(f)
+            except Exception:
+                self.log("dialog error:\n" + traceback.format_exc())
+
+    def _queue_dialog(self, f: Finding):
+        if not self.cfg.prompt:
+            return
+        if self._dialog_thread is None or not self._dialog_thread.is_alive():
+            self._dialog_thread = threading.Thread(target=self._dialog_worker, name="threatscan-dialogs", daemon=True)
+            self._dialog_thread.start()
+        self._dialogs.put(f)
+
     def handle(self, findings: List[Finding], context: str):
+        """Apply the configured policy, alert, and record."""
         if not findings:
             return
-        acted = self.protector.respond(findings, auto_kill=self.cfg.auto_kill, auto_clean=self.cfg.auto_clean)
+        policy = (self.cfg.action or "quarantine").lower()
+        if policy == "ask":
+            acted = self.protector.respond(findings, auto_kill=self.cfg.auto_kill, auto_clean=self.cfg.auto_clean,
+                                           decide=self.decide)
+        elif policy == "delete":
+            acted = self.protector.respond(findings, auto_kill=self.cfg.auto_kill, auto_clean=True,
+                                           decide=lambda f, w: prompt.DELETE)
+        elif policy == "report":
+            acted = self.protector.respond(findings, auto_kill=self.cfg.auto_kill, auto_clean=False)
+        else:  # quarantine: act first (reversible), then let the user decide
+            acted = self.protector.respond(findings, auto_kill=self.cfg.auto_kill, auto_clean=True)
         now = time.time()
         fresh = []
         for f in findings:
+            if f.action.startswith("kept"):
+                self.seen[f.key] = now      # user saw it; do not nag
+                continue
             # Re-alert on the same finding at most once per 6 hours, always alert actions.
             if f.action or now - self.seen.get(f.key, 0) > 6 * 3600:
                 fresh.append(f)
-            self.seen[f.key] = now
-        # prune
+                self.seen[f.key] = now
         for k in [k for k, t in self.seen.items() if now - t > 7 * 86400]:
             del self.seen[k]
         self._save_json(self.state_dir / "seen.json", self.seen)
@@ -125,6 +191,56 @@ class Guard:
             self.notifier.alert([f for f in fresh if f.severity >= Severity.WARNING], context=context)
         if acted:
             self.log(f"responded to {len(acted)} finding(s)")
+        if policy == "quarantine":
+            for f in acted:
+                if f.path and f.category not in ("malicious_process", "c2_connection") \
+                        and (f.meta.get("quarantine") or f.meta.get("cleanable") or f.meta.get("mid_file_injection")):
+                    self._queue_dialog(f)
+
+    # ── real-time ────────────────────────────────────────────────────────────
+    def _watch_skip(self, name: str) -> bool:
+        if self.cfg.deep and name in ("node_modules", "vendor"):
+            return False
+        return skip_dir(name)
+
+    def _interesting(self, p: Path) -> bool:
+        if is_under(p, [self.data_dir]) or is_under(p, self.cfg.exclude):
+            return False
+        name = p.name
+        if name in ("tasks.json", "settings.json") and p.parent.name == ".vscode":
+            return True
+        if name in self.iocs.propagation_scripts or name in self.iocs.fake_font_names:
+            return True
+        ext = p.suffix.lower()
+        return ext in SCRIPT_EXTENSIONS or ext in ASSET_MAGIC or ext in TEXT_ASSET_EXTENSIONS
+
+    def on_fs_events(self, paths):
+        rs = RepoScanner(Path.home(), self.ui, self.iocs, exclude=self.cfg.exclude, deep=self.cfg.deep)
+        findings: List[Finding] = []
+        n = 0
+        for p in paths:
+            try:
+                if not p.is_file() or not self._interesting(p):
+                    continue
+                if p.stat().st_size > 8 * 1024 * 1024:
+                    continue
+            except OSError:
+                continue
+            n += 1
+            findings += rs.scan_file(p)
+            self.mtimes[str(p)] = p.stat().st_mtime if p.exists() else 0
+        if findings:
+            self.log(f"realtime: {n} file(s) scanned, {len(findings)} finding(s)")
+        self.handle(findings, "realtime")
+
+    def start_realtime(self):
+        if not self.cfg.realtime or self.watcher is not None:
+            return
+        roots = self.cfg.roots(self.plat)
+        if not roots:
+            return
+        self.watcher = Watcher(roots, skip=self._watch_skip, on_events=self.on_fs_events, log=self.log)
+        self.watcher.start()
 
     # ── passes ───────────────────────────────────────────────────────────────
     def quick_pass(self):
@@ -153,16 +269,19 @@ class Guard:
     def full_pass(self):
         self.heartbeat("full")
         start = time.time()
-        self.refresh_targets()
         findings: List[Finding] = []
         repos_total = infected = files = 0
+        discovered = {}
         for root in self.cfg.roots(self.plat):
-            rs = RepoScanner(root, self.ui, self.iocs, js_all=self.cfg.js_all, exclude=self.cfg.exclude)
-            fs, total, inf = rs.scan_all()
+            rs = RepoScanner(root, self.ui, self.iocs, js_all=self.cfg.js_all, exclude=self.cfg.exclude,
+                             deep=self.cfg.deep)
+            discovered[root] = rs.discover()
+            fs, total, inf = rs.scan_all(*discovered[root])
             findings += fs
             repos_total += total
             infected += inf
             files += rs.files_checked
+        self.refresh_targets(discovered)
         ss = SystemScanner(self.plat, self.ui, self.iocs)
         findings += ss.scan_all(repo_infected=infected > 0)
         self.handle(findings, "guard-full")
@@ -197,7 +316,7 @@ class Guard:
             except Exception:
                 pass
         self.log(f"guard v{VERSION} starting (iocs {self.iocs.version}, auto_kill={self.cfg.auto_kill}, "
-                 f"auto_clean={self.cfg.auto_clean}, dry_run={self.dry_run})")
+                 f"auto_clean={self.cfg.auto_clean}, prompt={self.cfg.prompt}, deep={self.cfg.deep}, dry_run={self.dry_run})")
         try:
             self.maybe_update_iocs()
             self.full_pass()
@@ -205,13 +324,18 @@ class Guard:
             self.log("full pass error:\n" + traceback.format_exc())
         if self.once:
             return 0
-        next_quick = time.time() + self.cfg.quick_interval
+        try:
+            self.start_realtime()
+        except Exception:
+            self.log("realtime start error:\n" + traceback.format_exc())
+        quick = max(self.cfg.quick_interval, 15 if self.plat.is_windows else 2)
+        next_quick = time.time() + quick
         while self.running:
             time.sleep(1)
             now = time.time()
             if now < next_quick:
                 continue
-            next_quick = now + self.cfg.quick_interval
+            next_quick = now + quick
             try:
                 if now - self.last_full >= self.cfg.full_interval:
                     self.maybe_update_iocs()
@@ -220,6 +344,8 @@ class Guard:
                     self.quick_pass()
             except Exception:
                 self.log("pass error:\n" + traceback.format_exc())
+        if self.watcher:
+            self.watcher.stop()
         self.log("guard stopped")
         return 0
 

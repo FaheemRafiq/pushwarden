@@ -1,3 +1,4 @@
+// threatscan:allow-signatures
 rule Lazarus_Contagious_Interview_C2 {
     meta:
         description = "Detects Lazarus Group Contagious Interview blockchain C2 malware"

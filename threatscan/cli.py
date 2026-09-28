@@ -14,6 +14,7 @@ from .findings import Finding, ScanStats, Severity
 from .hardening import EDITOR_SETTINGS, editor_status, harden_editor, harden_npm, install_pre_commit, unharden_npm
 from .helpers import read_text
 from .notify import Notifier
+from . import prompt
 from .platform_info import PlatformInfo
 from .protect import NetBlocker, Protector
 from .report import report_dict, write_report
@@ -61,7 +62,8 @@ def cmd_scan(args) -> int:
     if not args.no_repos:
         ui.section("REPOSITORY SCAN")
         for d in dirs:
-            rs = RepoScanner(d, ui, iocs, js_all=args.js_all, verbose=args.verbose, exclude=cfg.exclude)
+            rs = RepoScanner(d, ui, iocs, js_all=not args.configs_only, verbose=args.verbose,
+                             exclude=cfg.exclude, deep=args.deep)
             fs, total, infected = rs.scan_all()
             all_findings += fs
             repos_total += total
@@ -81,14 +83,24 @@ def cmd_scan(args) -> int:
             ui.ok("No malicious processes, C2 connections, or RAT persistence found")
         all_findings += sysf
 
-    if args.fix or args.dry_run:
+    strong = [f for f in all_findings if Protector.needs_decision(f)]
+    interactive = (not args.ci and not args.no_prompt and not args.fix
+                   and (args.gui or (sys.stdin and sys.stdin.isatty())))
+    if args.fix or args.dry_run or (interactive and strong):
         ui.section("RESPONSE" + (" (dry run)" if args.dry_run else ""))
         prot = Protector(plat, iocs, data_dir, ui=ui, dry_run=args.dry_run)
-        acted = prot.respond(all_findings, auto_kill=True, auto_clean=True)
-        for f in acted:
-            ui.finding(f)
+        if args.fix or args.dry_run:
+            decide = None                       # --fix: act without asking (reversible: quarantine/strip)
+        elif args.gui:
+            decide = lambda f, w: prompt.ask(plat, f, w, timeout=cfg.prompt_timeout)
+        else:
+            decide = lambda f, w: prompt.ask_terminal(f, w)
+        acted = prot.respond(all_findings, auto_kill=cfg.auto_kill, auto_clean=args.fix or args.dry_run, decide=decide)
+        for f in all_findings:
+            if f.action:
+                ui.finding(f)
         if not acted:
-            ui.info("Nothing to act on.")
+            ui.info("Nothing was changed.")
         else:
             ui.info(f"Quarantine index: {prot.index}   (undo: threatscan restore <path>)")
 
@@ -149,17 +161,26 @@ def cmd_install(args) -> int:
     if args.no_clean:
         cfg.auto_clean = False
         changed = True
+    if args.no_prompt:
+        cfg.prompt = False
+        changed = True
+    if args.deep:
+        cfg.deep = True
+        changed = True
     if args.full_interval:
         cfg.full_interval = args.full_interval
         changed = True
-    p = cfg.save(data_dir)
-    ui.info(f"Config: {p}" + (" (updated)" if changed else ""))
+    if args.dry_run:
+        ui.info(f"[dry-run] config would be saved to {data_dir / 'config.json'}")
+    else:
+        p = cfg.save(data_dir)
+        ui.info(f"Config: {p}" + (" (updated)" if changed else ""))
     roots = cfg.roots(plat)
     ui.info("Guard will sweep: " + (", ".join(str(r) for r in roots) or "(no project dirs found; set with --roots)"))
 
     if not args.no_harden:
         ui.section("HARDENING")
-        _do_harden(plat, ui, npm=args.npm_ignore_scripts, dry_run=False)
+        _do_harden(plat, ui, npm=args.npm_ignore_scripts, dry_run=args.dry_run)
 
     ui.section("BACKGROUND GUARD")
     sm = ServiceManager(plat, data_dir, ui)
@@ -179,9 +200,9 @@ def cmd_install(args) -> int:
 
     ui.section("FIRST SCAN")
     ui.info("Running the first full scan now (this may take a minute)...")
-    ns = argparse.Namespace(directories=[], home=True, no_repos=False, no_system=False, js_all=False,
-                            verbose=False, ci=False, json=None,
-                            fix=(not args.no_clean) and not args.dry_run, dry_run=args.dry_run,
+    ns = argparse.Namespace(directories=[], home=True, no_repos=False, no_system=False, configs_only=False,
+                            deep=cfg.deep, verbose=False, ci=False, json=None, gui=not sys.stdin.isatty(),
+                            no_prompt=args.dry_run, fix=False, dry_run=args.dry_run,
                             no_report=args.dry_run, notify=not args.dry_run)
     rc = cmd_scan(ns)
     ui.info(f"Status any time:  threatscan status      Logs: {data_dir / 'guard.log'}")
@@ -219,7 +240,7 @@ def cmd_status(args) -> int:
         ("Last full sweep", time.strftime("%Y-%m-%d %H:%M", time.localtime(hb["last_full"])) if hb.get("last_full") else "never"),
         ("Repos tracked", str(hb.get("repos", "?"))),
         ("Indicators", f"{iocs.version} ({iocs.source})"),
-        ("Auto-kill / auto-clean", f"{cfg.auto_kill} / {cfg.auto_clean}"),
+        ("Auto-kill / prompt / fallback-clean", f"{cfg.auto_kill} / {cfg.prompt} / {cfg.auto_clean}"),
         ("Webhook", "configured" if cfg.webhook_url else "none"),
         ("Firewall", NetBlocker(plat, iocs).status()),
         ("Data dir", str(data_dir)),
@@ -325,6 +346,42 @@ def cmd_restore(args) -> int:
     return 1
 
 
+def cmd_history(args) -> int:
+    plat, data_dir, cfg, iocs = _ctx(args)
+    ui = TerminalUI()
+    prot = Protector(plat, iocs, data_dir, ui=ui)
+    if args.restore:
+        ok = prot.restore(args.restore)
+        (ui.ok if ok else ui.err)(("Restored " if ok else "No quarantine entry for ") + args.restore)
+        return 0 if ok else 1
+    if args.allow:
+        ok = prot.restore(args.allow)
+        if not ok:
+            ui.err(f"No quarantine entry for {args.allow}")
+            return 1
+        from .findings import Finding
+        prot.remember(Finding(Severity.CRITICAL, "user_allow", "allowed by user", args.allow), prompt.KEEP)
+        ui.ok(f"Restored and allowed {args.allow} (this exact content will not be flagged again for 30 days)")
+        return 0
+    if args.remove:
+        n = prot.purge(args.remove)
+        (ui.ok if n else ui.err)(f"Removed {n} quarantined cop{'y' if n == 1 else 'ies'} of {args.remove}")
+        return 0 if n else 1
+    entries = prot.entries()
+    if not entries:
+        ui.info("Protection history is empty.")
+        return 0
+    print(f"  {'when':<19} {'action':<11} {'threat':<38} path")
+    for e in entries[-int(args.limit):]:
+        label = e.get("threat") or e.get("title") or ""
+        target = e.get("original") or (f"pid {e.get('pid')}" if e.get("pid") else e.get("name") or e.get("line") or "")
+        extra = f"  ({e['removed_bytes']} bytes stripped)" if e.get("removed_bytes") else ""
+        extra += "  [dry-run]" if e.get("dry_run") else ""
+        print(f"  {e.get('ts', ''):<19} {e.get('type', ''):<11} {label[:38]:<38} {target}{extra}")
+    print("\n  threatscan history --restore <path> | --allow <path> | --remove <path>")
+    return 0
+
+
 def cmd_update_iocs(args) -> int:
     plat, data_dir, cfg, iocs = _ctx(args)
     ui = TerminalUI()
@@ -401,13 +458,17 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("directories", nargs="*", help="directories to scan (default: cwd)")
     s.add_argument("--home", action="store_true", help="also scan common project dirs under $HOME")
     s.add_argument("--verbose", action="store_true")
-    s.add_argument("--js-all", action="store_true", help="scan every JS/TS file, not just configs")
+    s.add_argument("--configs-only", action="store_true", help="only check known config/entry files (faster, v4 behaviour)")
+    s.add_argument("--js-all", action="store_true", help=argparse.SUPPRESS)  # v4 compat, now the default
+    s.add_argument("--deep", action="store_true", help="also descend into node_modules / vendor")
     s.add_argument("--no-system", action="store_true", help="skip host checks")
     s.add_argument("--no-repos", action="store_true", help="skip repository checks")
     s.add_argument("--json", metavar="FILE", help="write JSON report")
     s.add_argument("--ci", action="store_true", help="CI mode (no colour, compact)")
-    s.add_argument("--fix", action="store_true", help="kill/quarantine/strip CRITICAL findings (originals kept)")
+    s.add_argument("--fix", action="store_true", help="act on CRITICAL findings without asking (reversible: quarantine/strip)")
     s.add_argument("--dry-run", action="store_true", help="show what --fix would do")
+    s.add_argument("--gui", action="store_true", help="ask about each malicious file with a native dialog instead of the terminal")
+    s.add_argument("--no-prompt", action="store_true", help="report only; never ask, never change files")
     s.add_argument("--notify", action="store_true", help="send desktop/webhook alert on HIGH+")
     s.add_argument("--no-report", action="store_true", help="do not save a report under ~/.threatscan/reports")
     s.set_defaults(func=cmd_scan)
@@ -422,7 +483,9 @@ def build_parser() -> argparse.ArgumentParser:
     i.add_argument("--roots", nargs="*", help="project directories to watch (default: auto-discover)")
     i.add_argument("--webhook", help="URL that receives JSON alerts (Slack/Discord/Teams/custom)")
     i.add_argument("--no-kill", action="store_true", help="never kill processes automatically")
-    i.add_argument("--no-clean", action="store_true", help="never quarantine/strip files automatically")
+    i.add_argument("--no-clean", action="store_true", help="when no dialog can be shown, leave files in place instead of quarantining")
+    i.add_argument("--no-prompt", action="store_true", help="never show dialogs; rely on auto-clean (quarantine) only")
+    i.add_argument("--deep", action="store_true", help="guard also scans node_modules / vendor (slow)")
     i.add_argument("--no-harden", action="store_true", help="skip editor hardening")
     i.add_argument("--npm-ignore-scripts", action="store_true", help="also set ignore-scripts=true in ~/.npmrc")
     i.add_argument("--block-c2", action="store_true", help="also add firewall + hosts blocks (needs admin)")
@@ -451,7 +514,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--status", action="store_true")
     p.set_defaults(func=cmd_protect)
 
-    r = sub.add_parser("restore", help="list quarantine or restore an original file")
+    hi = sub.add_parser("history", help="protection history: what was quarantined/removed; restore, allow or purge")
+    hi.add_argument("--restore", metavar="PATH", help="put the original back (it is still malicious)")
+    hi.add_argument("--allow", metavar="PATH", help="restore and stop flagging this exact file content")
+    hi.add_argument("--remove", metavar="PATH", help="delete the quarantined copies permanently")
+    hi.add_argument("--limit", default=50)
+    hi.set_defaults(func=cmd_history)
+
+    r = sub.add_parser("restore", help="alias for history --restore")
     r.add_argument("path", nargs="?")
     r.add_argument("--list", action="store_true")
     r.set_defaults(func=cmd_restore)
@@ -472,7 +542,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     ap = build_parser()
-    known = {"scan", "guard", "install", "uninstall", "status", "harden", "protect", "restore",
+    known = {"scan", "guard", "install", "uninstall", "status", "harden", "protect", "restore", "history",
              "update-iocs", "config", "check-staged", "-h", "--help", "--version"}
     # Backwards compatible: `threatscan [opts] [dirs]` means `threatscan scan ...`
     if not argv or argv[0] not in known:

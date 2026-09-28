@@ -1,3 +1,4 @@
+# threatscan:allow-signatures
 import os
 import sys
 from pathlib import Path
