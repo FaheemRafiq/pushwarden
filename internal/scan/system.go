@@ -31,18 +31,11 @@ func (s *System) CheckProcesses() []*F {
 	me := os.Getpid()
 	var out []*F
 	for _, pr := range s.P.Processes() {
-		low := strings.ToLower(pr.Cmd)
-		if pr.PID == me || strings.Contains(low, "threatscan") || ownTools[strings.ToLower(strings.TrimSuffix(pr.Name, ".exe"))] {
+		if pr.PID == me {
 			continue
 		}
-		for _, re := range s.I.Process {
-			if !re.MatchString(pr.Cmd) {
-				continue
-			}
-			killable := false
-			for _, k := range s.I.ProcessKill {
-				killable = killable || k.MatchString(pr.Cmd)
-			}
+		re, killable := s.matchProcess(pr.Name, pr.Cmd)
+		if re != nil {
 			kill := fmt.Sprintf("kill -9 %d", pr.PID)
 			if s.P.IsWindows() {
 				kill = fmt.Sprintf("taskkill /PID %d /F", pr.PID)
@@ -56,10 +49,47 @@ func (s *System) CheckProcesses() []*F {
 				Details:     "Pattern: " + h.Trunc(re.String(), 50) + "\nCmd: " + cmd,
 				Remediation: kill + "\n  Then find its parent and persistence (see persistence findings).",
 				Meta:        findings.Meta{PID: pr.PID, Kill: killable, Cmd: h.Trunc(pr.Cmd, 500)}})
-			break
 		}
 	}
 	return out
+}
+
+// sandbox wrappers list host paths they bind-mount on their command line
+// (bwrap --ro-bind /home/x/.cache/fontconfig ...). Those are mount specs, not
+// code being run, so they are removed before the indicators are applied.
+var (
+	sandboxes  = map[string]bool{"bwrap": true, "flatpak": true, "flatpak-bwrap": true, "xdg-dbus-proxy": true}
+	bindPairRe = regexp.MustCompile(`\s--(?:ro-|dev-)?bind(?:-try)?(?:-data)?\s+\S+\s+\S+`)
+	bindOneRe  = regexp.MustCompile(`\s--(?:symlink\s+\S+\s+\S+|(?:tmpfs|dir|chdir|file|ro-bind-data|seccomp|dbus-fd)\s+\S+|(?:filesystem|persist)=\S+)`)
+)
+
+func stripSandboxMounts(name, cmd string) string {
+	if !sandboxes[strings.ToLower(strings.TrimSuffix(name, ".exe"))] {
+		return cmd
+	}
+	cmd = bindPairRe.ReplaceAllString(cmd, " ")
+	return bindOneRe.ReplaceAllString(cmd, " ")
+}
+
+// matchProcess returns the first indicator a command line matches (nil when
+// clean) and whether it is on the kill list. Our own tools are skipped: the
+// dialogs and notifications quote indicators in their arguments.
+func (s *System) matchProcess(name, cmd string) (*regexp.Regexp, bool) {
+	if strings.Contains(strings.ToLower(cmd), "threatscan") || ownTools[strings.ToLower(strings.TrimSuffix(name, ".exe"))] {
+		return nil, false
+	}
+	cmd = stripSandboxMounts(name, cmd)
+	for _, re := range s.I.Process {
+		if !re.MatchString(cmd) {
+			continue
+		}
+		killable := false
+		for _, k := range s.I.ProcessKill {
+			killable = killable || k.MatchString(cmd)
+		}
+		return re, killable
+	}
+	return nil, false
 }
 
 func (s *System) CheckNetwork() []*F {

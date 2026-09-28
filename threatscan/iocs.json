@@ -1,7 +1,7 @@
 {
   "_note": "threatscan:allow-signatures - indicator database, strings here are detection data",
   "schema": 1,
-  "version": "2026.09.28.1",
+  "version": "2026.09.28.2",
   "updated": "2026-09-28",
   "sources": [
     "https://github.com/OpenSourceMalware/PolinRider",
@@ -303,7 +303,7 @@
     "MicrosoftCLROptimization",
     "--token\\s+https?://[^\\s]+\\|",
     "font[-_]?updater",
-    "\\.cache/font",
+    "\\.cache/font(?:/|\\s|$)",
     "fa-solid-[4589]00\\.woff2",
     "spellright\\.dict",
     "global(?:\\.i|\\[['\"]i['\"]\\])\\s*=\\s*['\"]A\\d+",
