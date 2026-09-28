@@ -42,7 +42,8 @@ file is the plan.
 | `internal/config`, `report`, `ui` | same names in Python | config already has `auto_update`, `update_channel`, `update_interval`, `update_api_url` |
 | `internal/guard` | `guard.py` | loop, policy, dialog worker, heartbeat; `Hooks` for later phases |
 | `internal/realtime` | `realtime.py` | fsnotify + polling fallback |
-| `cmd/threatscan` | `cli.py` | scan, guard, status, history, restore, harden, protect, config, check-staged, version |
+| `internal/service` | `service.py` | P4: `Manager` with `Preview`, `PlaceBinary`, `Install`, `Uninstall`, `Status`, `LinkCLI`/`UnlinkCLI`; Windows PATH edits in `path_windows.go` |
+| `cmd/threatscan` | `cli.py` | scan, guard, status, history, restore, harden, protect, config, check-staged, version, install, uninstall |
 
 Tests: `GOTOOLCHAIN=go1.24.13 go test -race ./...` passes. Python tests
 (`pytest -q`, 24 cases) still pass and must keep passing.
@@ -68,7 +69,20 @@ Tests: `GOTOOLCHAIN=go1.24.13 go test -race ./...` passes. Python tests
 - `platform.Info.DataDir()` is `~/.threatscan` (`THREATSCAN_HOME` overrides it).
   Tests must set `THREATSCAN_HOME` to a temp dir.
 
-## P4. Start the guard at sign-in: `internal/service`
+## P4. Start the guard at sign-in: `internal/service` (done)
+
+Implemented as specified below. Choices worth knowing:
+- Linux runs `enable` then `restart` (not `enable --now`) so a reinstall picks up
+  the new binary. `Status()` reports "not installed" when the unit file is absent.
+- On Windows a successful task registration deletes a leftover Startup-folder
+  launcher so two guards never start. The stop before copying ends the task and
+  kills any `threatscan ... guard` process (gopsutil, not PowerShell).
+- `PlaceBinary` is a no-op when the target is the same file or has the same SHA-256.
+- `uninstall` also removes the `~/.local/bin` symlink (only if it points at the
+  installed binary) or the Windows PATH entry. It leaves the binary itself; P7's
+  installers own removing program files.
+- Not yet verified: a real `install` on Linux/macOS/Windows (`Guard: alive`).
+  That is the CI smoke job in P5/P7.
 
 Port `threatscan/service.py` (class `ServiceManager`, function `_guard_cmd`).
 Keep these names so v6 replaces a v5 install cleanly:
