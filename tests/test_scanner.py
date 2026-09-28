@@ -369,11 +369,16 @@ def test_watcher_detects_new_and_modified_files(tmp_path):
         fh.write(" " * 300 + "global['_V']='8-st1';")
     assert ev.wait(6)
     ev.clear(); got.clear()
+    # A whole new directory tree appears (git checkout / unzip), then a loader
+    # is written two levels down.  Directory events may arrive in their own
+    # batch first, so wait for the file itself rather than for "any event".
     (root / "proj" / "newdir" / "public" / "fonts").mkdir(parents=True)
-    time.sleep(0.6)
+    time.sleep(1.5)
     (root / "proj" / "newdir" / "public" / "fonts" / "fa-solid-900.woff2").write_bytes(b"var x=1;")
-    assert ev.wait(6)
-    assert any(p.name == "fa-solid-900.woff2" for p in got)
+    deadline = time.time() + 8
+    while time.time() < deadline and not any(p.name == "fa-solid-900.woff2" for p in got):
+        time.sleep(0.2)
+    assert any(p.name == "fa-solid-900.woff2" for p in got), f"loader not seen (backend={w.backend}, got={got})"
     w.stop()
     assert w.backend in ("inotify", "kqueue", "rdcw", "poll")
 

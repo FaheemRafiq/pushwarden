@@ -34,3 +34,53 @@ jobs:
           threatscan install --dry-run --no-harden
           threatscan status
         shell: bash
+
+  fedora:
+    name: test (fedora ${{ matrix.release }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ["latest", "42"]
+    container:
+      image: fedora:${{ matrix.release }}
+    steps:
+      - name: Install system packages
+        run: dnf install -y -q python3 python3-pip git zenity jq iptables python3-pyyaml
+      - uses: actions/checkout@v4
+      - name: Install with the colleague installer (CLI only; no systemd in a container)
+        run: THREATSCAN_NO_INSTALL=1 sh installers/install.sh
+        env:
+          HOME: /root
+      - name: Run test suite
+        run: |
+          /root/.threatscan/venv/bin/python -m pip install -q pytest
+          /root/.threatscan/venv/bin/python -m pytest -q
+      - name: Smoke-test CLI, zipapp and self-scan
+        run: |
+          export PATH="/root/.local/bin:$PATH"
+          threatscan --version
+          threatscan scan --ci --no-report --no-system --no-prompt .
+          threatscan install --dry-run --no-harden
+          threatscan status
+          sh installers/build-pyz.sh
+          python3 dist/threatscan.pyz --version
+      - name: Validate Falco rule set
+        run: |
+          python3 - <<'PY'
+          import yaml
+          rules = yaml.safe_load(open("falco/polinrider.rules.yaml"))
+          names = [r["rule"] for r in rules if "rule" in r]
+          assert len(names) >= 15, names
+          kill = [r["rule"] for r in rules if "rule" in r and "kill" in r.get("tags", [])]
+          print(f"{len(names)} rules, {len(kill)} kill-eligible: {kill}")
+          for r in rules:
+              if "rule" in r:
+                  assert r.get("condition") and r.get("output") and r.get("priority"), r["rule"]
+          PY
+      - name: Firewall blocking (iptables in container)
+        run: |
+          export PATH="/root/.local/bin:$PATH"
+          threatscan protect --block-c2 || echo "iptables unavailable in this container (expected on some runners)"
+          threatscan protect --status
+          threatscan protect --unblock || true

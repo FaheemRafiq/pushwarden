@@ -175,18 +175,37 @@ class Watcher:
             raise OSError(f"{len(dirs)} directories is too many for kqueue")
         kq = select.kqueue()
         fds = {}
+        watched = set()
         flags = select.KQ_NOTE_WRITE | select.KQ_NOTE_EXTEND | select.KQ_NOTE_RENAME | select.KQ_NOTE_DELETE
-        for d in dirs:
+        snap = {}
+
+        def add_dir(d: Path) -> bool:
+            if d in watched:
+                return False
             try:
                 fd = os.open(str(d), os.O_RDONLY)
             except OSError:
-                continue
+                return False
             fds[fd] = d
+            watched.add(d)
             kq.control([select.kevent(fd, select.KQ_FILTER_VNODE, select.KQ_EV_ADD | select.KQ_EV_CLEAR, flags)], 0)
-        self.log(f"realtime: kqueue watching {len(fds)} directories")
-        snap = {}
-        for d in fds.values():
             snap[d] = self._dir_snapshot(d)
+            return True
+
+        def add_tree(d: Path):
+            """Watch d and every directory below it; report files already inside
+            (a git checkout or unzip creates the whole tree before we see it)."""
+            new_files = []
+            for dp, ds, fs in os.walk(d):
+                ds[:] = [x for x in ds if not self.skip(x)]
+                if add_dir(Path(dp)):
+                    new_files += [Path(dp) / f for f in fs]
+            if new_files:
+                self._emit(new_files)
+
+        for d in dirs:
+            add_dir(d)
+        self.log(f"realtime: kqueue watching {len(fds)} directories")
         last = time.time()
         last_poll = time.time()
         while not self._stop.is_set():
@@ -199,15 +218,8 @@ class Watcher:
                 snap[d] = new
                 for name in new:
                     sub = d / name
-                    if sub.is_dir() and not self.skip(name) and not any(v == sub for v in fds.values()):
-                        try:
-                            fd = os.open(str(sub), os.O_RDONLY)
-                            fds[fd] = sub
-                            kq.control([select.kevent(fd, select.KQ_FILTER_VNODE, select.KQ_EV_ADD | select.KQ_EV_CLEAR, flags)], 0)
-                            snap[sub] = {}
-                            self._emit(Path(dp) / f for dp, _, fs in os.walk(sub) for f in fs)
-                        except OSError:
-                            pass
+                    if sub not in watched and not self.skip(name) and sub.is_dir():
+                        add_tree(sub)
             # in-place rewrites of existing files do not change the directory
             # entry, so also poll mtimes of files in all watched dirs (cheap)
             if time.time() - last_poll >= self.poll_interval:
