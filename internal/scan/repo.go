@@ -4,6 +4,8 @@ package scan
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -219,7 +221,40 @@ func (r *Repo) CheckSignatures(fp string) []*F {
 			break
 		}
 	}
+	if len(I.FileHashes) > 0 {
+		sum := sha256.Sum256([]byte(content))
+		if d := hex.EncodeToString(sum[:]); I.FileHashes[d] {
+			out = append(out, &F{Severity: crit, Category: "known_malicious_file", Title: "Known PolinRider file: " + name,
+				Path: fp, Details: "SHA-256 " + d + " is a published indicator.",
+				Remediation: "Delete or restore a clean copy of:\n  " + fp, Meta: findings.Meta{Quarantine: true}})
+		}
+	}
+	if strings.EqualFold(filepath.Ext(fp), ".php") && phpRunsNode(content) {
+		out = append(out, r.withEvidence(&F{Severity: high, Category: "php_node_exec", Title: "PHP file runs Node.js code: " + name,
+			Path: fp, Details: "shell_exec/exec/system together with node -e: the PHP route the PolinRider Packagist compromise used (Sept 2026).",
+			Remediation: "Review " + fp + "; a legitimate PHP file rarely runs inline JavaScript through the shell."}, content))
+	}
 	return out
+}
+
+var (
+	phpExecNodeRe = regexp.MustCompile(`(?is)\b(?:shell_exec|exec|system|passthru|proc_open|popen)\s*\(\s*[^;]{0,400}?\bnode(?:\.exe)?['"]?\s+(?:-e|--eval|-p|--print)\b`)
+	phpNodeVarRe  = regexp.MustCompile(`(?i)\$(\w+)\s*=\s*['"]\s*node(?:\.exe)?\s+(?:-e|--eval|-p|--print)\b`)
+)
+
+// phpRunsNode: a shell call in PHP whose command is `node -e ...`, either inline
+// or through a variable assigned such a string.
+func phpRunsNode(content string) bool {
+	if phpExecNodeRe.MatchString(content) {
+		return true
+	}
+	for _, m := range phpNodeVarRe.FindAllStringSubmatch(content, 20) {
+		call := regexp.MustCompile(`(?i)\b(?:shell_exec|exec|system|passthru|proc_open|popen)\s*\(\s*\$` + regexp.QuoteMeta(m[1]) + `\b`)
+		if call.MatchString(content) {
+			return true
+		}
+	}
+	return false
 }
 
 func join(xs []string) string {
@@ -686,7 +721,7 @@ func (r *Repo) CheckGoMod(repo string) []*F {
 }
 
 func (r *Repo) CheckComposer(repo string) []*F {
-	var out []*F
+	out := r.checkComposerVersions(repo)
 	for _, n := range []string{"composer.json", "composer.lock"} {
 		p := filepath.Join(repo, n)
 		content := h.ReadText(p, 20<<20)
@@ -697,6 +732,68 @@ func (r *Repo) CheckComposer(repo string) []*F {
 					Remediation: "Remove " + pkg + "; composer clear-cache; rotate any secrets the project holds."})
 			}
 		}
+	}
+	return out
+}
+
+// checkComposerVersions handles packages compromised only in some versions or
+// branches: CRITICAL when composer.lock resolves one of them, HIGH when the
+// package is present in another version (or only in composer.json).
+func (r *Repo) checkComposerVersions(repo string) []*F {
+	if len(r.I.CompromisedPackagistVersions) == 0 {
+		return nil
+	}
+	installed := map[string]string{}
+	lockPath := filepath.Join(repo, "composer.lock")
+	if b := h.ReadBytes(lockPath, 20<<20); b != nil {
+		var lock struct {
+			Packages    []struct{ Name, Version string } `json:"packages"`
+			PackagesDev []struct{ Name, Version string } `json:"packages-dev"`
+		}
+		if json.Unmarshal(b, &lock) == nil {
+			for _, p := range append(lock.Packages, lock.PackagesDev...) {
+				installed[strings.ToLower(p.Name)] = p.Version
+			}
+		}
+	}
+	required := map[string]string{}
+	jsonPath := filepath.Join(repo, "composer.json")
+	if b := h.ReadBytes(jsonPath, 5<<20); b != nil {
+		var cj struct {
+			Require    map[string]string `json:"require"`
+			RequireDev map[string]string `json:"require-dev"`
+		}
+		if json.Unmarshal(b, &cj) == nil {
+			for _, m := range []map[string]string{cj.Require, cj.RequireDev} {
+				for k, v := range m {
+					required[strings.ToLower(k)] = v
+				}
+			}
+		}
+	}
+	var out []*F
+	for pkg, bad := range r.I.CompromisedPackagistVersions {
+		key := strings.ToLower(pkg)
+		ver, inLock := installed[key]
+		constraint, inJSON := required[key]
+		if !inLock && !inJSON {
+			continue
+		}
+		path, shown := jsonPath, constraint
+		if inLock {
+			path, shown = lockPath, ver
+		}
+		hit := false
+		for _, v := range bad {
+			hit = hit || strings.EqualFold(shown, v) || (!inLock && strings.Contains(constraint, v))
+		}
+		sev, title := high, "Package with compromised branches: "+pkg+" "+shown
+		if hit {
+			sev, title = crit, "Compromised Packagist package: "+pkg+" "+shown
+		}
+		out = append(out, &F{Severity: sev, Category: "compromised_package", Title: title, Path: path,
+			Details:     "Poisoned versions/branches: " + strings.Join(bad, ", "),
+			Remediation: "Pin " + pkg + " to a clean stable release, composer clear-cache, reinstall; rotate secrets if a poisoned branch was installed."})
 	}
 	return out
 }

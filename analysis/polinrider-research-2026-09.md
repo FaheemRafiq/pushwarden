@@ -4,6 +4,16 @@
 Research date: 2026-09-28. Baseline: ThreatScan indicator file `threatscan/iocs.json` version `2026.09.28`
 and program version 0.1.1.
 
+> **Applied 2026-09-28** in indicator file `2026.09.28.1` and program 0.2.0: everything in the
+> [proposal](#proposed-iocsjson-additions) except the generic `/api/ipcheck` and `/api/ip-check/` paths
+> (ThreatScan pairs any C2 path with any `http` string, so they would flag ordinary IP-lookup code; the
+> exact `*.vercel.app` hosts cover that infrastructure instead). `visanduma/nova-two-factor` uses the new
+> version-aware key `compromised_packagist_versions` (CRITICAL on the four `dev-*` branches, HIGH on other
+> versions). `@common-stack/generate-plugin` uses the version prefix `9.0.2-alpha.` because package versions
+> are matched by substring. Code changes 1-3 are implemented with regression tests; change 4 (Go module
+> cache in `--deep`) is not, because the cache holds thousands of modules and needs its own design.
+> A scan of the author's `~/Coding` gave identical results before and after (no new false positives).
+
 **Status labels** used throughout:
 
 - **NEW**: not in `iocs.json` 2026.09.28 (checked by string search of the file, not by assumption).

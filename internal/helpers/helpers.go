@@ -42,7 +42,7 @@ var TextAssetExt = map[string]bool{".dict": true}
 var ScriptExt = map[string]bool{}
 
 func init() {
-	for _, e := range strings.Fields(".js .mjs .cjs .ts .tsx .jsx .mts .cts .json .jsonc .py .sh .bash .zsh .bat .cmd .ps1 .vbs .html .htm .env .yml .yaml .toml .txt .md") {
+	for _, e := range strings.Fields(".js .mjs .cjs .ts .tsx .jsx .mts .cts .json .jsonc .php .py .sh .bash .zsh .bat .cmd .ps1 .vbs .html .htm .env .yml .yaml .toml .txt .md") {
 		ScriptExt[e] = true
 	}
 }

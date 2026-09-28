@@ -15,37 +15,42 @@ import (
 
 // Raw mirrors iocs.json.  Unknown keys are ignored so newer files load in older binaries.
 type Raw struct {
-	Version                 string              `json:"version"`
-	LiteralSignatures       []string            `json:"literal_signatures"`
-	XorKeys                 []string            `json:"xor_keys"`
-	MarkerRegexes           []string            `json:"marker_regexes"`
-	HistoryPayloadRegex     string              `json:"history_payload_regex"`
-	BlockchainRPCHosts      []string            `json:"blockchain_rpc_hosts"`
-	Wallets                 []string            `json:"wallets"`
-	MaliciousIPs            []string            `json:"malicious_ips"`
-	MaliciousHosts          []string            `json:"malicious_hosts"`
-	C2URLPaths              []string            `json:"c2_url_paths"`
-	TelegramIndicators      []string            `json:"telegram_indicators"`
-	FakeFontSHA256          []string            `json:"fake_font_sha256"`
-	FakeFontNames           []string            `json:"fake_font_names"`
-	ConfigFiles             []string            `json:"config_files"`
-	EntryFiles              []string            `json:"entry_files"`
-	PropagationScripts      []string            `json:"propagation_scripts"`
-	GitignoreIOCs           []string            `json:"gitignore_iocs"`
-	CompromisedNPM          map[string][]string `json:"compromised_npm"`
-	CompromisedGo           []string            `json:"compromised_go"`
-	CompromisedPackagist    []string            `json:"compromised_packagist"`
-	RatDirNames             []string            `json:"rat_dir_names"`
-	RatServiceNames         []string            `json:"rat_service_names"`
-	RatEnvKeys              []string            `json:"rat_env_keys"`
-	RatFiles                []string            `json:"rat_files"`
-	ProcessRegexes          []string            `json:"process_regexes"`
-	ProcessKillRegexes      []string            `json:"process_kill_regexes"`
-	ShellRegexes            []string            `json:"shell_regexes"`
-	ScheduledTaskKeywords   []string            `json:"scheduled_task_keywords"`
-	ScheduledTaskCritical   []string            `json:"scheduled_task_critical"`
-	CIEvasionHostnames      []string            `json:"ci_evasion_hostnames"`
-	TasksJSONLoaderKeywords []string            `json:"tasks_json_loader_keywords"`
+	Version              string              `json:"version"`
+	LiteralSignatures    []string            `json:"literal_signatures"`
+	XorKeys              []string            `json:"xor_keys"`
+	MarkerRegexes        []string            `json:"marker_regexes"`
+	HistoryPayloadRegex  string              `json:"history_payload_regex"`
+	BlockchainRPCHosts   []string            `json:"blockchain_rpc_hosts"`
+	Wallets              []string            `json:"wallets"`
+	MaliciousIPs         []string            `json:"malicious_ips"`
+	MaliciousHosts       []string            `json:"malicious_hosts"`
+	C2URLPaths           []string            `json:"c2_url_paths"`
+	TelegramIndicators   []string            `json:"telegram_indicators"`
+	FakeFontSHA256       []string            `json:"fake_font_sha256"`
+	FakeFontNames        []string            `json:"fake_font_names"`
+	ConfigFiles          []string            `json:"config_files"`
+	EntryFiles           []string            `json:"entry_files"`
+	PropagationScripts   []string            `json:"propagation_scripts"`
+	GitignoreIOCs        []string            `json:"gitignore_iocs"`
+	CompromisedNPM       map[string][]string `json:"compromised_npm"`
+	CompromisedGo        []string            `json:"compromised_go"`
+	CompromisedPackagist []string            `json:"compromised_packagist"`
+	// Packages compromised only in some versions or branches (e.g. dev-main); absent
+	// from CompromisedPackagist so older builds do not flag every version.
+	CompromisedPackagistVersions map[string][]string `json:"compromised_packagist_versions"`
+	// SHA-256 of any known-malicious file (configs, loaders, package tarballs).
+	MaliciousFileSHA256     []string `json:"malicious_file_sha256"`
+	RatDirNames             []string `json:"rat_dir_names"`
+	RatServiceNames         []string `json:"rat_service_names"`
+	RatEnvKeys              []string `json:"rat_env_keys"`
+	RatFiles                []string `json:"rat_files"`
+	ProcessRegexes          []string `json:"process_regexes"`
+	ProcessKillRegexes      []string `json:"process_kill_regexes"`
+	ShellRegexes            []string `json:"shell_regexes"`
+	ScheduledTaskKeywords   []string `json:"scheduled_task_keywords"`
+	ScheduledTaskCritical   []string `json:"scheduled_task_critical"`
+	CIEvasionHostnames      []string `json:"ci_evasion_hostnames"`
+	TasksJSONLoaderKeywords []string `json:"tasks_json_loader_keywords"`
 }
 
 type IOCs struct {
@@ -56,6 +61,7 @@ type IOCs struct {
 	ProcessKill    []*regexp.Regexp
 	Shell          []*regexp.Regexp
 	FontHashes     map[string]bool
+	FileHashes     map[string]bool
 	TronWallets    []string
 	LoaderExt      *regexp.Regexp
 	configSet      map[string]bool
@@ -123,6 +129,13 @@ func Parse(b []byte, source string) (*IOCs, error) {
 			return nil, fmt.Errorf("bad sha256 %q", h)
 		}
 		i.FontHashes[h] = true
+	}
+	i.FileHashes = map[string]bool{}
+	for _, h := range r.MaliciousFileSHA256 {
+		if !hexRe.MatchString(h) {
+			return nil, fmt.Errorf("bad sha256 %q", h)
+		}
+		i.FileHashes[h] = true
 	}
 	for _, w := range r.Wallets {
 		if strings.HasPrefix(w, "T") {
