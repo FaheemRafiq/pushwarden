@@ -293,6 +293,7 @@ func TestChannelsAndDrafts(t *testing.T) {
 	f := newFixture(t, good)
 	a := f.rels[0].Assets
 	f.rels = []Release{
+		{Tag: "v6.0.0", Assets: a}, // withdrawn: never offered, although its number is highest
 		{Tag: "v1.0.0", Draft: true, Assets: a},
 		{Tag: "v0.4.0-rc1", Prerelease: true, Assets: a},
 		{Tag: "v0.3.0", Assets: a},
@@ -320,8 +321,11 @@ func TestChannelsAndDrafts(t *testing.T) {
 }
 
 func TestCompareVersions(t *testing.T) {
-	if !IsWithdrawn("v6.0.0") || IsWithdrawn("0.1.0") {
-		t.Error("IsWithdrawn")
+	for v, want := range map[string]bool{"v6.0.0": true, "6.0.0": true, "6.0.0-rc1": true, "6.0.0-dev": true,
+		"6.0.0+build.1": true, "0.1.0": false, "6.0.1": false, "16.0.0": false, "0.6.0": false} {
+		if IsWithdrawn(v) != want {
+			t.Errorf("IsWithdrawn(%q) = %v, want %v", v, !want, want)
+		}
 	}
 	for _, c := range []struct {
 		a, b string

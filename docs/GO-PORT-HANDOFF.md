@@ -6,7 +6,9 @@
 > installed 6.0.0, but a 6.0.0 install can never self-update to 0.x (its updater
 > only accepts higher numbers), so those machines must run the installer again.
 > P8's migration should look for the newest stable Go release (`v0.*` and later),
-> not `v6.*`.
+> not `v6.*`. Since 0.1.1: the updater never offers a withdrawn version (any
+> 6.0.0, including -rc/-dev builds), and the .deb/.rpm carry `epoch: 1` so apt/dnf
+> treat 1:0.1.x as newer than the 6.0.0 package. The epoch must never be lowered.
 
 This guide is for whoever picks up the Go rewrite, human or AI agent. It says
 what is done, what remains, which existing functions to plug into, and how to

@@ -174,7 +174,7 @@ func (u *Updater) Check() (*Release, error) {
 	var best *Release
 	for i := range rels {
 		r := &rels[i]
-		if r.Draft || r.Tag == "" || (r.Prerelease && u.Channel != "beta") || st.failed(r.Version()) {
+		if r.Draft || r.Tag == "" || (r.Prerelease && u.Channel != "beta") || st.failed(r.Version()) || IsWithdrawn(r.Version()) {
 			continue
 		}
 		if CompareVersions(r.Version(), u.Current) <= 0 {

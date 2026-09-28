@@ -164,9 +164,11 @@ func TestPlaceBinaryKeepsNewerInstalled(t *testing.T) {
 	if copied, err := m.PlaceBinary(); !copied || err != nil {
 		t.Fatalf("older binary not replaced: %v %v", copied, err)
 	}
-	// so is the withdrawn 6.0.0, although its number is higher
-	os.WriteFile(m.Exe(), []byte("#!/bin/sh\necho 'ThreatScan 6.0.0'\n"), 0o755)
-	if copied, err := m.PlaceBinary(); !copied || err != nil {
-		t.Fatalf("withdrawn 6.0.0 not replaced: %v %v", copied, err)
+	// so is the withdrawn 6.0.0 line, although its number is higher
+	for _, v := range []string{"6.0.0", "6.0.0-rc1", "6.0.0-dev"} {
+		os.WriteFile(m.Exe(), []byte("#!/bin/sh\necho 'ThreatScan "+v+"'\n"), 0o755)
+		if copied, err := m.PlaceBinary(); !copied || err != nil {
+			t.Fatalf("withdrawn %s not replaced: %v %v", v, copied, err)
+		}
 	}
 }

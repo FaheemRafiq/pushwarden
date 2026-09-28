@@ -7,6 +7,9 @@ arch: @ARCH@
 platform: linux
 version: @VERSION@
 version_schema: semver
+# Epoch 1: numbering restarted at 0.1.0 after the withdrawn 6.0.0 package, and
+# apt/dnf must see 1:0.1.0 as newer than 6.0.0. Never lower it.
+epoch: "1"
 section: utils
 priority: optional
 maintainer: ThreatScan <noreply@github.com>

@@ -5,13 +5,20 @@ import (
 	"strings"
 )
 
-// Withdrawn lists released versions that were renumbered away: 6.0.0 was the
-// first Go release before numbering restarted at 0.1.0. An installed withdrawn
-// version counts as older than any other, so reinstalling replaces it.
+// Withdrawn lists version cores that were renumbered away: 6.0.0 was the first
+// Go release before numbering restarted at 0.1.0. A withdrawn version is never
+// offered as an update, and an installed one counts as older than any other so
+// reinstalling replaces it. Pre-releases and dev builds of a withdrawn core
+// (6.0.0-rc1, 6.0.0-dev) are withdrawn too.
 var Withdrawn = map[string]bool{"6.0.0": true}
 
 // IsWithdrawn reports whether v (with or without a leading "v") was withdrawn.
-func IsWithdrawn(v string) bool { return Withdrawn[strings.TrimPrefix(v, "v")] }
+func IsWithdrawn(v string) bool {
+	core := strings.TrimPrefix(v, "v")
+	core, _, _ = strings.Cut(core, "+")
+	core, _, _ = strings.Cut(core, "-")
+	return Withdrawn[core]
+}
 
 // CompareVersions compares two semantic versions ("v0.2.0", "0.2.0-rc1").
 // A pre-release sorts before its release.
