@@ -299,6 +299,7 @@ func (m *Remediator) branch(ctx context.Context, fullName, base, bare, name stri
 
 	r := scan.NewRepo(wt, m.ui, m.I)
 	fs := r.ScanRepo(wt, false)
+	fs = append(fs, r.CheckPayloadCompanions(wt)...)
 	fixable := 0
 	for _, f := range fs {
 		if protect.NeedsDecision(f) {
@@ -306,7 +307,7 @@ func (m *Remediator) branch(ctx context.Context, fullName, base, bare, name stri
 		}
 	}
 	for _, f := range fs {
-		if f.Severity >= findings.High {
+		if f.Severity >= findings.Warning {
 			br.Findings = append(br.Findings, relFinding(f, wt))
 		}
 	}

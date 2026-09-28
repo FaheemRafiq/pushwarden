@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -313,5 +314,73 @@ func TestGitignoreTamperingIsOneCleanableFinding(t *testing.T) {
 		if f.Category == "gitignore_tampering" && (f.Severity != findings.High || f.Meta.Cleanable) {
 			t.Fatalf("weak-only entry should be HIGH/manual: %+v", f)
 		}
+	}
+}
+
+func TestVSCodeSettingsTemplateIsCritical(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, ".vscode", "settings.json"), `{"task.allowAutomaticTasks": true, "editor.tabSize": 2}`)
+	fs := newRepo(t, dir).CheckVSCodeSettings(dir)
+	if len(fs) != 1 || fs[0].Severity != findings.High || fs[0].Meta.Quarantine {
+		t.Fatalf("allowAutomaticTasks alone must stay HIGH/manual: %+v", fs)
+	}
+	write(t, filepath.Join(dir, ".vscode", "settings.json"), `{"task.allowAutomaticTasks": true,
+	  "terminal.integrated.hideOnStartup": "always", "debug.openDebug": "neverOpen",
+	  "tasks": {"label": "lint on open", "type": "shell", "command": "npm run lint", "runOn": "folderOpen"}}`)
+	fs = newRepo(t, dir).CheckVSCodeSettings(dir)
+	if len(fs) != 1 || fs[0].Severity != findings.Critical || !fs[0].Meta.Quarantine {
+		t.Fatalf("PolinRider template must be CRITICAL/quarantine: %+v", fs)
+	}
+}
+
+func gitT(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"}, args...)...)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+}
+
+func TestPayloadCompanions(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git missing")
+	}
+	dir := t.TempDir()
+	gitT(t, dir, "init", "-q")
+	write(t, filepath.Join(dir, "index.php"), "<?php echo 1;\n")
+	gitT(t, dir, "add", "-A")
+	gitT(t, dir, "commit", "-q", "-m", "init")
+	// the malware commit: loader + camouflage fonts + decoy README + .vscode
+	write(t, filepath.Join(dir, "public", "fonts", "fa-solid-400.woff2"), string(testfixtures.FakeWoff2))
+	write(t, filepath.Join(dir, "public", "fonts", "fa-solid-900.woff2"), "wOF2"+strings.Repeat("\x00", 64))
+	write(t, filepath.Join(dir, "public", "fonts", "fa-brands-400.woff2"), "wOF2"+strings.Repeat("\x00", 64))
+	write(t, filepath.Join(dir, "public", "fonts", "README.md"), "# Fonts\n")
+	write(t, filepath.Join(dir, ".vscode", "launch.json"), "{}\n")
+	write(t, filepath.Join(dir, "application", "new_feature.php"), "<?php // mine\n")
+	gitT(t, dir, "add", "-A")
+	gitT(t, dir, "commit", "-q", "-m", "Edit & Delete")
+	// the clean-up commit removes the loader; the camouflage stays
+	gitT(t, dir, "rm", "-q", "public/fonts/fa-solid-400.woff2")
+	gitT(t, dir, "commit", "-q", "-m", "security: remove PolinRider malware")
+
+	fs := newRepo(t, dir).CheckPayloadCompanions(dir)
+	if len(fs) != 1 {
+		t.Fatalf("want one companions finding, got %d", len(fs))
+	}
+	f := fs[0]
+	if f.Severity != findings.Warning || f.Category != "payload_companions" {
+		t.Fatalf("%+v", f)
+	}
+	for _, want := range []string{"public/fonts/fa-solid-900.woff2", "public/fonts/README.md", ".vscode/launch.json", "application/new_feature.php", "public/fonts/"} {
+		if !strings.Contains(f.Details+f.Remediation, want) {
+			t.Errorf("missing %q in\n%s\n%s", want, f.Details, f.Remediation)
+		}
+	}
+	if strings.Contains(f.Details, "fa-solid-400.woff2") || strings.Contains(f.Details, "index.php") {
+		t.Errorf("removed loader or pre-existing file listed:\n%s", f.Details)
+	}
+	if !strings.Contains(f.Title, "5 file(s)") {
+		t.Errorf("title: %s", f.Title)
 	}
 }

@@ -510,7 +510,7 @@ with a link in `~/.local/bin` (override with `THREATSCAN_INSTALL_DIR`).
 |---|---|---|
 | CRITICAL | confirmed PolinRider artifact or activity | yes, per `action` policy |
 | HIGH | strong indicator that needs a human: compromised package version, exposed keys on an infected host | no, listed for review |
-| WARNING | context worth checking: suspicious git reflog, secrets file in an infected repo | no |
+| WARNING | context worth checking: suspicious git reflog, secrets file in an infected repo, files that arrived in the same commit as a loader (camouflage fonts, decoy README, `.vscode` set) | no |
 | INFO | informational | no |
 
 Dialogs, notifications and reports name threats Defender-style, for example

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FaheemRafiq/threatscan/internal/findings"
 	"github.com/FaheemRafiq/threatscan/internal/github"
 	"github.com/FaheemRafiq/threatscan/internal/remediate"
 	"github.com/FaheemRafiq/threatscan/internal/ui"
@@ -350,9 +351,15 @@ func printResult(u *ui.UI, res remediate.Result, apply bool) {
 		for _, f := range b.Fixed {
 			u.P("      - %s", f)
 		}
-		if b.Status == remediate.StatusManual {
-			for _, f := range b.Findings {
+		for _, f := range b.Findings {
+			switch {
+			case f.Severity >= findings.High && b.Status == remediate.StatusManual:
 				u.P("      ! %s  %s", f.Title, u.C("DIM", f.Path))
+			case f.Severity == findings.Warning:
+				u.P("      %s %s", u.C("YELLOW", "note:"), f.Title)
+				for _, l := range strings.Split(f.Remediation, "\n") {
+					u.P("            %s", strings.TrimSpace(l))
+				}
 			}
 		}
 	}

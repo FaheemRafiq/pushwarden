@@ -11,8 +11,10 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -465,6 +467,18 @@ func (r *Repo) CheckVSCodeSettings(repo string) []*F {
 	if len(extras) > 0 {
 		d += "\nAlso sets: " + strings.Join(extras, ", ")
 	}
+	// allowAutomaticTasks alone has legitimate uses. Combined with hiding the terminal at
+	// start-up or an inline folderOpen task it is the PolinRider settings.json template.
+	if len(extras) >= 2 {
+		ev := []string{`"task.allowAutomaticTasks": true`}
+		for _, e := range extras {
+			ev = append(ev, e+" (hides or auto-runs the stage-1 task)")
+		}
+		return []*F{{Severity: crit, Category: "vscode_autorun", Title: "VS Code settings are the PolinRider autorun template", Path: s,
+			Details:     d + "\nThis combination is dropped next to the malicious tasks.json; it has no purpose once that file is gone.",
+			Remediation: "Delete " + s + " (recreate your own settings afterwards if you had any).",
+			Meta:        findings.Meta{Quarantine: true, Evidence: ev}}}
+	}
 	return []*F{{Severity: high, Category: "vscode_autorun", Title: "VS Code settings force automatic tasks on", Path: s,
 		Details: d, Remediation: "Remove task.allowAutomaticTasks from " + s + " unless you added it."}}
 }
@@ -606,6 +620,66 @@ func (r *Repo) CheckHistoryPayloads(repo string) []*F {
 		Details: strings.Join(lines, "\n") +
 			"\nCheck each one: commit messages are often decoys that add the loader rather than remove it.",
 		Remediation: "git -C " + repo + " show --stat <commit>   # then audit every branch that contains it"}}
+}
+
+// CheckPayloadCompanions lists files that are still present and were added by
+// the same commit that introduced payload code. PolinRider drops a whole
+// fonts/ folder of genuine Font Awesome files, a decoy README and a .vscode/
+// set around its loader so the loader looks at home; removing the loader
+// leaves that camouflage behind. The malware amends the victim's latest
+// commit, so some listed files can be legitimate: this is a review list.
+func (r *Repo) CheckPayloadCompanions(repo string) []*F {
+	log := git(60*time.Second, repo, "log", "--all", "-n", "200", "--diff-filter=A", "--text", "-E", "-G", r.I.HistoryPayloadRegex,
+		"--format=%h|%ad|%s", "--date=short")
+	var out []*F
+	seen := map[string]bool{}
+	for _, l := range strings.Split(strings.TrimSpace(log), "\n") {
+		p := strings.SplitN(l, "|", 3)
+		if len(p) != 3 || seen[p[0]] || len(out) >= 3 {
+			continue
+		}
+		seen[p[0]] = true
+		var present []string
+		dirs := map[string]int{}
+		for _, f := range strings.Split(strings.TrimSpace(git(30*time.Second, repo, "show", "--format=", "--name-only", "--diff-filter=A", p[0])), "\n") {
+			f = strings.TrimSpace(f)
+			if f == "" {
+				continue
+			}
+			if st, err := os.Stat(filepath.Join(repo, filepath.FromSlash(f))); err == nil && !st.IsDir() {
+				present = append(present, f)
+				dirs[path.Dir(f)]++
+			}
+		}
+		if len(present) == 0 {
+			continue
+		}
+		var lines []string
+		for i, f := range present {
+			if i >= 25 {
+				lines = append(lines, fmt.Sprintf("... and %d more", len(present)-25))
+				break
+			}
+			lines = append(lines, "  "+f)
+		}
+		var rm []string
+		for d, n := range dirs {
+			if n >= 3 && d != "." {
+				rm = append(rm, d+"/")
+			}
+		}
+		sort.Strings(rm)
+		rem := "Review each file; delete the ones you did not add."
+		if len(rm) > 0 {
+			rem = "If these folders were not yours, delete them: " + strings.Join(rm, " ") + "\n  Then review the remaining files."
+		}
+		out = append(out, &F{Severity: warn, Category: "payload_companions", Path: filepath.Join(repo, ".git"),
+			Title: fmt.Sprintf("%d file(s) still present were added by commit %s together with PolinRider payload", len(present), p[0]),
+			Details: fmt.Sprintf("Commit %s (%s) %q added:\n%s\nPolinRider amends your latest commit, so some of these may be yours.",
+				p[0], p[1], h.Trunc(p[2], 50), strings.Join(lines, "\n")),
+			Remediation: rem})
+	}
+	return out
 }
 
 var (
@@ -912,6 +986,7 @@ func (r *Repo) ScanRepo(repo string, isGit bool) []*F {
 		f = append(f, r.CheckGitHooks(repo)...)
 		f = append(f, r.CheckGitHistory(repo)...)
 		f = append(f, r.CheckHistoryPayloads(repo)...)
+		f = append(f, r.CheckPayloadCompanions(repo)...)
 	}
 	if findings.AnyAtLeast(f, high) {
 		f = append(f, r.CheckEnvFiles(repo)...)
