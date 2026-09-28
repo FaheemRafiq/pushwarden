@@ -35,6 +35,77 @@ jobs:
           threatscan status
         shell: bash
 
+  go:
+    name: go (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, macos-13, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      GOTOOLCHAIN: local   # go.mod says 1.24.0 on purpose; never switch toolchains
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.13"
+      - uses: actions/setup-python@v5
+        if: runner.os == 'Linux'
+        with:
+          python-version: "3.12"
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: go build -o dist/ ./cmd/threatscan
+      - name: Parity with the Python v5 scanner
+        if: runner.os == 'Linux'
+        run: scripts/parity.sh
+      - name: Smoke-test install, guard and uninstall
+        # GitHub's Linux runners have no systemd user session; macOS and Windows do.
+        continue-on-error: ${{ runner.os == 'Linux' }}
+        run: |
+          exe=dist/threatscan; [ "$RUNNER_OS" = Windows ] && exe=dist/threatscan.exe
+          "$exe" install --dry-run --no-harden
+          "$exe" install --unattended --no-harden
+          for i in $(seq 1 30); do
+            "$exe" status | tee status.txt | grep -Eq 'Guard:.*alive' && break
+            sleep 3
+          done
+          cat status.txt
+          grep -Eq 'Guard:.*alive' status.txt
+          "$exe" uninstall
+
+  go-fedora:
+    name: go (fedora ${{ matrix.release }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ["latest", "42"]
+    container:
+      image: fedora:${{ matrix.release }}
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - name: Install system packages
+        run: dnf install -y -q git gcc tar gzip python3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.13"
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: go build -o dist/ ./cmd/threatscan
+      - run: scripts/parity.sh
+      - name: Smoke-test CLI (no systemd in a container)
+        run: |
+          dist/threatscan --version
+          dist/threatscan scan --ci --no-report --no-system --no-prompt .
+          dist/threatscan install --dry-run --no-harden
+          dist/threatscan status
+
   fedora:
     name: test (fedora ${{ matrix.release }})
     runs-on: ubuntu-latest

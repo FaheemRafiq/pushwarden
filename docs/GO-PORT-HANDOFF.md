@@ -135,7 +135,30 @@ Tests (`internal/service/service_test.go`, use `THREATSCAN_INSTALL_DIR` and
 Done when `install --dry-run` prints the definition for the current OS, and a
 real `install` on a Linux box shows `Guard: alive` in `threatscan status`.
 
-## P5. Remaining tests, parity, CI
+## P5. Remaining tests, parity, CI (done, CI not yet run on GitHub)
+
+- Tests: `internal/scan/repo_test.go`, `internal/protect/protect_test.go`,
+  `internal/prompt/prompt_test.go`, and `TestInstallDryRunWritesNothing` in
+  `cmd/threatscan`. The exclude test uses `third_party`, because `vendor` is
+  already a default skip dir and would pass without `Exclude`.
+- `testfixtures.Build(dir)` writes the fixtures without a `testing.TB`;
+  `go run ./scripts/fixtures DIR` exposes it to scripts.
+- `scripts/parity.sh [DIR ...]`: fixtures match exactly. `~/Coding` on the
+  author's machine: 20 common findings, one known difference (below).
+- CI: `go` job (ubuntu, macos-latest, macos-13, windows-latest) and `go-fedora`
+  (latest, 42). The go job also smoke-tests a real `install --unattended` until
+  `status` shows `Guard: alive`, then `uninstall`; it is `continue-on-error`
+  on Linux because GitHub's Linux runners have no systemd user session.
+
+**Known parity difference: `history_payload` on slow repos.** Both builds run
+`git log --all -G <regex>` with a 60 s timeout. When git is killed, Python's
+`subprocess.run` raises and the check returns nothing; Go's
+`CommandContext(...).Output()` returns what git printed before it was killed,
+so Go reports the commits it found in time. Kept on purpose: dropping real
+hits because the search was slow helps nobody. The count in the title can be
+an undercount in that case.
+
+### Original P5 specification
 
 Port every case in `tests/test_scanner.py` that has no Go twin yet. Missing:
 - `internal/scan/repo_test.go`: infected fixture yields config_injection,
