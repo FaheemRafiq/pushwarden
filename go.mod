@@ -3,6 +3,7 @@ module github.com/FaheemRafiq/threatscan
 go 1.24.0
 
 require (
+	github.com/fsnotify/fsnotify v1.10.1
 	github.com/ncruces/zenity v0.10.14
 	github.com/shirou/gopsutil/v4 v4.26.8
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
