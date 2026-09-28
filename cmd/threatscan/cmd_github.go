@@ -422,6 +422,17 @@ func summarize(u *ui.UI, results []remediate.Result, apply bool, d time.Duration
 	return 0
 }
 
+// isAskpassCall recognises git invoking this binary as GIT_ASKPASS. Git passes the
+// prompt as the only argument and there is no way to add a subcommand, so the
+// hook is identified by the prompt text plus the token github-clean exported.
+func isAskpassCall(args []string) bool {
+	if os.Getenv(remediate.TokenEnv) == "" || len(args) != 1 {
+		return false
+	}
+	p := strings.ToLower(args[0])
+	return strings.HasPrefix(p, "username") || strings.HasPrefix(p, "password")
+}
+
 // askpass answers git's credential prompts with the token from the environment.
 // git calls: <program> "Username for 'https://github.com': " then "Password for ...".
 func askpass(args []string) int {

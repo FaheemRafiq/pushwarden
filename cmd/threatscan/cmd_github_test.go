@@ -38,6 +38,37 @@ func TestAskpass(t *testing.T) {
 	if run([]string{"__askpass", "Username"}) != 0 {
 		t.Fatal("hidden command not routed")
 	}
+	t.Setenv(remediate.TokenEnv, "sekret")
+	if run([]string{"Username for 'https://github.com': "}) != 0 || run([]string{"Password for 'https://x@github.com': "}) != 0 {
+		t.Fatal("git's bare prompt form not routed")
+	}
+	os.Unsetenv(remediate.TokenEnv)
+	if isAskpassCall([]string{"Username for 'https://github.com': "}) {
+		t.Fatal("without the token env a prompt-looking arg is not the hook")
+	}
+}
+
+// Real git must be able to use the binary as GIT_ASKPASS: this is exactly what
+// failed in 0.2.2 ("unable to read askpass response").
+func TestGitUsesBinaryAsAskpass(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git missing")
+	}
+	bin := filepath.Join(t.TempDir(), "threatscan")
+	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
+		t.Skipf("cannot build binary: %v\n%s", err, out)
+	}
+	cmd := exec.Command("git", "-c", "credential.helper=", "credential", "fill")
+	cmd.Env = append(os.Environ(), "GIT_ASKPASS="+bin, "GIT_TERMINAL_PROMPT=0", remediate.TokenEnv+"=sekret",
+		"THREATSCAN_HOME="+t.TempDir())
+	cmd.Stdin = strings.NewReader("protocol=https\nhost=github.com\n\n")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git credential fill: %v\n%s", err, out)
+	}
+	if !strings.Contains(string(out), "username=x-access-token") || !strings.Contains(string(out), "password=sekret") {
+		t.Fatalf("askpass answers not used:\n%s", out)
+	}
 }
 
 // End to end through the command: fake GitHub API, real git, local "remote".
