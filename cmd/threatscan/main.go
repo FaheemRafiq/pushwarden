@@ -10,7 +10,7 @@ import (
 )
 
 // version is set at build time: -ldflags "-X main.version=0.1.0"
-var version = "0.1.0-dev"
+var version = "0.2.0-dev"
 
 type command struct {
 	name, help string
@@ -50,6 +50,8 @@ func main() { os.Exit(run(os.Args[1:])) }
 func run(args []string) int {
 	if len(args) > 0 {
 		switch args[0] {
+		case "__askpass": // git credential helper used by github-clean; not a user command
+			return askpass(args[1:])
 		case "-h", "--help", "help":
 			usage()
 			return 0

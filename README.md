@@ -98,6 +98,33 @@ threatscan uninstall [--unblock] [--purge]
 `threatscan [dirs]` is short for `threatscan scan [dirs]`. Every script file is scanned by default;
 `--configs-only` restores the v4 "known config names only" scope.
 
+### Clean every GitHub repository and branch you own
+
+PolinRider force-pushes the backdoor to every branch of every repo the stolen token can reach.
+`github-clean` walks them back in reverse: it clones each repository you can push to, checks out every
+branch, strips or deletes the malicious files, and pushes one normal commit per infected branch. History
+is never rewritten and nothing is force-pushed.
+
+```sh
+threatscan github-clean                          # dry run: list what would change, touch nothing
+threatscan github-clean --apply                  # fix and push every infected branch
+threatscan github-clean --select --apply         # pick repos from a numbered list; typed order = run order
+threatscan github-clean --repo me/api --repo me/web --apply   # only these, in this order
+threatscan github-clean --owner my-org --branch 'release/*' --apply
+threatscan github-clean --list                   # show the repos the token can push to
+```
+
+The token comes from `--token`, `GITHUB_TOKEN`, `GH_TOKEN`, `--token-stdin`, or the `gh` CLI login.
+Use a **fine-grained** personal access token with *Contents: Read and write* on the repos to clean
+(a classic token needs the `repo` scope). It is passed to git through an askpass helper, never written
+to disk or into the report. Forks and archived repositories are skipped unless `--include-forks` /
+`--include-archived` is given. Fixed originals go to the local quarantine (`threatscan history`).
+
+Exit codes: 0 clean or fully fixed, 1 infected branches remain (dry run or push refused), 2 error.
+A push to a protected branch is reported, not forced: allow it temporarily or open a PR from a clean branch.
+Afterwards rotate the token and every secret those repos or their CI could read, and check
+*Settings, Applications* and *Deploy keys* on GitHub for anything you did not add.
+
 ### Exit codes
 
 | Code | Meaning |
