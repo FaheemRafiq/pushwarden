@@ -32,7 +32,7 @@ func setup(t *testing.T, mutate func(*config.Config)) (*Guard, string, string) {
 		t.Fatal(err)
 	}
 	os.MkdirAll(root, 0o755)
-	g, err := New(platform.New(), home, "6.0.0-test", true, false, false)
+	g, err := New(platform.New(), home, "0.1.0-test", true, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestOnceQuarantinesAndWritesState(t *testing.T) {
 		t.Fatal(rc)
 	}
 	hb, _, alive := ReadHeartbeat(home)
-	if !alive || hb.Repos != 1 || hb.Version != "6.0.0-test" {
+	if !alive || hb.Repos != 1 || hb.Version != "0.1.0-test" {
 		t.Fatalf("heartbeat %+v alive=%v", hb, alive)
 	}
 	if _, err := os.Stat(filepath.Join(home, "reports", "latest.json")); err != nil {

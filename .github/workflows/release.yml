@@ -1,10 +1,10 @@
 name: Release
 
-# v6+ (Go). Tag vX.Y.Z to publish; a tag with a hyphen (v6.0.0-rc1) becomes a
+# Tag vX.Y.Z to publish; a tag with a hyphen (v0.2.0-rc1) becomes a
 # pre-release. Run manually to build and smoke-test without publishing.
 on:
   push:
-    tags: ["v[6-9].*", "v[1-9][0-9].*"]
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:

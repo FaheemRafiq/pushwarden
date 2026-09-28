@@ -150,7 +150,7 @@ func TestPlaceBinaryKeepsNewerInstalled(t *testing.T) {
 	if v := InstalledVersion(m.Exe()); v != "99.0.0" {
 		t.Fatalf("InstalledVersion = %q", v)
 	}
-	m.Version = "6.0.0"
+	m.Version = "0.1.0"
 	copied, err := m.PlaceBinary()
 	var e *ErrNewerInstalled
 	if copied || !errors.As(err, &e) || e.Installed != "99.0.0" {
@@ -160,8 +160,13 @@ func TestPlaceBinaryKeepsNewerInstalled(t *testing.T) {
 		t.Fatal("newer binary was overwritten")
 	}
 	// an older installed binary is replaced
-	os.WriteFile(m.Exe(), []byte("#!/bin/sh\necho 'ThreatScan 5.0.0'\n"), 0o755)
+	os.WriteFile(m.Exe(), []byte("#!/bin/sh\necho 'ThreatScan 0.0.9'\n"), 0o755)
 	if copied, err := m.PlaceBinary(); !copied || err != nil {
 		t.Fatalf("older binary not replaced: %v %v", copied, err)
+	}
+	// so is the withdrawn 6.0.0, although its number is higher
+	os.WriteFile(m.Exe(), []byte("#!/bin/sh\necho 'ThreatScan 6.0.0'\n"), 0o755)
+	if copied, err := m.PlaceBinary(); !copied || err != nil {
+		t.Fatalf("withdrawn 6.0.0 not replaced: %v %v", copied, err)
 	}
 }

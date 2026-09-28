@@ -5,7 +5,15 @@ import (
 	"strings"
 )
 
-// CompareVersions compares two semantic versions ("v6.1.0", "6.0.0-rc1").
+// Withdrawn lists released versions that were renumbered away: 6.0.0 was the
+// first Go release before numbering restarted at 0.1.0. An installed withdrawn
+// version counts as older than any other, so reinstalling replaces it.
+var Withdrawn = map[string]bool{"6.0.0": true}
+
+// IsWithdrawn reports whether v (with or without a leading "v") was withdrawn.
+func IsWithdrawn(v string) bool { return Withdrawn[strings.TrimPrefix(v, "v")] }
+
+// CompareVersions compares two semantic versions ("v0.2.0", "0.2.0-rc1").
 // A pre-release sorts before its release.
 func CompareVersions(a, b string) int {
 	a, b = strings.TrimPrefix(a, "v"), strings.TrimPrefix(b, "v")

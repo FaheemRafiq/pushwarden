@@ -27,8 +27,8 @@ var (
 	buildErr  error
 )
 
-// fakeBins builds testdata/fakebin as v6.0.0 (installed), v6.1.0 (good) and
-// v6.1.0-that-crashes (broken).
+// fakeBins builds testdata/fakebin as v0.1.0 (installed), v0.2.0 (good) and
+// v0.2.0-that-crashes (broken).
 func fakeBins(t *testing.T) (old, good, broken string) {
 	t.Helper()
 	buildOnce.Do(func() {
@@ -38,9 +38,9 @@ func fakeBins(t *testing.T) (old, good, broken string) {
 		}
 		goBin := filepath.Join(runtime.GOROOT(), "bin", "go")
 		for _, b := range []struct{ name, ldflags string }{
-			{"old", "-X main.version=6.0.0"},
-			{"good", "-X main.version=6.1.0"},
-			{"broken", "-X main.version=6.1.0 -X main.broken=1"},
+			{"old", "-X main.version=0.1.0"},
+			{"good", "-X main.version=0.2.0"},
+			{"broken", "-X main.version=0.2.0 -X main.broken=1"},
 		} {
 			out, err := exec.Command(goBin, "build", "-o", filepath.Join(binDir, b.name+exeSuffix()),
 				"-ldflags", b.ldflags, "./testdata/fakebin").CombinedOutput()
@@ -91,7 +91,7 @@ type fixture struct {
 	oldBin []byte
 }
 
-// newFixture serves a release v6.1.0 whose binary is `bin`, signed with a test key.
+// newFixture serves a release v0.2.0 whose binary is `bin`, signed with a test key.
 func newFixture(t *testing.T, bin string) *fixture {
 	old, _, _ := fakeBins(t)
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
@@ -124,9 +124,9 @@ func newFixture(t *testing.T, bin string) *fixture {
 	exe := filepath.Join(dir, "threatscan"+exeSuffix())
 	f.oldBin = read(t, old)
 	os.WriteFile(exe, f.oldBin, 0o755)
-	f.u = &Updater{DataDir: t.TempDir(), Current: "6.0.0", Exe: exe, APIURL: f.srv.URL + "/releases/latest",
+	f.u = &Updater{DataDir: t.TempDir(), Current: "0.1.0", Exe: exe, APIURL: f.srv.URL + "/releases/latest",
 		Channel: "stable", Keys: []string{f.pub}, GOOS: runtime.GOOS, GOARCH: runtime.GOARCH, Client: f.srv.Client()}
-	f.publish("v6.1.0", read(t, bin))
+	f.publish("v0.2.0", read(t, bin))
 	return f
 }
 
@@ -172,7 +172,7 @@ func TestValidUpdateInstalled(t *testing.T) {
 	_, good, _ := fakeBins(t)
 	f := newFixture(t, good)
 	rel, err := f.u.Check()
-	if err != nil || rel == nil || rel.Version() != "6.1.0" {
+	if err != nil || rel == nil || rel.Version() != "0.2.0" {
 		t.Fatalf("Check: %+v %v", rel, err)
 	}
 	if err := f.u.Apply(rel); err != nil {
@@ -185,22 +185,22 @@ func TestValidUpdateInstalled(t *testing.T) {
 		t.Fatal(".old is not the previous binary")
 	}
 	st := f.u.LoadState()
-	if st.Version != "6.1.0" || st.Previous != "6.0.0" || st.Time == 0 || st.Confirmed {
+	if st.Version != "0.2.0" || st.Previous != "0.1.0" || st.Time == 0 || st.Confirmed {
 		t.Fatalf("state: %+v", st)
 	}
 	// the new version starts, writes a heartbeat, and is confirmed
 	nu := *f.u
-	nu.Current = "6.1.0"
-	if rb, err := nu.OnGuardStart("6.0.0", time.Now().Add(-time.Hour)); rb || err != nil {
+	nu.Current = "0.2.0"
+	if rb, err := nu.OnGuardStart("0.1.0", time.Now().Add(-time.Hour)); rb || err != nil {
 		t.Fatalf("first start rolled back: %v %v", rb, err)
 	}
-	if v := nu.Confirm("6.1.0"); v != "6.1.0" {
+	if v := nu.Confirm("0.2.0"); v != "0.2.0" {
 		t.Fatalf("Confirm = %q", v)
 	}
 	if _, err := os.Stat(f.u.Exe + ".old"); err == nil {
 		t.Fatal(".old not deleted after confirmation")
 	}
-	if nu.Confirm("6.1.0") != "" {
+	if nu.Confirm("0.2.0") != "" {
 		t.Fatal("confirmed twice")
 	}
 	// nothing newer now
@@ -247,13 +247,13 @@ func TestMissingHeartbeatRollsBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	nu := *f.u
-	nu.Current = "6.1.0"
-	// first start of 6.1.0: counted, no rollback yet
-	if rb, _ := nu.OnGuardStart("6.0.0", time.Now().Add(-time.Hour)); rb {
+	nu.Current = "0.2.0"
+	// first start of 0.2.0: counted, no rollback yet
+	if rb, _ := nu.OnGuardStart("0.1.0", time.Now().Add(-time.Hour)); rb {
 		t.Fatal("rolled back on the first start")
 	}
 	// it crashed before writing a heartbeat; the service manager restarts it
-	rb, err := nu.OnGuardStart("6.0.0", time.Now().Add(-time.Hour))
+	rb, err := nu.OnGuardStart("0.1.0", time.Now().Add(-time.Hour))
 	if err != nil || !rb {
 		t.Fatalf("no rollback: %v %v", rb, err)
 	}
@@ -261,7 +261,7 @@ func TestMissingHeartbeatRollsBack(t *testing.T) {
 		t.Fatal("previous binary not restored")
 	}
 	st := f.u.LoadState()
-	if len(st.Failed) != 1 || st.Failed[0] != "6.1.0" || st.pending() {
+	if len(st.Failed) != 1 || st.Failed[0] != "0.2.0" || st.pending() {
 		t.Fatalf("state after rollback: %+v", st)
 	}
 	// the failed version is never offered again
@@ -280,10 +280,10 @@ func TestHealthyRestartDoesNotRollBack(t *testing.T) {
 	rel, _ := f.u.Check()
 	f.u.Apply(rel)
 	nu := *f.u
-	nu.Current = "6.1.0"
+	nu.Current = "0.2.0"
 	nu.OnGuardStart("", time.Time{})
-	// the first run wrote a heartbeat as 6.1.0, then was restarted (e.g. logout)
-	if rb, _ := nu.OnGuardStart("6.1.0", time.Now()); rb {
+	// the first run wrote a heartbeat as 0.2.0, then was restarted (e.g. logout)
+	if rb, _ := nu.OnGuardStart("0.2.0", time.Now()); rb {
 		t.Fatal("healthy version rolled back")
 	}
 }
@@ -293,17 +293,17 @@ func TestChannelsAndDrafts(t *testing.T) {
 	f := newFixture(t, good)
 	a := f.rels[0].Assets
 	f.rels = []Release{
-		{Tag: "v7.0.0", Draft: true, Assets: a},
-		{Tag: "v6.3.0-rc1", Prerelease: true, Assets: a},
-		{Tag: "v6.2.0", Assets: a},
-		{Tag: "v5.9.0", Assets: a},
+		{Tag: "v1.0.0", Draft: true, Assets: a},
+		{Tag: "v0.4.0-rc1", Prerelease: true, Assets: a},
+		{Tag: "v0.3.0", Assets: a},
+		{Tag: "v0.0.9", Assets: a},
 	}
 	f.u.APIURL = f.srv.URL + "/releases"
-	if rel, _ := f.u.Check(); rel == nil || rel.Tag != "v6.2.0" {
+	if rel, _ := f.u.Check(); rel == nil || rel.Tag != "v0.3.0" {
 		t.Fatalf("stable picked %+v", rel)
 	}
 	f.u.Channel = "beta"
-	if rel, _ := f.u.Check(); rel == nil || rel.Tag != "v6.3.0-rc1" {
+	if rel, _ := f.u.Check(); rel == nil || rel.Tag != "v0.4.0-rc1" {
 		t.Fatalf("beta picked %+v", rel)
 	}
 	f.rels = nil
@@ -312,14 +312,17 @@ func TestChannelsAndDrafts(t *testing.T) {
 		t.Fatalf("no releases: %+v %v", rel, err)
 	}
 	f.u.APIURL = f.srv.URL + "/releases"
-	f.rels = []Release{{Tag: "v7.0.0", Assets: a}}
-	f.u.Current = "7.0.0"
+	f.rels = []Release{{Tag: "v1.0.0", Assets: a}}
+	f.u.Current = "1.0.0"
 	if rel, _ := f.u.Check(); rel != nil {
 		t.Fatalf("offered a downgrade: %s", rel.Tag)
 	}
 }
 
 func TestCompareVersions(t *testing.T) {
+	if !IsWithdrawn("v6.0.0") || IsWithdrawn("0.1.0") {
+		t.Error("IsWithdrawn")
+	}
 	for _, c := range []struct {
 		a, b string
 		want int

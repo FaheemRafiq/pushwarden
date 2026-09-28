@@ -1,5 +1,13 @@
 # Go port (v6) handoff: finishing P4 to P8
 
+> **Renumbered 2026-09-28:** the Go build was first released as v6.0.0, then
+> renumbered to **0.1.0** because it is still early. "v6" below means "the Go
+> build". 6.0.0 is withdrawn (`update.Withdrawn`): installing 0.1.0+ replaces an
+> installed 6.0.0, but a 6.0.0 install can never self-update to 0.x (its updater
+> only accepts higher numbers), so those machines must run the installer again.
+> P8's migration should look for the newest stable Go release (`v0.*` and later),
+> not `v6.*`.
+
 This guide is for whoever picks up the Go rewrite, human or AI agent. It says
 what is done, what remains, which existing functions to plug into, and how to
 prove each piece works. Read `~/.claude/plans/` is not available to you; this

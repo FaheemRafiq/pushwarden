@@ -30,7 +30,7 @@ type Config struct {
 	IOCUpdate          bool     `json:"ioc_update"`
 	IOCUpdateURL       string   `json:"ioc_update_url"`
 	ReportKeep         int      `json:"report_keep"`
-	// v6: program self-update
+	// program self-update (Go build)
 	AutoUpdate     bool   `json:"auto_update"`
 	UpdateChannel  string `json:"update_channel"`
 	UpdateInterval int    `json:"update_interval"`

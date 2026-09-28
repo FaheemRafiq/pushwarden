@@ -6,7 +6,7 @@
 //	        folder .vbs launcher when schtasks is refused for the current user.
 //
 // None of these need administrator rights. Names match the Python v5 build so a
-// v6 install replaces a v5 one in place.
+// Go install replaces a v5 (Python) one in place.
 package service
 
 import (
@@ -271,7 +271,7 @@ func (m *Manager) PlaceBinary() (bool, error) {
 			return false, nil
 		}
 		if m.Version != "" {
-			if iv := InstalledVersion(dst); iv != "" && update.CompareVersions(iv, m.Version) > 0 {
+			if iv := InstalledVersion(dst); iv != "" && !update.IsWithdrawn(iv) && update.CompareVersions(iv, m.Version) > 0 {
 				return false, &ErrNewerInstalled{iv}
 			}
 		}

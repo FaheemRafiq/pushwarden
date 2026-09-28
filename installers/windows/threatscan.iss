@@ -1,5 +1,5 @@
 ; Inno Setup script for ThreatScan-Setup.exe (per user, no administrator rights).
-; Build on Windows:  iscc /DAppVersion=6.0.0 /DDist=..\..\dist installers\windows\threatscan.iss
+; Build on Windows:  iscc /DAppVersion=0.1.0 /DDist=..\..\dist installers\windows\threatscan.iss
 ; Expects threatscan-windows-amd64.exe and threatscan-windows-arm64.exe in Dist.
 
 #ifndef AppVersion

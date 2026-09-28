@@ -65,7 +65,7 @@ Options for the one-liner:
 |---|---|
 | `THREATSCAN_WEBHOOK=https://hooks.slack.com/...` | send alerts from this machine to a Slack/Discord/Teams/custom webhook |
 | `THREATSCAN_ROOTS="~/code ~/work"` | which project directories to watch (default: auto-discover) |
-| `THREATSCAN_VERSION=v6.0.0-rc1` | install a specific release (e.g. a pre-release) |
+| `THREATSCAN_VERSION=v0.2.0-rc1` | install a specific release (e.g. a pre-release) |
 | `THREATSCAN_NO_INSTALL=1` | install the program only, no guard |
 
 Firewall blocking of the C2 addresses needs admin rights, so it is a separate step:
@@ -73,7 +73,9 @@ Firewall blocking of the C2 addresses needs admin rights, so it is a separate st
 
 Updates can be turned off with `threatscan config --set auto_update=false`; check by hand with `threatscan update --check`.
 
-ThreatScan v6 is a single Go program. The Python v5 code is archived on the
+ThreatScan is a single Go program, still in early development (0.x): expect frequent releases while
+detection is extended for new variants. Version numbers restarted at 0.1.0 with the Go rewrite; the
+earlier Python releases (v4, v5) are archived on the
 [`archive/python-v5`](https://github.com/FaheemRafiq/threatscan/tree/archive/python-v5) branch.
 
 ---
@@ -291,7 +293,7 @@ docs/                  download page (GitHub Pages), Go port handoff notes
 Tests never touch `~/.threatscan`; they run under a temporary `THREATSCAN_HOME`, and the malware
 fixtures are inert files that only mimic the artefacts' shape.
 
-Releases: push a tag `vX.Y.Z` (a hyphen, as in `v6.1.0-rc1`, makes a pre-release). The Release workflow
+Releases: push a tag `vX.Y.Z` (a hyphen, as in `v0.2.0-rc1`, makes a pre-release). The Release workflow
 builds every asset, installs it on Windows, macOS and Linux until the guard reports alive, then publishes
 with a signed `checksums.txt`. Installed copies pick the release up within 6 hours.
 

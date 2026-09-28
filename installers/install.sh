@@ -6,7 +6,7 @@
 # checksums.txt is not checked here; the binary checks it on every self-update.
 #
 # Environment:
-#   THREATSCAN_VERSION=v6.0.0-rc1   install this release instead of the latest
+#   THREATSCAN_VERSION=v0.2.0-rc1   install this release instead of the latest
 #   THREATSCAN_BASE_URL=URL         download assets from URL (a directory; file:// works)
 #   THREATSCAN_WEBHOOK=URL          alert webhook to configure
 #   THREATSCAN_ROOTS="~/code ~/src" project dirs to watch (default: auto-discover)
