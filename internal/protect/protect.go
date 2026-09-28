@@ -191,6 +191,8 @@ func isPersistence(f *F) bool {
 
 func ActionWord(f *F) string {
 	switch {
+	case len(f.Meta.StripLines) > 0:
+		return "Remove hidden entries"
 	case f.Meta.Cleanable:
 		return "Remove payload"
 	case isPersistence(f):
@@ -250,7 +252,11 @@ func (pr *Protector) Quarantine(f *F) bool {
 }
 
 // Clean strips an appended single-line payload; anything else quarantines the whole file.
+// A finding with StripLines removes those entries (whole lines) instead.
 func (pr *Protector) Clean(f *F) bool {
+	if len(f.Meta.StripLines) > 0 {
+		return pr.cleanLines(f)
+	}
 	raw := h.ReadBytes(f.Path, 20<<20)
 	if raw == nil {
 		return false
@@ -291,6 +297,51 @@ func (pr *Protector) Clean(f *F) bool {
 	pr.record(Entry{Type: "clean", Original: f.Path, Copy: cp, Cut: cut, RemovedBytes: removed, Title: f.Title,
 		Threat: prompt.ThreatName(f), Evidence: f.Meta.Evidence})
 	pr.say("Stripped payload from " + f.Path)
+	return true
+}
+
+// cleanLines removes every line whose entry (ignoring whitespace and a leading
+// slash) is one of Meta.StripLines. Other lines and line endings are kept.
+func (pr *Protector) cleanLines(f *F) bool {
+	raw := h.ReadBytes(f.Path, 20<<20)
+	if raw == nil {
+		return false
+	}
+	drop := map[string]bool{}
+	for _, l := range f.Meta.StripLines {
+		drop[l] = true
+	}
+	lines := strings.SplitAfter(string(raw), "\n")
+	var kept, removed []string
+	for _, l := range lines {
+		entry := strings.TrimPrefix(strings.TrimSpace(l), "/")
+		if drop[entry] {
+			removed = append(removed, entry)
+			continue
+		}
+		kept = append(kept, l)
+	}
+	if len(removed) == 0 {
+		f.Action = "clean failed: entries not found"
+		return false
+	}
+	cleaned := strings.Join(kept, "")
+	cp, err := pr.stash(f.Path)
+	if err != nil {
+		f.Action = "clean failed (backup error)"
+		return false
+	}
+	if !pr.DryRun {
+		st, _ := os.Stat(f.Path)
+		if err := os.WriteFile(f.Path, []byte(cleaned), st.Mode().Perm()); err != nil {
+			f.Action = "clean failed: " + err.Error()
+			return false
+		}
+	}
+	f.Action = fmt.Sprintf("removed %d line(s): %s (original in %s)", len(removed), strings.Join(removed, ", "), cp)
+	pr.record(Entry{Type: "clean", Original: f.Path, Copy: cp, RemovedBytes: len(raw) - len(cleaned), Line: strings.Join(removed, ", "),
+		Title: f.Title, Threat: prompt.ThreatName(f), Evidence: f.Meta.Evidence})
+	pr.say("Removed " + strings.Join(removed, ", ") + " from " + f.Path)
 	return true
 }
 

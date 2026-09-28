@@ -286,3 +286,32 @@ func TestNewNPMPackages(t *testing.T) {
 		}
 	}
 }
+
+func TestGitignoreTamperingIsOneCleanableFinding(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, ".git", "HEAD"), "ref: refs/heads/main\n")
+	write(t, filepath.Join(dir, ".gitignore"), "node_modules\ntemp_auto_push.bat\ntemp_interactive_push.bat\n/branch_structure.json\n.gitignore\nnul\n")
+	var gi []*findings.Finding
+	for _, f := range newRepo(t, dir).CheckPropagation(dir) {
+		if f.Category == "gitignore_tampering" {
+			gi = append(gi, f)
+		}
+	}
+	if len(gi) != 1 {
+		t.Fatalf("want one finding, got %d", len(gi))
+	}
+	f := gi[0]
+	if f.Severity != findings.Critical || !f.Meta.Cleanable || len(f.Meta.StripLines) != 5 {
+		t.Fatalf("severity=%s cleanable=%v strip=%v", f.Severity, f.Meta.Cleanable, f.Meta.StripLines)
+	}
+	if !strings.Contains(strings.Join(f.Meta.StripLines, ","), "nul") {
+		t.Fatal("weak entries are stripped together with strong ones")
+	}
+	// weak entries alone stay HIGH and manual
+	write(t, filepath.Join(dir, ".gitignore"), "node_modules\nnul\n")
+	for _, f := range newRepo(t, dir).CheckPropagation(dir) {
+		if f.Category == "gitignore_tampering" && (f.Severity != findings.High || f.Meta.Cleanable) {
+			t.Fatalf("weak-only entry should be HIGH/manual: %+v", f)
+		}
+	}
+}

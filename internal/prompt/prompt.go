@@ -33,7 +33,7 @@ var threatNames = map[string]string{
 	"git_hook": "Trojan:Script/PolinRider.GitHook", "compromised_package": "Trojan:JS/PolinRider.Package",
 	"malicious_process": "Behavior:Node/PolinRider.Payload", "c2_connection": "Behavior:Net/PolinRider.C2",
 	"rat_footprint": "Backdoor:JS/RuntimeDevLink", "stage4_runtime": "Backdoor:JS/RuntimeDevLink",
-	"editor_injection": "Trojan:JS/PolinRider.EditorInject",
+	"editor_injection": "Trojan:JS/PolinRider.EditorInject", "gitignore_tampering": "Trojan:Script/PolinRider.Hide",
 }
 
 func ThreatName(f *findings.Finding) string {

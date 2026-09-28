@@ -388,6 +388,8 @@ func shortAction(f *findings.Finding) string {
 	switch {
 	case strings.Contains(a, "whole file quarantined") || strings.HasPrefix(a, "quarantined"):
 		return "deleted"
+	case strings.HasPrefix(a, "removed") && strings.Contains(a, "line(s)"):
+		return "entries removed"
 	case strings.HasPrefix(a, "removed"):
 		return "payload stripped"
 	case a == "":

@@ -82,7 +82,7 @@ footprints, editor injection and exposed credentials.
 | `--no-system` | skip the host checks |
 | `--no-repos` | skip the repository checks |
 | `--verbose` | list every repository, including clean ones |
-| `--fix` | act on CRITICAL findings without asking: strip the payload or quarantine the file, kill malicious processes, remove persistence. Reversible |
+| `--fix` | act on CRITICAL findings without asking: strip the payload or quarantine the file, remove PolinRider entries from `.gitignore`, kill malicious processes, remove persistence. Reversible |
 | `--dry-run` | show what `--fix` would do and change nothing |
 | `--gui` | ask about each malicious file with a native dialog instead of in the terminal |
 | `--no-prompt` | report only. Never ask, never change a file |
@@ -162,7 +162,8 @@ branch it can reach. `github-clean` undoes that at the same scale. For every rep
 2. check out each branch in its own worktree;
 3. run the repository scanner;
 4. strip trailing payloads from config files, delete whole-file threats (fake fonts, malicious
-   `.vscode/tasks.json`, propagation scripts) with the same reversible protector as `scan --fix`;
+   `.vscode/tasks.json`, propagation scripts) and remove the entries PolinRider adds to
+   `.gitignore` to hide them, with the same reversible protector as `scan --fix`;
 5. commit once per infected branch and push with an explicit refspec.
 
 History is never rewritten and nothing is force-pushed. A push the remote refuses (protected

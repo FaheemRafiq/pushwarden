@@ -52,7 +52,8 @@ func buildOrigin(t *testing.T) string {
 	put(t, filepath.Join(work, "postcss.config.mjs"), []byte(testfixtures.InfectedPostcss))
 	put(t, filepath.Join(work, "public", "fonts", "fa-solid-900.woff2"), testfixtures.FakeWoff2)
 	put(t, filepath.Join(work, ".vscode", "tasks.json"), []byte(testfixtures.TasksJSON))
-	sh(t, work, "add", "-A")
+	put(t, filepath.Join(work, ".gitignore"), []byte("node_modules\ntemp_auto_push.bat\nbranch_structure.json\n.gitignore\n"))
+	sh(t, work, "add", "-A", "-f") // the malicious .gitignore ignores itself, as PolinRider's does
 	sh(t, work, "commit", "-q", "-m", "chore: update config")
 	sh(t, work, "checkout", "-q", "-b", "feature", "clean")
 	put(t, filepath.Join(work, "public", "fonts", "fa-solid-900.woff2"), testfixtures.FakeWoff2)
@@ -97,7 +98,7 @@ func TestDryRunChangesNothing(t *testing.T) {
 	if b["main"].Status != StatusInfected || b["feature"].Status != StatusInfected || b["clean"].Status != StatusClean {
 		t.Fatalf("statuses: main=%s feature=%s clean=%s", b["main"].Status, b["feature"].Status, b["clean"].Status)
 	}
-	if len(b["main"].Fixed) < 3 {
+	if len(b["main"].Fixed) < 4 {
 		t.Fatalf("main should list 3 fixes, got %v", b["main"].Fixed)
 	}
 	if res.Branches[0].Name != "main" {
@@ -138,6 +139,9 @@ func TestApplyFixesEveryInfectedBranch(t *testing.T) {
 		if _, ok := show(t, origin, "main", f); ok {
 			t.Fatalf("%s should be deleted from main", f)
 		}
+	}
+	if gi, ok := show(t, origin, "main", ".gitignore"); !ok || gi != "node_modules\n" {
+		t.Fatalf(".gitignore should keep only the legitimate entry, got %q", gi)
 	}
 	if _, ok := show(t, origin, "feature", "public/fonts/fa-solid-900.woff2"); ok {
 		t.Fatal("fake font should be deleted from feature")

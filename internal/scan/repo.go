@@ -346,21 +346,43 @@ func (r *Repo) CheckPropagation(repo string) []*F {
 	if content == "" {
 		return out
 	}
+	// strong: names only PolinRider uses. weak: entries that are odd but have innocent uses
+	// (a stray "nul" file on Windows, .gitignore ignoring itself).
+	var strong, weak []string
 	for _, name := range r.I.PropagationScripts {
 		if lineRe(name, false).MatchString(content) {
-			out = append(out, &F{Severity: high, Category: "gitignore_tampering", Title: ".gitignore hides " + name, Path: gi,
-				Details:     "PolinRider adds its orchestrator to .gitignore so it never shows in git status.",
-				Remediation: fmt.Sprintf("Remove '%s' from %s.", name, gi)})
+			strong = append(strong, name)
 		}
 	}
 	if _, err := os.Stat(filepath.Join(repo, ".git")); err == nil {
 		for _, name := range r.I.GitignoreIOCs {
-			if lineRe(name, true).MatchString(content) {
-				out = append(out, &F{Severity: high, Category: "gitignore_tampering", Title: ".gitignore hides " + name, Path: gi,
-					Details:     "PolinRider ignores its own artefacts (and .gitignore itself) to hide the tampering.",
-					Remediation: fmt.Sprintf("Remove '%s' from %s, then run: git status --ignored", name, gi)})
+			if !lineRe(name, true).MatchString(content) {
+				continue
+			}
+			if name == "branch_structure.json" {
+				strong = append(strong, name)
+			} else {
+				weak = append(weak, name)
 			}
 		}
+	}
+	if len(strong) > 0 {
+		all := append(strong, weak...)
+		ev := make([]string, 0, len(all))
+		for _, n := range all {
+			ev = append(ev, ".gitignore entry "+n)
+		}
+		out = append(out, &F{Severity: crit, Category: "gitignore_tampering",
+			Title: ".gitignore hides PolinRider files: " + strings.Join(all, ", "), Path: gi,
+			Details:     "PolinRider adds its orchestrator and artefacts to .gitignore so they never show in git status.",
+			Remediation: "Remove these entries from " + gi + ", then run: git status --ignored",
+			Meta:        findings.Meta{Cleanable: true, StripLines: all, Evidence: ev}})
+		return out
+	}
+	for _, name := range weak {
+		out = append(out, &F{Severity: high, Category: "gitignore_tampering", Title: ".gitignore hides " + name, Path: gi,
+			Details:     "PolinRider ignores its own artefacts (and .gitignore itself) to hide the tampering.",
+			Remediation: fmt.Sprintf("Remove '%s' from %s, then run: git status --ignored", name, gi)})
 	}
 	return out
 }

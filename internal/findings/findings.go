@@ -59,6 +59,7 @@ type Meta struct {
 	CronLine         string   `json:"cron_line,omitempty"`
 	Cut              int      `json:"cut,omitempty"`
 	MidFileInjection bool     `json:"mid_file_injection,omitempty"`
+	StripLines       []string `json:"strip_lines,omitempty"` // Cleanable: remove these entries (whole lines) instead of a trailing payload
 }
 
 type Finding struct {
