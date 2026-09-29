@@ -43,6 +43,14 @@ type Entry struct {
 	Line         string   `json:"line,omitempty"`
 	Copies       int      `json:"copies,omitempty"`
 	DryRun       bool     `json:"dry_run,omitempty"`
+	Reason       string   `json:"reason,omitempty"` // why this response was taken (findings.WhyAction)
+}
+
+// entryFor starts a history entry for a finding: what it was, the threat name,
+// the evidence and the reason for the response taken.
+func entryFor(f *F, typ string) Entry {
+	return Entry{Type: typ, Original: f.Path, Title: f.Title, Threat: prompt.ThreatName(f), Evidence: f.Meta.Evidence,
+		Reason: findings.WhyAction(f)}
 }
 
 type decision struct {
@@ -223,7 +231,9 @@ func (pr *Protector) Kill(f *F) bool {
 	} else {
 		f.Action = fmt.Sprintf("kill PID %d failed (permission?)", pid)
 	}
-	pr.record(Entry{Type: "kill", PID: pid, Cmd: f.Meta.Cmd, OK: &ok, Title: f.Title, Threat: prompt.ThreatName(f)})
+	e := entryFor(f, "kill")
+	e.Original, e.PID, e.Cmd, e.OK = "", pid, f.Meta.Cmd, &ok
+	pr.record(e)
 	return ok
 }
 
@@ -246,7 +256,9 @@ func (pr *Protector) Quarantine(f *F) bool {
 		}
 	}
 	f.Action = "quarantined to " + cp
-	pr.record(Entry{Type: "quarantine", Original: f.Path, Copy: cp, Title: f.Title, Threat: prompt.ThreatName(f), Evidence: f.Meta.Evidence})
+	e := entryFor(f, "quarantine")
+	e.Copy = cp
+	pr.record(e)
 	pr.say("Quarantined " + f.Path)
 	return true
 }
@@ -294,8 +306,9 @@ func (pr *Protector) Clean(f *F) bool {
 	}
 	f.Meta.Cut = cut
 	f.Action = fmt.Sprintf("removed %d bytes of payload (original in %s)", removed, cp)
-	pr.record(Entry{Type: "clean", Original: f.Path, Copy: cp, Cut: cut, RemovedBytes: removed, Title: f.Title,
-		Threat: prompt.ThreatName(f), Evidence: f.Meta.Evidence})
+	e := entryFor(f, "clean")
+	e.Copy, e.Cut, e.RemovedBytes = cp, cut, removed
+	pr.record(e)
 	pr.say("Stripped payload from " + f.Path)
 	return true
 }
@@ -339,8 +352,9 @@ func (pr *Protector) cleanLines(f *F) bool {
 		}
 	}
 	f.Action = fmt.Sprintf("removed %d line(s): %s (original in %s)", len(removed), strings.Join(removed, ", "), cp)
-	pr.record(Entry{Type: "clean", Original: f.Path, Copy: cp, RemovedBytes: len(raw) - len(cleaned), Line: strings.Join(removed, ", "),
-		Title: f.Title, Threat: prompt.ThreatName(f), Evidence: f.Meta.Evidence})
+	e := entryFor(f, "clean")
+	e.Copy, e.RemovedBytes, e.Line = cp, len(raw)-len(cleaned), strings.Join(removed, ", ")
+	pr.record(e)
 	pr.say("Removed " + strings.Join(removed, ", ") + " from " + f.Path)
 	return true
 }
@@ -358,7 +372,9 @@ func (pr *Protector) Delete(f *F) bool {
 		}
 	}
 	f.Action = "deleted (user confirmed)"
-	pr.record(Entry{Type: "delete", Original: f.Path, SHA256: sum, Title: f.Title, Threat: prompt.ThreatName(f), Evidence: f.Meta.Evidence})
+	e := entryFor(f, "delete")
+	e.SHA256 = sum
+	pr.record(e)
 	pr.say("Deleted " + f.Path)
 	return true
 }
@@ -385,7 +401,9 @@ func (pr *Protector) RemovePersistence(f *F) bool {
 			pr.P.RunRC(30*time.Second, "schtasks", "/Delete", "/TN", m.Schtask, "/F")
 		}
 		f.Action = "deleted scheduled task " + m.Schtask
-		pr.record(Entry{Type: "schtask", Name: m.Schtask, Title: f.Title})
+		e := entryFor(f, "schtask")
+		e.Original, e.Name = "", m.Schtask
+		pr.record(e)
 		return true
 	case m.CronLine != "" && !pr.P.IsWindows():
 		rc, cur, _ := pr.P.RunRC(15*time.Second, "crontab", "-l")
@@ -409,7 +427,9 @@ func (pr *Protector) RemovePersistence(f *F) bool {
 			}
 		}
 		f.Action = "removed crontab line (backup in quarantine)"
-		pr.record(Entry{Type: "cron", Line: m.CronLine, Title: f.Title})
+		e := entryFor(f, "cron")
+		e.Original, e.Line = "", m.CronLine
+		pr.record(e)
 		return true
 	case m.Quarantine:
 		return pr.Quarantine(f)

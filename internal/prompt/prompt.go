@@ -65,7 +65,7 @@ func evidenceLines(f *findings.Finding) []string {
 
 // BuildMessage is the before-action dialog text.
 func BuildMessage(f *findings.Finding, action string) string {
-	l := []string{"Threat: " + ThreatName(f), "File:   " + f.Path, ""}
+	l := []string{"Threat: " + ThreatName(f), "File:   " + f.Path, "", "Why: " + findings.Why(f), ""}
 	l = append(l, evidenceLines(f)...)
 	l = append(l, "")
 	if action == "Delete the file" {
@@ -79,6 +79,8 @@ func BuildMessage(f *findings.Finding, action string) string {
 // QuarantinedMessage is the Defender-style after-action dialog text.
 func QuarantinedMessage(f *findings.Finding) string {
 	l := []string{"Threat: " + ThreatName(f), "File:   " + f.Path, "", "The file was quarantined and can no longer run.", ""}
+	l = append(l, findings.Explain(f)...)
+	l = append(l, "")
 	l = append(l, evidenceLines(f)...)
 	l = append(l, "", "Remove it permanently, or restore it and allow this exact file?")
 	return strings.Join(l, "\n")
@@ -142,6 +144,12 @@ func AskTerminal(f *findings.Finding, action string) Verdict {
 		return Delete
 	}
 	return Keep
+}
+
+// ShowInfo displays plain text in a native dialog (used by `alerts --gui`).
+func ShowInfo(title, text string) error {
+	ensureDisplay()
+	return zenity.Info(text, zenity.Title(title), zenity.Width(620), zenity.InfoIcon)
 }
 
 // SetDialogForTest replaces the native dialog (tests only).

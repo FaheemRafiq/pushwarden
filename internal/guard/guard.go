@@ -280,7 +280,9 @@ func (g *Guard) Handle(fs []*F, context string) {
 	for _, f := range fs {
 		msg := fmt.Sprintf("[%s] %s %s", f.Severity, f.Title, f.Path)
 		if f.Action != "" {
-			msg += " -> " + f.Action
+			msg += " -> " + f.Action + " | why: " + findings.WhyAction(f)
+		} else {
+			msg += " | why: " + findings.Why(f)
 		}
 		g.Log(msg)
 	}

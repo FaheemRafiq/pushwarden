@@ -89,7 +89,8 @@ threatscan scan --home --gui      # same, but asks through the native dialog
 threatscan scan --home --no-prompt   # report only
 threatscan scan --home --fix      # act without asking (quarantine / strip, reversible)
 threatscan scan --deep ~/proj     # also descend into node_modules / vendor
-threatscan history                # protection history (restore / allow / remove)
+threatscan history                # protection history (restore / allow / remove), with the reason for each action
+threatscan alerts                 # recent alerts and why each one fired
 threatscan update-iocs            # pull the latest indicator file
 sudo threatscan protect --block-c2   # firewall + hosts sinkhole for all known C2
 threatscan uninstall [--unblock] [--purge]

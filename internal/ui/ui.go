@@ -62,8 +62,12 @@ func (u *UI) Finding(f *findings.Finding) {
 			u.P("      %s", u.C("DIM", l))
 		}
 	}
+	if f.Severity >= findings.Warning {
+		u.P("      %s", u.C("CYAN", "Why: "+findings.Why(f)))
+	}
 	if f.Action != "" {
 		u.P("      %s", u.C("BOLD_GREEN", "Action: "+f.Action))
+		u.P("      %s", u.C("CYAN", findings.WhyAction(f)))
 	}
 }
 

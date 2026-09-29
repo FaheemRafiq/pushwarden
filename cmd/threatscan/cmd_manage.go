@@ -32,6 +32,8 @@ func cmdHistory(args []string) int {
 	allow := fs.String("allow", "", "restore and stop flagging this exact file content")
 	remove := fs.String("remove", "", "delete the quarantined copies permanently")
 	limit := fs.Int("limit", 50, "number of entries to show")
+	details := fs.Bool("details", false, "show the evidence behind each entry")
+	asJSON := fs.Bool("json", false, "print the raw entries as JSON")
 	if _, err := parseInterspersed(fs, args); err != nil {
 		return 2
 	}
@@ -64,14 +66,27 @@ func cmdHistory(args []string) int {
 		return 0
 	}
 	es := pr.Entries()
+	if len(es) > *limit {
+		es = es[len(es)-*limit:]
+	}
+	if *asJSON {
+		b, _ := json.MarshalIndent(es, "", "  ")
+		fmt.Println(string(b))
+		return 0
+	}
 	if len(es) == 0 {
 		u.Info("Protection history is empty.")
 		return 0
 	}
-	fmt.Printf("  %-19s %-11s %-38s %s\n", "when", "action", "threat", "path")
-	if len(es) > *limit {
-		es = es[len(es)-*limit:]
-	}
+	fmt.Print(formatHistory(es, *details))
+	return 0
+}
+
+// formatHistory renders history entries: one row each plus the reason for the
+// response; --details adds the evidence and, for kills, the command line.
+func formatHistory(es []protect.Entry, details bool) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "  %-19s %-11s %-38s %s\n", "when", "action", "threat", "path")
 	for _, e := range es {
 		label := e.Threat
 		if label == "" {
@@ -90,16 +105,40 @@ func cmdHistory(args []string) int {
 		if e.RemovedBytes > 0 {
 			extra = fmt.Sprintf("  (%d bytes stripped)", e.RemovedBytes)
 		}
+		if e.OK != nil && !*e.OK {
+			extra += "  [failed]"
+		}
 		if e.DryRun {
 			extra += "  [dry-run]"
 		}
 		if len(label) > 38 {
 			label = label[:38]
 		}
-		fmt.Printf("  %-19s %-11s %-38s %s%s\n", e.TS, e.Type, label, target, extra)
+		fmt.Fprintf(&b, "  %-19s %-11s %-38s %s%s\n", e.TS, e.Type, label, target, extra)
+		why := e.Reason
+		if why == "" && len(e.Evidence) > 0 {
+			why = e.Evidence[0]
+		}
+		if why != "" {
+			fmt.Fprintf(&b, "      why: %s\n", why)
+		}
+		if details {
+			if e.Title != "" && e.Title != label {
+				fmt.Fprintf(&b, "      finding: %s\n", e.Title)
+			}
+			for _, ev := range e.Evidence {
+				fmt.Fprintf(&b, "      - %s\n", ev)
+			}
+			if e.Cmd != "" {
+				fmt.Fprintf(&b, "      cmd: %s\n", e.Cmd)
+			}
+			if e.Copy != "" {
+				fmt.Fprintf(&b, "      copy: %s\n", e.Copy)
+			}
+		}
 	}
-	fmt.Println("\n  threatscan history --restore <path> | --allow <path> | --remove <path>")
-	return 0
+	b.WriteString("\n  threatscan history --details | --restore <path> | --allow <path> | --remove <path>\n")
+	return b.String()
 }
 
 func cmdRestore(args []string) int {

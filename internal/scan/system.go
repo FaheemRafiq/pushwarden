@@ -34,24 +34,32 @@ func (s *System) CheckProcesses() []*F {
 		if pr.PID == me {
 			continue
 		}
-		re, killable := s.matchProcess(pr.Name, pr.Cmd)
-		if re != nil {
-			kill := fmt.Sprintf("kill -9 %d", pr.PID)
-			if s.P.IsWindows() {
-				kill = fmt.Sprintf("taskkill /PID %d /F", pr.PID)
-			}
-			cmd := pr.Cmd
-			if len(cmd) > 200 {
-				cmd = cmd[:200] + "..."
-			}
-			out = append(out, &F{Severity: crit, Category: "malicious_process",
-				Title:       fmt.Sprintf("Malicious process running: PID %d (%s)", pr.PID, pr.Name),
-				Details:     "Pattern: " + h.Trunc(re.String(), 50) + "\nCmd: " + cmd,
-				Remediation: kill + "\n  Then find its parent and persistence (see persistence findings).",
-				Meta:        findings.Meta{PID: pr.PID, Kill: killable, Cmd: h.Trunc(pr.Cmd, 500)}})
+		if re, kill := s.matchProcess(pr.Name, pr.Cmd); re != nil {
+			out = append(out, processFinding(pr, re, kill, s.P.IsWindows()))
 		}
 	}
 	return out
+}
+
+// processFinding builds the malicious_process finding. kill is the strict
+// kill-list indicator that matched, nil when only a broad one did.
+func processFinding(pr platform.Proc, re, kill *regexp.Regexp, windows bool) *F {
+	killCmd := fmt.Sprintf("kill -9 %d", pr.PID)
+	if windows {
+		killCmd = fmt.Sprintf("taskkill /PID %d /F", pr.PID)
+	}
+	ev := []string{"command line matches PolinRider indicator /" + h.Trunc(re.String(), 60) + "/"}
+	if kill != nil {
+		ev = append(ev, "strict kill marker /"+h.Trunc(kill.String(), 60)+"/ present: confirmed payload, auto-killed")
+	} else {
+		ev = append(ev, "no strict kill marker: broad indicator only, not auto-killed")
+	}
+	ev = append(ev, fmt.Sprintf("pid %d (%s)", pr.PID, pr.Name), "cmd: "+h.Trunc(pr.Cmd, 160))
+	return &F{Severity: crit, Category: "malicious_process",
+		Title:       fmt.Sprintf("Malicious process running: PID %d (%s)", pr.PID, pr.Name),
+		Details:     "Pattern: " + h.Trunc(re.String(), 50) + "\nCmd: " + h.Trunc(pr.Cmd, 200),
+		Remediation: killCmd + "\n  Then find its parent and persistence (see persistence findings).",
+		Meta:        findings.Meta{PID: pr.PID, Kill: kill != nil, Cmd: h.Trunc(pr.Cmd, 500), Evidence: ev}}
 }
 
 // sandbox wrappers list host paths they bind-mount on their command line
@@ -72,24 +80,26 @@ func stripSandboxMounts(name, cmd string) string {
 }
 
 // matchProcess returns the first indicator a command line matches (nil when
-// clean) and whether it is on the kill list. Our own tools are skipped: the
-// dialogs and notifications quote indicators in their arguments.
-func (s *System) matchProcess(name, cmd string) (*regexp.Regexp, bool) {
+// clean) and the kill-list indicator that matched (nil when none). Our own
+// tools are skipped: the dialogs and notifications quote indicators in their
+// arguments.
+func (s *System) matchProcess(name, cmd string) (re, kill *regexp.Regexp) {
 	if strings.Contains(strings.ToLower(cmd), "threatscan") || ownTools[strings.ToLower(strings.TrimSuffix(name, ".exe"))] {
-		return nil, false
+		return nil, nil
 	}
 	cmd = stripSandboxMounts(name, cmd)
 	for _, re := range s.I.Process {
 		if !re.MatchString(cmd) {
 			continue
 		}
-		killable := false
 		for _, k := range s.I.ProcessKill {
-			killable = killable || k.MatchString(cmd)
+			if k.MatchString(cmd) {
+				return re, k
+			}
 		}
-		return re, killable
+		return re, nil
 	}
-	return nil, false
+	return nil, nil
 }
 
 func (s *System) CheckNetwork() []*F {
@@ -100,24 +110,47 @@ func (s *System) CheckNetwork() []*F {
 	}
 	seen := map[string]bool{}
 	var out []*F
+	var owners map[int]string
 	for _, c := range s.P.Connections() {
 		key := fmt.Sprintf("%s:%d", c.IP, c.Port)
 		if !bad[c.IP] || seen[key] {
 			continue
 		}
 		seen[key] = true
-		block := "sudo iptables -A OUTPUT -d " + c.IP + " -j DROP"
-		if s.P.IsWindows() {
-			block = `netsh advfirewall firewall add rule name="PolinRider C2" dir=out action=block remoteip=` + c.IP
-		} else if s.P.IsMac() {
-			block = "echo 'block drop out to " + c.IP + "' | sudo pfctl -ef -"
+		if owners == nil { // one process listing, only when there is a hit
+			owners = map[int]string{}
+			for _, pr := range s.P.Processes() {
+				owners[pr.PID] = pr.Cmd
+			}
 		}
-		out = append(out, &F{Severity: crit, Category: "c2_connection", Title: "Live connection to PolinRider C2 " + key,
-			Details:     fmt.Sprintf("PID: %d", c.PID),
-			Remediation: block + fmt.Sprintf("\n  Then kill PID %d.  Or: sudo threatscan protect --block-c2", c.PID),
-			Meta:        findings.Meta{PID: c.PID, Kill: c.PID > 0, IP: c.IP}})
+		out = append(out, c2Finding(c, owners[c.PID], s.I.Version, s.P.OS))
 	}
 	return out
+}
+
+// c2Finding builds the c2_connection finding for one live connection.
+func c2Finding(c platform.Conn, ownerCmd, iocVersion, goos string) *F {
+	key := fmt.Sprintf("%s:%d", c.IP, c.Port)
+	block := "sudo iptables -A OUTPUT -d " + c.IP + " -j DROP"
+	switch goos {
+	case "windows":
+		block = `netsh advfirewall firewall add rule name="PolinRider C2" dir=out action=block remoteip=` + c.IP
+	case "darwin":
+		block = "echo 'block drop out to " + c.IP + "' | sudo pfctl -ef -"
+	}
+	ev := []string{"established connection to " + key, c.IP + " is on the PolinRider C2 list (indicators " + iocVersion + ")"}
+	switch {
+	case c.PID > 0 && ownerCmd != "":
+		ev = append(ev, fmt.Sprintf("owning process: pid %d %s", c.PID, h.Trunc(ownerCmd, 120)))
+	case c.PID > 0:
+		ev = append(ev, fmt.Sprintf("owning process: pid %d", c.PID))
+	default:
+		ev = append(ev, "owning process unknown (no permission to read it)")
+	}
+	return &F{Severity: crit, Category: "c2_connection", Title: "Live connection to PolinRider C2 " + key,
+		Details:     fmt.Sprintf("PID: %d", c.PID),
+		Remediation: block + fmt.Sprintf("\n  Then kill PID %d.  Or: sudo threatscan protect --install", c.PID),
+		Meta:        findings.Meta{PID: c.PID, Kill: c.PID > 0, IP: c.IP, Cmd: h.Trunc(ownerCmd, 500), Evidence: ev}}
 }
 
 func containsAny(s string, keys ...string) bool {

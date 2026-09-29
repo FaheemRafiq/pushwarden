@@ -16,7 +16,7 @@ one-liner and a description of the threat, see the [README](../README.md).
 - [Conventions](#conventions)
 - [Quick start](#quick-start)
 - [Commands](#commands)
-  - [scan](#scan) · [status](#status) · [history and restore](#history-and-restore)
+  - [scan](#scan) · [status](#status) · [history and restore](#history-and-restore) · [alerts](#alerts)
   - [github-clean](#github-clean)
   - [guard](#guard) · [install](#install) · [uninstall](#uninstall)
   - [update](#update) · [update-iocs](#update-iocs)
@@ -141,11 +141,35 @@ threatscan restore PATH            # same as history --restore PATH
 | Option | Effect |
 |---|---|
 | `--limit N` | number of entries to show (default 50) |
+| `--details` | also print the evidence behind each entry and, for kills, the command line |
+| `--json` | print the raw entries as JSON |
 | `--restore PATH` | put the original file back at `PATH`. It is still malicious and will be flagged again |
 | `--allow PATH` | restore and stop flagging this exact file content. The decision is remembered for 30 days and only for this content hash. Use it for a false positive |
 | `--remove PATH` | delete the quarantined copies permanently |
 
 `PATH` is the original location as shown by `threatscan history`.
+
+Every entry carries a `why:` line: the reason for the response, for example that a process was
+killed because its command line held a strict PolinRider marker, or that a file was quarantined
+whole because the payload was woven into it rather than appended.
+
+### alerts
+
+Recent alerts with the reason for each one. This is what a click on a desktop notification opens.
+
+```
+threatscan alerts [--last N] [--gui] [--json]
+```
+
+| Option | Effect |
+|---|---|
+| `--last N` | number of alerts to show (default 10) |
+| `--gui` | show them in a native dialog instead of the terminal |
+| `--json` | print the raw records from `alerts.log` |
+
+Each alert shows when it happened, the severity and threat name, the file or process, a `why:` line
+explaining what the evidence means and why it has that severity, and a `response:` line saying
+what was done and why (killed, stripped, quarantined, or left for you to decide).
 
 ### github-clean
 
@@ -480,10 +504,11 @@ The data directory is `~/.threatscan` (override with `THREATSCAN_HOME`).
 | `config.json` | settings |
 | `iocs.json` | downloaded indicators; the binary carries an embedded copy as fallback |
 | `guard.log` | the guard's log |
-| `alerts.log` | one JSON line per alert |
+| `alerts.log` | one JSON line per alert, including the `why` and `response` texts as worded at the time |
 | `reports/` | timestamped JSON reports plus `latest.json` |
 | `quarantine/` | copies of every stripped or deleted file, and `index.jsonl`, the protection history |
 | `decisions.json` | files you chose to allow, with their content hash |
+| `ThreatScan Notifier.app` | macOS only, in the install directory: the helper that posts notifications so a click opens `threatscan alerts --gui` |
 | `guard/` | heartbeat and state of the running guard |
 
 The binary itself lives in a per-user install directory, on Linux `~/.local/share/threatscan`
@@ -512,6 +537,13 @@ with a link in `~/.local/bin` (override with `THREATSCAN_INSTALL_DIR`).
 | HIGH | strong indicator that needs a human: compromised package version, exposed keys on an infected host | no, listed for review |
 | WARNING | context worth checking: suspicious git reflog, secrets file in an infected repo, files that arrived in the same commit as a loader (camouflage fonts, decoy README, `.vscode` set) | no |
 | INFO | informational | no |
+
+**Why-lines.** Every finding has a one-sentence reason for its severity, and every response
+(kill, strip, quarantine, or nothing) has a one-sentence reason too. They appear in scan output,
+in the dialogs, in `threatscan alerts`, in `threatscan history`, in desktop notifications, in the
+webhook JSON (`reasons` array) and in `guard.log`. A process is killed only when its command line
+holds a strict PolinRider marker that legitimate tools never use; a broad indicator alone is
+reported but not killed, and the reason says so.
 
 Dialogs, notifications and reports name threats Defender-style, for example
 `Trojan:JS/PolinRider.FakeFont` for a script disguised as a font, `Trojan:Script/PolinRider` for an
@@ -557,6 +589,10 @@ threatscan scan --home --no-prompt --verbose --json audit.json
 ```
 
 ## Troubleshooting
+
+**Clicking a macOS notification opens Script Editor.** Builds before 0.3 posted notifications
+through osascript. Run `threatscan install` again: it builds the notification helper app, and
+macOS will ask once whether ThreatScan may send notifications. Allow it.
 
 **A legitimate file was quarantined.** `threatscan history` shows it; `threatscan history --allow
 PATH` restores it and stops flagging that exact content. Please also open an issue with the file so

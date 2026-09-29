@@ -138,6 +138,14 @@ func cmdInstall(args []string) int {
 			u.Info(msg)
 		}
 	}
+	if c.P.IsMac() {
+		// notifications posted by this applet open `threatscan alerts --gui` when clicked
+		if msg, err := notify.InstallMacNotifier(c.P, c.P.InstallDir(), m.Exe(), *dry); err != nil {
+			u.Warn("Notification helper not built (" + err.Error() + "); clicking a notification will not show details")
+		} else {
+			u.OK("Notification helper: " + msg)
+		}
+	}
 
 	if *blockC2 {
 		u.Section("NETWORK BLOCKING")
@@ -199,6 +207,9 @@ func cmdUninstall(args []string) int {
 		u.Err(msg)
 	}
 	m.UnlinkCLI()
+	if c.P.IsMac() {
+		notify.RemoveMacNotifier(c.P.InstallDir())
+	}
 	if *unblock {
 		nb := &protect.NetBlocker{P: c.P, I: c.I, UI: u}
 		nb.UnblockIPs()

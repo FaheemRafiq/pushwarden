@@ -26,7 +26,7 @@ func register(name, help string, run func([]string) int) {
 func usage() {
 	fmt.Println("ThreatScan " + version + " - PolinRider / Contagious Interview protection\n")
 	fmt.Println("Usage: threatscan <command> [options]\n\nCommands:")
-	order := map[string]int{"scan": 0, "status": 1, "history": 2, "guard": 3, "install": 4, "uninstall": 5, "update": 6, "update-iocs": 7}
+	order := map[string]int{"scan": 0, "status": 1, "history": 2, "alerts": 3, "guard": 4, "install": 5, "uninstall": 6, "update": 7, "update-iocs": 8}
 	sorted := append([]command{}, commands...)
 	sort.SliceStable(sorted, func(i, j int) bool {
 		oi, ok1 := order[sorted[i].name]

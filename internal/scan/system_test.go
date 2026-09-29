@@ -2,6 +2,7 @@
 package scan
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/FaheemRafiq/threatscan/internal/platform"
@@ -45,10 +46,10 @@ func TestMatchProcess(t *testing.T) {
 			t.Errorf("%s: missed %q", name, cmd)
 		}
 	}
-	if re, kill := s.matchProcess("node", "node -e \"global['_V']='8-st17'\""); re == nil || !kill {
+	if re, kill := s.matchProcess("node", "node -e \"global['_V']='8-st17'\""); re == nil || kill == nil {
 		t.Fatal("kill-list indicator should be killable")
 	}
-	if _, kill := s.matchProcess("node", "node /home/x/.cache/font/l.js"); kill {
+	if _, kill := s.matchProcess("node", "node /home/x/.cache/font/l.js"); kill != nil {
 		t.Fatal(".cache/font alone must not be on the kill list")
 	}
 }
@@ -79,4 +80,25 @@ func indexOf(s, sub string) int {
 		}
 	}
 	return -1
+}
+
+func TestProcessAndC2FindingsCarryEvidence(t *testing.T) {
+	s := &System{P: platform.New(), UI: ui.New(true, true), I: testIOCs(t)}
+	re, kill := s.matchProcess("node", "node -e \"global['_V']='8-st17'\"")
+	f := processFinding(platform.Proc{PID: 42, Name: "node", Cmd: "node -e \"global['_V']='8-st17'\""}, re, kill, false)
+	if !f.Meta.Kill || len(f.Meta.Evidence) != 4 || !strings.Contains(f.Meta.Evidence[1], "strict kill marker") || !strings.Contains(f.Remediation, "kill -9 42") {
+		t.Fatalf("%+v", f)
+	}
+	re, kill = s.matchProcess("node", "node /home/x/.cache/font/l.js")
+	f = processFinding(platform.Proc{PID: 43, Name: "node", Cmd: "node /home/x/.cache/font/l.js"}, re, kill, true)
+	if f.Meta.Kill || !strings.Contains(f.Meta.Evidence[1], "not auto-killed") || !strings.Contains(f.Remediation, "taskkill /PID 43") {
+		t.Fatalf("%+v", f)
+	}
+	c := c2Finding(platform.Conn{IP: "1.2.3.4", Port: 443, PID: 9}, "node /tmp/.x/a.js", "2026.09.28.2", "linux")
+	if !c.Meta.Kill || c.Meta.Cmd != "node /tmp/.x/a.js" || len(c.Meta.Evidence) != 3 || !strings.Contains(c.Meta.Evidence[2], "pid 9 node") {
+		t.Fatalf("%+v", c)
+	}
+	if c := c2Finding(platform.Conn{IP: "1.2.3.4", Port: 443}, "", "v", "darwin"); c.Meta.Kill || !strings.Contains(c.Meta.Evidence[2], "unknown") || !strings.Contains(c.Remediation, "pfctl") {
+		t.Fatalf("%+v", c)
+	}
 }

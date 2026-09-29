@@ -6,7 +6,7 @@ import (
 )
 
 func TestTopicsAndLookup(t *testing.T) {
-	for _, name := range []string{"scan", "github-clean", "install", "history", "restore", "config-keys", "env", "troubleshooting", "HELP-less"} {
+	for _, name := range []string{"scan", "github-clean", "install", "history", "restore", "alerts", "config-keys", "env", "troubleshooting", "HELP-less"} {
 		tp, ok := Lookup(name)
 		if name == "HELP-less" {
 			if ok {
