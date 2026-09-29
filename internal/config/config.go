@@ -27,6 +27,7 @@ type Config struct {
 	NotifyMinSeverity  string   `json:"notify_min_severity"`
 	WebhookURL         string   `json:"webhook_url"`
 	WebhookMinSeverity string   `json:"webhook_min_severity"`
+	BlockC2            bool     `json:"block_c2"` // keep the C2 firewall/hosts block installed (needs admin once)
 	IOCUpdate          bool     `json:"ioc_update"`
 	IOCUpdateURL       string   `json:"ioc_update_url"`
 	ReportKeep         int      `json:"report_keep"`
@@ -43,7 +44,7 @@ func Default() *Config {
 		QuickInterval: 5, FullInterval: 6 * 3600, IOCUpdateInterval: 24 * 3600,
 		Realtime: true, Action: "quarantine", AutoKill: true, AutoClean: true,
 		Prompt: true, PromptTimeout: 180, NotifyDesktop: true, NotifyMinSeverity: "HIGH",
-		WebhookMinSeverity: "HIGH", IOCUpdate: true, ReportKeep: 60,
+		WebhookMinSeverity: "HIGH", BlockC2: true, IOCUpdate: true, ReportKeep: 60,
 		AutoUpdate: true, UpdateChannel: "stable", UpdateInterval: 6 * 3600,
 	}
 }

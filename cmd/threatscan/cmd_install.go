@@ -50,7 +50,8 @@ func cmdInstall(args []string) int {
 	deep := fs.Bool("deep", false, "guard also scans node_modules / vendor (slow)")
 	noHarden := fs.Bool("no-harden", false, "skip editor hardening")
 	npm := fs.Bool("npm-ignore-scripts", false, "also set ignore-scripts=true in ~/.npmrc")
-	blockC2 := fs.Bool("block-c2", false, "also add firewall + hosts blocks (needs admin)")
+	_ = fs.Bool("block-c2", true, "kept for compatibility: C2 blocking is on by default")
+	noBlock := fs.Bool("no-block-c2", false, "do not ask for administrator rights to block the C2 servers")
 	fullInterval := fs.Int("full-interval", 0, "seconds between full sweeps (default 21600)")
 	dry := fs.Bool("dry-run", false, "show what would be done; change nothing")
 	unattended := fs.Bool("unattended", false, "for installers: no questions, first scan in the background")
@@ -90,6 +91,9 @@ func cmdInstall(args []string) int {
 	}
 	if *fullInterval > 0 {
 		c.Cfg.FullInterval, changed = *fullInterval, true
+	}
+	if *noBlock {
+		c.Cfg.BlockC2, changed = false, true
 	}
 	if *dry {
 		u.Info("[dry-run] config would be saved to " + c.DataDir + string(os.PathSeparator) + "config.json")
@@ -147,17 +151,11 @@ func cmdInstall(args []string) int {
 		}
 	}
 
-	if *blockC2 {
+	if c.Cfg.BlockC2 && !protect.ElevationDisabled() {
 		u.Section("NETWORK BLOCKING")
-		if platform.IsAdmin() && !*dry {
-			nb := &protect.NetBlocker{P: c.P, I: c.I, UI: u}
-			nb.BlockIPs()
-			nb.SinkholeHosts()
-		} else if *dry {
-			u.Info("[dry-run] would block C2 IPs and sinkhole C2 hostnames")
-		} else {
-			u.Warn("Not running as root/Administrator; skip. Later:  sudo threatscan protect --block-c2")
-		}
+		installBlock(u, c, m.Exe(), *dry, *unattended)
+	} else if c.Cfg.BlockC2 {
+		u.Info("C2 blocking left to the package installer (" + protect.NoBlockEnv + " is set)")
 	}
 
 	u.Section("FIRST SCAN")
@@ -190,6 +188,51 @@ func cmdInstall(args []string) int {
 	return 1
 }
 
+// installBlock makes the C2 firewall/hosts block persistent, asking the OS for
+// administrator rights when needed. It never changes the install exit code.
+func installBlock(u *ui.UI, c *ctx, exe string, dry, unattended bool) {
+	nb := &protect.NetBlocker{P: c.P, UI: u}
+	if strings.HasPrefix(nb.Describe(), "active (persistent") && !dry {
+		u.OK("Firewall: " + nb.Describe())
+		return
+	}
+	switch {
+	case dry:
+		for _, l := range strings.Split(nb.PreviewInstall(), "\n") {
+			u.Info("[dry-run] " + l)
+		}
+		return
+	case platform.IsAdmin():
+		ok, msg := nb.InstallPersistent()
+		say(u, ok, msg)
+		return
+	}
+	if _, err := os.Stat(exe); err != nil {
+		exe = platform.Exe()
+	}
+	u.Info("The PolinRider command servers are blocked system-wide at the firewall; this needs administrator rights once.")
+	if !unattended && isTTY() {
+		fmt.Print("  Block them now? [Y/n] ")
+		var ans string
+		fmt.Scanln(&ans)
+		if a := strings.ToLower(strings.TrimSpace(ans)); a == "n" || a == "no" {
+			u.Info("Skipped. Later:  threatscan protect --install     Opt out for good:  threatscan config --set block_c2=false")
+			return
+		}
+	}
+	rc, how := protect.Elevate(c.P, exe, []string{"protect", "--install"}, unattended || !isTTY())
+	if rc == 0 {
+		u.OK("Firewall: " + nb.Describe())
+		return
+	}
+	u.Warn("C2 blocking not enabled (" + how + ")")
+	if c.P.IsWindows() {
+		u.Info("Later, from an elevated terminal:  threatscan protect --install")
+	} else {
+		u.Info("Later:  sudo threatscan protect --install")
+	}
+}
+
 func cmdUninstall(args []string) int {
 	fs := newFlags("uninstall", "[--unblock] [--purge]")
 	unblock := fs.Bool("unblock", false, "also remove firewall/hosts blocks")
@@ -211,9 +254,14 @@ func cmdUninstall(args []string) int {
 		notify.RemoveMacNotifier(c.P.InstallDir())
 	}
 	if *unblock {
-		nb := &protect.NetBlocker{P: c.P, I: c.I, UI: u}
-		nb.UnblockIPs()
-		nb.UnsinkholeHosts()
+		if platform.IsAdmin() {
+			nb := &protect.NetBlocker{P: c.P, I: c.I, UI: u}
+			nb.UninstallPersistent()
+		} else if rc, how := protect.Elevate(c.P, platform.Exe(), []string{"protect", "--uninstall"}, !isTTY()); rc != 0 {
+			u.Warn("Could not remove the C2 block (" + how + "). Run:  sudo threatscan protect --uninstall")
+		} else {
+			u.OK("C2 block removed")
+		}
 	}
 	if *purge {
 		if err := os.RemoveAll(c.DataDir); err != nil {

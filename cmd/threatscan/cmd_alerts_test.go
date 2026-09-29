@@ -59,3 +59,23 @@ func TestAlertsCommand(t *testing.T) {
 		t.Fatal(rc)
 	}
 }
+
+func TestProtectDryRunAndStatusNeedNoRoot(t *testing.T) {
+	isolate(t)
+	if rc := run([]string{"protect", "--dry-run"}); rc != 0 {
+		t.Fatal("dry-run", rc)
+	}
+	if rc := run([]string{"protect", "--status"}); rc != 0 {
+		t.Fatal("status", rc)
+	}
+	// without root and with elevation disabled, --install explains and exits 2
+	if rc := run([]string{"protect", "--install"}); rc != 2 && os.Getuid() != 0 {
+		t.Fatal("install without root", rc)
+	}
+	if rc := run([]string{"install", "--dry-run"}); rc != 0 {
+		t.Fatal("install dry-run", rc)
+	}
+	if ents, _ := os.ReadDir(os.Getenv("THREATSCAN_SYSTEM_DIR")); len(ents) != 0 {
+		t.Fatal("dry runs wrote to the system dir")
+	}
+}

@@ -33,10 +33,27 @@ func TestWhyCoversEveryCategory(t *testing.T) {
 }
 
 func TestWhyAction(t *testing.T) {
-	killed := &Finding{Category: "malicious_process", Meta: Meta{Kill: true}, Action: "killed PID 5"}
-	notKilled := &Finding{Category: "malicious_process", Meta: Meta{Kill: false}}
+	killed := &Finding{Category: "malicious_process", Meta: Meta{Kill: true, Matched: "global['_V']='8-st17'"}, Action: "killed PID 5"}
+	notKilled := &Finding{Category: "malicious_process", Meta: Meta{Kill: false, Matched: "/home/x/.cache/font/l.js"}}
 	if a, b := WhyAction(killed), WhyAction(notKilled); a == b || !strings.HasPrefix(a, "Killed") || !strings.HasPrefix(b, "Not killed") {
 		t.Fatalf("kill reasons: %q / %q", a, b)
+	}
+	if a := WhyAction(killed); !strings.Contains(a, `"global['_V']='8-st17'"`) {
+		t.Fatalf("kill reason must quote the exact marker: %q", a)
+	}
+	if b := WhyAction(notKilled); !strings.Contains(b, `.cache/font/l.js`) {
+		t.Fatalf("not-killed reason must quote the match: %q", b)
+	}
+	ev := &Finding{Category: "fake_font_loader", Severity: Critical, Meta: Meta{Quarantine: true,
+		Evidence: []string{`literal signature "global['!']='A10-010'"`, "other"}}}
+	if got := Because(ev); got != "global['!']='A10-010'" {
+		t.Fatalf("Because from evidence: %q", got)
+	}
+	if w := Why(ev); !strings.Contains(w, `Found: "global['!']='A10-010'"`) {
+		t.Fatalf("Why must cite the trigger: %q", w)
+	}
+	if Because(&Finding{}) != "" {
+		t.Fatal("no evidence, no trigger")
 	}
 	if w := WhyAction(&Finding{Category: "malicious_process", Meta: Meta{Kill: true}, Action: "would kill PID 5"}); !strings.HasPrefix(w, "Would kill") {
 		t.Fatal(w)
@@ -48,14 +65,14 @@ func TestWhyAction(t *testing.T) {
 		t.Fatal(w)
 	}
 	cases := map[string]*Finding{
-		"Payload stripped":  {Category: "config_injection", Meta: Meta{Cleanable: true}, Action: "removed 300 bytes of payload"},
-		"Whole file":        {Category: "config_injection", Meta: Meta{Cleanable: true, MidFileInjection: true}, Action: "whole file quarantined"},
-		"Removed only":      {Category: "gitignore_tampering", Meta: Meta{Cleanable: true, StripLines: []string{"x"}}, Action: "removed 1 line(s)"},
-		"Quarantined":       {Category: "fake_font_loader", Meta: Meta{Quarantine: true}, Action: "quarantined to /q"},
-		"Start-up entry":    {Category: "persistence_systemd", Meta: Meta{Quarantine: true}, Action: "quarantined to /q"},
-		"Left in place":     {Category: "fake_font_loader", Meta: Meta{Quarantine: true}, Action: "kept by user"},
-		"Not changed":       {Category: "fake_font_loader", Severity: Critical, Meta: Meta{Quarantine: true}},
-		"Deleted permanent": {Category: "fake_font_loader", Action: "deleted (user confirmed)"},
+		"Payload stripped":           {Category: "config_injection", Meta: Meta{Cleanable: true}, Action: "removed 300 bytes of payload"},
+		"Whole file":                 {Category: "config_injection", Meta: Meta{Cleanable: true, MidFileInjection: true}, Action: "whole file quarantined"},
+		"Removed only the entries x": {Category: "gitignore_tampering", Meta: Meta{Cleanable: true, StripLines: []string{"x"}}, Action: "removed 1 line(s)"},
+		"Quarantined":                {Category: "fake_font_loader", Meta: Meta{Quarantine: true}, Action: "quarantined to /q"},
+		"Start-up entry":             {Category: "persistence_systemd", Meta: Meta{Quarantine: true}, Action: "quarantined to /q"},
+		"Left in place":              {Category: "fake_font_loader", Meta: Meta{Quarantine: true}, Action: "kept by user"},
+		"Not changed":                {Category: "fake_font_loader", Severity: Critical, Meta: Meta{Quarantine: true}},
+		"Deleted permanent":          {Category: "fake_font_loader", Action: "deleted (user confirmed)"},
 	}
 	for want, f := range cases {
 		if got := WhyAction(f); !strings.HasPrefix(got, want) {

@@ -2,8 +2,64 @@ package findings
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
+
+var quoted = regexp.MustCompile(`"((?:[^"\\]|\\.)*)"`)
+
+// Because returns the concrete trigger of a finding: the matched text when the
+// scanner recorded it, otherwise the quoted part of the first evidence line,
+// otherwise the first evidence line itself. Empty when there is none.
+func Because(f *Finding) string {
+	if f.Meta.Matched != "" {
+		return f.Meta.Matched
+	}
+	if len(f.Meta.Evidence) == 0 {
+		return ""
+	}
+	e := f.Meta.Evidence[0]
+	if m := quoted.FindStringSubmatch(e); m != nil {
+		s, err := strconvUnquote(m[0])
+		if err == nil {
+			return s
+		}
+		return m[1]
+	}
+	return e
+}
+
+func strconvUnquote(s string) (string, error) {
+	var out strings.Builder
+	esc := false
+	for _, r := range strings.Trim(s, `"`) {
+		switch {
+		case esc:
+			esc = false
+			switch r {
+			case 'n':
+				out.WriteRune('\n')
+			case 't':
+				out.WriteRune('\t')
+			default:
+				out.WriteRune(r)
+			}
+		case r == '\\':
+			esc = true
+		default:
+			out.WriteRune(r)
+		}
+	}
+	return out.String(), nil
+}
+
+func short(s string, n int) string {
+	s = strings.ReplaceAll(strings.ReplaceAll(s, "\n", " "), "\r", "")
+	if len(s) > n {
+		return s[:n] + "..."
+	}
+	return s
+}
 
 // why explains, per category, what the evidence means and why it carries the
 // severity it does. One sentence, short enough for a desktop notification.
@@ -58,12 +114,15 @@ func Why(f *Finding) string {
 		s = "A secrets file is present; nothing read it as far as the scanner knows, but rotate if this host was infected."
 	}
 	if !ok {
-		return bySeverity[f.Severity]
+		s = bySeverity[f.Severity]
 	}
-	if f.Severity >= Critical || f.Severity == Info {
-		return s
+	if f.Severity < Critical && f.Severity > Info && ok {
+		s += " " + strings.TrimSuffix(bySeverity[f.Severity], ".") + "."
 	}
-	return s + " " + strings.TrimSuffix(bySeverity[f.Severity], ".") + "."
+	if b := Because(f); b != "" {
+		s += fmt.Sprintf(" Found: %q.", short(b, 80))
+	}
+	return s
 }
 
 // WhyAction explains the response: why a process was killed or not, why a
@@ -79,19 +138,24 @@ func WhyAction(f *Finding) string {
 		}
 		return did
 	}
+	b := Because(f)
+	found := ""
+	if b != "" {
+		found = fmt.Sprintf(" It contains %q.", short(b, 80))
+	}
 	switch f.Category {
 	case "malicious_process":
 		if f.Meta.Kill {
-			return past("Killed: the command line contains a strict PolinRider marker that legitimate tools never use.",
-				"Would kill: the command line contains a strict PolinRider marker.")
+			return past(fmt.Sprintf("Killed: its command line contains %q, a marker that only the PolinRider payload uses.", short(b, 80)),
+				fmt.Sprintf("Would kill: its command line contains %q, a marker that only the PolinRider payload uses.", short(b, 80)))
 		}
-		return "Not killed automatically: only a broad indicator matched, which can appear in legitimate tools; review the command line."
+		return fmt.Sprintf("Not killed automatically: its command line contains %q, which matches a broad PolinRider indicator that legitimate tools can also produce; review it.", short(b, 80))
 	case "c2_connection":
 		if f.Meta.PID <= 0 {
-			return "Not killed: the owning process is unknown. Block the address with: threatscan protect"
+			return fmt.Sprintf("Not killed: the process talking to %s is unknown. Block the address with: threatscan protect", f.Meta.IP)
 		}
-		return past(fmt.Sprintf("Killed PID %d: it was talking to a known PolinRider command server.", f.Meta.PID),
-			fmt.Sprintf("Would kill PID %d: it is talking to a known PolinRider command server.", f.Meta.PID))
+		return past(fmt.Sprintf("Killed PID %d: it had an open connection to %s, a known PolinRider command server.", f.Meta.PID, f.Meta.IP),
+			fmt.Sprintf("Would kill PID %d: it has an open connection to %s, a known PolinRider command server.", f.Meta.PID, f.Meta.IP))
 	}
 	switch {
 	case strings.HasPrefix(a, "kept"):
@@ -101,20 +165,24 @@ func WhyAction(f *Finding) string {
 	case a == "":
 		return "No automatic action at this severity; see the remediation hint."
 	case len(f.Meta.StripLines) > 0:
-		return past("Removed only the listed entries; every other line was kept and the original is in quarantine.",
-			"Would remove only the listed entries and keep the original in quarantine.")
+		return past(fmt.Sprintf("Removed only the entries %s; every other line was kept and the original is in quarantine.", strings.Join(f.Meta.StripLines, ", ")),
+			fmt.Sprintf("Would remove only the entries %s and keep the original in quarantine.", strings.Join(f.Meta.StripLines, ", ")))
 	case f.Meta.MidFileInjection:
-		return past("Whole file quarantined: the payload is woven into the file, so it cannot be stripped safely.",
-			"Would quarantine the whole file: the payload is woven into it.")
+		return past("Whole file quarantined: the payload is woven into the file, so it cannot be stripped safely."+found,
+			"Would quarantine the whole file: the payload is woven into it."+found)
 	case f.Meta.Cleanable:
-		return past("Payload stripped: it was appended after the legitimate code, so only that tail was removed; original kept.",
-			"Would strip the appended payload and keep the original in quarantine.")
+		at := ""
+		if f.Meta.Cut > 0 {
+			at = fmt.Sprintf(" at byte %d", f.Meta.Cut)
+		}
+		return past(fmt.Sprintf("Payload stripped: %q was appended after the legitimate code%s, so only that tail was removed; original kept.", short(b, 80), at),
+			fmt.Sprintf("Would strip the payload %q appended after the legitimate code and keep the original in quarantine.", short(b, 80)))
 	case strings.HasPrefix(f.Category, "persistence_") || f.Category == "rat_footprint" || f.Category == "stage4_runtime":
-		return past("Start-up entry disabled and quarantined so the malware no longer relaunches at sign-in.",
-			"Would disable the start-up entry and quarantine it.")
+		return past("Start-up entry disabled and quarantined so the malware no longer relaunches at sign-in."+found,
+			"Would disable the start-up entry and quarantine it."+found)
 	case f.Meta.Quarantine:
-		return past("Quarantined: the file is executable malware, not data; moved out so it cannot run, restorable.",
-			"Would quarantine the file so it cannot run; restorable.")
+		return past("Quarantined: the file is executable malware, not data; moved out so it cannot run, restorable."+found,
+			"Would quarantine the file so it cannot run; restorable."+found)
 	case strings.HasPrefix(a, "deleted"):
 		return "Deleted permanently at your request; a record is kept in the protection history."
 	}

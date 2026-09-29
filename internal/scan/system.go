@@ -48,9 +48,12 @@ func processFinding(pr platform.Proc, re, kill *regexp.Regexp, windows bool) *F 
 	if windows {
 		killCmd = fmt.Sprintf("taskkill /PID %d /F", pr.PID)
 	}
-	ev := []string{"command line matches PolinRider indicator /" + h.Trunc(re.String(), 60) + "/"}
+	clean := stripSandboxMounts(pr.Name, pr.Cmd)
+	matched := re.FindString(clean)
+	ev := []string{fmt.Sprintf("command line contains %q (indicator /%s/)", h.Trunc(matched, 80), h.Trunc(re.String(), 60))}
 	if kill != nil {
-		ev = append(ev, "strict kill marker /"+h.Trunc(kill.String(), 60)+"/ present: confirmed payload, auto-killed")
+		matched = kill.FindString(clean)
+		ev = append(ev, fmt.Sprintf("strict kill marker %q present (/%s/): confirmed payload, auto-killed", h.Trunc(matched, 80), h.Trunc(kill.String(), 60)))
 	} else {
 		ev = append(ev, "no strict kill marker: broad indicator only, not auto-killed")
 	}
@@ -59,7 +62,7 @@ func processFinding(pr platform.Proc, re, kill *regexp.Regexp, windows bool) *F 
 		Title:       fmt.Sprintf("Malicious process running: PID %d (%s)", pr.PID, pr.Name),
 		Details:     "Pattern: " + h.Trunc(re.String(), 50) + "\nCmd: " + h.Trunc(pr.Cmd, 200),
 		Remediation: killCmd + "\n  Then find its parent and persistence (see persistence findings).",
-		Meta:        findings.Meta{PID: pr.PID, Kill: kill != nil, Cmd: h.Trunc(pr.Cmd, 500), Evidence: ev}}
+		Meta:        findings.Meta{PID: pr.PID, Kill: kill != nil, Cmd: h.Trunc(pr.Cmd, 500), Evidence: ev, Matched: matched}}
 }
 
 // sandbox wrappers list host paths they bind-mount on their command line
@@ -150,7 +153,7 @@ func c2Finding(c platform.Conn, ownerCmd, iocVersion, goos string) *F {
 	return &F{Severity: crit, Category: "c2_connection", Title: "Live connection to PolinRider C2 " + key,
 		Details:     fmt.Sprintf("PID: %d", c.PID),
 		Remediation: block + fmt.Sprintf("\n  Then kill PID %d.  Or: sudo threatscan protect --install", c.PID),
-		Meta:        findings.Meta{PID: c.PID, Kill: c.PID > 0, IP: c.IP, Cmd: h.Trunc(ownerCmd, 500), Evidence: ev}}
+		Meta:        findings.Meta{PID: c.PID, Kill: c.PID > 0, IP: c.IP, Cmd: h.Trunc(ownerCmd, 500), Evidence: ev, Matched: key}}
 }
 
 func containsAny(s string, keys ...string) bool {

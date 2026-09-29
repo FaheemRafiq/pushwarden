@@ -302,7 +302,7 @@ turned on.
 |---|---|
 | `--roots DIR` | project directory to watch. Repeatable. Default: auto-discover the usual places under your home folder |
 | `--webhook URL` | URL that receives JSON alerts (Slack, Discord, Teams or your own endpoint) |
-| `--block-c2` | also add firewall and hosts blocks for the known C2 addresses (needs admin) |
+| `--no-block-c2` | do not ask for administrator rights to block the C2 servers (default is to ask once; see [protect](#protect)) |
 | `--deep` | the guard also scans `node_modules` and `vendor` (slow) |
 | `--full-interval SECONDS` | seconds between full sweeps (default 21600) |
 | `--no-harden` | skip editor hardening |
@@ -327,7 +327,7 @@ threatscan uninstall [--unblock] [--purge]
 
 | Option | Effect |
 |---|---|
-| `--unblock` | also remove the firewall rules and hosts entries added by `protect` |
+| `--unblock` | also remove the C2 block: the boot-time job, the firewall rules and the hosts entries (asks for administrator rights) |
 | `--purge` | also delete the data directory: config, reports, quarantine |
 
 Editor hardening is left in place because it is a safe default.
@@ -377,19 +377,52 @@ threatscan harden [options]
 
 ### protect
 
-Block the known C2 IP addresses at the firewall and sinkhole the C2 hostnames in the hosts file.
-Needs administrator rights: `sudo threatscan protect` on Linux and macOS, an elevated terminal on
-Windows.
+Block the PolinRider command-and-control (C2) servers system-wide and keep them blocked.
 
 ```
-threatscan protect [--block-c2 | --unblock | --status]
+threatscan protect [--install | --refresh | --uninstall | --status | --block-c2 | --unblock] [--dry-run]
 ```
+
+`threatscan install` does this for you: it asks once for administrator rights (native password
+dialog on macOS, polkit or sudo on Linux, UAC on Windows) and registers a small privileged job
+that re-applies the block at every boot and refreshes the address list once a day. You only need
+`protect` directly to check on it, to add it later, or to remove it.
 
 | Option | Effect |
 |---|---|
-| `--block-c2` | add the blocks (default) |
-| `--unblock` | remove them |
-| `--status` | show whether blocking is active |
+| `--install` (default) | block now and register the boot-time job. Needs administrator rights; asks for them when run as a normal user |
+| `--status` | is the block active, and will it survive a reboot? No rights needed |
+| `--refresh` | what the job runs: re-apply the rules from the root-owned indicators, then fetch newer ones and re-apply |
+| `--uninstall` | remove the job, the firewall rules and the hosts entries |
+| `--block-c2` | one-shot block for this boot only, no job (the pre-0.3 behaviour) |
+| `--unblock` | remove the rules and hosts entries but keep the job, if any |
+| `--dry-run` | show what `--install` would do |
+
+**What gets installed.** Outgoing traffic to every IP on the C2 list is dropped: an `iptables`
+chain or `nftables` table named `threatscan` on Linux, a `pf` anchor on macOS, a Windows Firewall
+rule named "ThreatScan C2 block". The C2 hostnames are sinkholed in the hosts file between
+`# BEGIN THREATSCAN C2 SINKHOLE` and `# END` markers. The job that keeps this current is a systemd
+timer (`threatscan-netblock.timer`, at boot and daily), a LaunchDaemon (`com.threatscan.netblock`)
+or a Scheduled Task ("ThreatScan NetBlock", runs as SYSTEM at boot and daily).
+
+**Why it uses its own copy of the indicators.** The job runs as root, and the `iocs.json` under
+your home folder is writable by anything running as you. A privileged job must not let a
+user-writable file decide what goes into the hosts file, so it keeps a root-owned copy under
+`/etc/threatscan`, `/Library/Application Support/ThreatScan` or `%ProgramData%\ThreatScan`,
+refreshed from the project repository only, and runs a root-owned copy of the program.
+
+**Status values** shown by `threatscan status` and `protect --status`:
+
+| Firewall | Meaning |
+|---|---|
+| `active (persistent; 25 IPs, 15 hosts; applied 3h ago; indicators …)` | all good |
+| `active until reboot (…)` | a one-shot block from `--block-c2`; run `protect --install` to keep it |
+| `not active (rules from a previous boot were lost)` | same, after a reboot |
+| `not active` | never installed, or removed |
+
+Opt out with `threatscan install --no-block-c2` or `threatscan config --set block_c2=false`; the
+guard then stops reminding you. Setting `THREATSCAN_NO_BLOCK=1` skips the administrator prompt for
+one run, which the package installers use because they already did the work as root.
 
 ### config
 
@@ -480,6 +513,7 @@ Stored in `config.json` in the data directory. Change them with `threatscan conf
 | `notify_min_severity` | `HIGH` | lowest severity that notifies |
 | `webhook_url` | `""` | receives a JSON POST per alert |
 | `webhook_min_severity` | `HIGH` | lowest severity that posts |
+| `block_c2` | `true` | keep the system-wide C2 block installed; `install` asks for administrator rights once and the guard reminds you daily while it is missing |
 | `report_keep` | `60` | number of reports kept |
 | `auto_update` | `true` | update the binary automatically |
 | `update_channel` | `stable` | `stable` or `beta` |
@@ -511,6 +545,11 @@ The data directory is `~/.threatscan` (override with `THREATSCAN_HOME`).
 | `ThreatScan Notifier.app` | macOS only, in the install directory: the helper that posts notifications so a click opens `threatscan alerts --gui` |
 | `guard/` | heartbeat and state of the running guard |
 
+The privileged C2 block keeps its own root-owned files: `netblock-state.json` and a copy of
+`iocs.json` under `/etc/threatscan` (Linux), `/Library/Application Support/ThreatScan` (macOS) or
+`%ProgramData%\ThreatScan` (Windows), plus a copy of the program under `/usr/local/lib/threatscan`,
+`/usr/local/libexec/threatscan` or `%ProgramFiles%\ThreatScan`.
+
 The binary itself lives in a per-user install directory, on Linux `~/.local/share/threatscan`
 with a link in `~/.local/bin` (override with `THREATSCAN_INSTALL_DIR`).
 
@@ -523,6 +562,7 @@ with a link in `~/.local/bin` (override with `THREATSCAN_INSTALL_DIR`).
 | `GITHUB_TOKEN`, `GH_TOKEN` | `github-clean` | token when `--token` is not given |
 | `NO_COLOR` | every command | disable coloured output |
 | `PAGER`, `THREATSCAN_NO_PAGER` | `help` | pager for long pages; set the second to disable paging |
+| `THREATSCAN_NO_BLOCK` | `install`, `protect`, `uninstall` | never ask for administrator rights (package installers, CI) |
 | `THREATSCAN_ROOTS` | install script | space-separated project directories to watch |
 | `THREATSCAN_WEBHOOK` | install script | webhook URL |
 | `THREATSCAN_VERSION` | install script | install this release instead of the latest |
@@ -602,6 +642,11 @@ the indicator can be tightened.
 line. Update indicators first, since false positives are fixed there without a new release:
 `threatscan update-iocs` and then restart the service (`systemctl --user restart
 threatscan-guard.service` on Linux). If it persists, open an issue with the alert line.
+
+**Firewall says `not active` or `until reboot`.** The one-time administrator prompt was declined
+or could not be shown (for example a headless server without polkit). Run `sudo threatscan protect
+--install` on Linux and macOS, or `threatscan protect --install` from an elevated terminal on
+Windows. `threatscan protect --status` confirms it afterwards.
 
 **`status` says the guard is not alive.** Check the service: `systemctl --user status
 threatscan-guard.service` on Linux, `launchctl list | grep threatscan` on macOS, Task Scheduler

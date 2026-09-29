@@ -14,6 +14,8 @@ import (
 func isolate(t *testing.T) string {
 	home := filepath.Join(t.TempDir(), "tshome")
 	t.Setenv("THREATSCAN_HOME", home)
+	t.Setenv("THREATSCAN_NO_BLOCK", "1") // never ask for admin rights in tests
+	t.Setenv("THREATSCAN_SYSTEM_DIR", filepath.Join(t.TempDir(), "sys"))
 	return home
 }
 

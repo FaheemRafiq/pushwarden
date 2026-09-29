@@ -60,6 +60,7 @@ type Meta struct {
 	Cut              int      `json:"cut,omitempty"`
 	MidFileInjection bool     `json:"mid_file_injection,omitempty"`
 	StripLines       []string `json:"strip_lines,omitempty"` // Cleanable: remove these entries (whole lines) instead of a trailing payload
+	Matched          string   `json:"matched,omitempty"`     // the exact text that triggered the finding (quoted in the reasons)
 }
 
 type Finding struct {

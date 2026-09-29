@@ -10,6 +10,7 @@ import (
 
 	"github.com/FaheemRafiq/threatscan/internal/findings"
 	"github.com/FaheemRafiq/threatscan/internal/harden"
+	"github.com/FaheemRafiq/threatscan/internal/iocs"
 	"github.com/FaheemRafiq/threatscan/internal/platform"
 	"github.com/FaheemRafiq/threatscan/internal/prompt"
 	"github.com/FaheemRafiq/threatscan/internal/protect"
@@ -221,34 +222,105 @@ func doHarden(p *platform.Info, u *ui.UI, npm, dry bool) {
 }
 
 func cmdProtect(args []string) int {
-	fs := newFlags("protect", "[--block-c2 | --unblock | --status]")
-	_ = fs.Bool("block-c2", true, "block C2 IPs at the firewall and sinkhole C2 hostnames (default)")
-	unblock := fs.Bool("unblock", false, "remove the firewall rules and hosts entries")
-	status := fs.Bool("status", false, "show whether blocking is active")
+	fs := newFlags("protect", "[--install | --refresh | --uninstall | --status | --block-c2 | --unblock] [--dry-run]")
+	install := fs.Bool("install", false, "block now and keep it blocked: boot-time job + daily refresh (default when no other option is given)")
+	refresh := fs.Bool("refresh", false, "re-apply the block from the root-owned indicators and fetch newer ones (what the job runs)")
+	uninstall := fs.Bool("uninstall", false, "remove the job, the firewall rules and the hosts entries")
+	once := fs.Bool("block-c2", false, "one-shot block for this boot only (no job)")
+	unblock := fs.Bool("unblock", false, "remove the firewall rules and hosts entries (keeps the job, if any)")
+	status := fs.Bool("status", false, "show whether blocking is active and persistent")
+	dry := fs.Bool("dry-run", false, "show what --install would do")
 	if _, err := parseInterspersed(fs, args); err != nil {
 		return 2
 	}
-	c := mustCtx()
 	u := ui.New(false, false)
-	nb := &protect.NetBlocker{P: c.P, I: c.I, UI: u}
+	p := platform.New()
+	// The privileged paths never read the user's data dir: a user-writable
+	// iocs.json or config must not drive a hosts-file edit as root.
+	nb := &protect.NetBlocker{P: p, UI: u}
+	nb.I, _ = iocs.Load("")
 	switch {
 	case *status:
-		u.Info("Firewall: " + nb.Status())
+		u.Info("Firewall: " + nb.Describe())
 		return 0
+	case *dry:
+		for _, l := range strings.Split(nb.PreviewInstall(), "\n") {
+			u.Info("[dry-run] " + l)
+		}
+		return 0
+	case *refresh:
+		if !platform.IsAdmin() {
+			u.Err("protect --refresh needs root/Administrator (it is what the scheduled job runs)")
+			return 2
+		}
+		ok, msg := nb.Refresh()
+		say(u, ok, msg)
+		return rcOf(ok)
+	case *uninstall:
+		if !platform.IsAdmin() {
+			return elevateOrHint(u, p, []string{"protect", "--uninstall"})
+		}
+		ok, msg := nb.UninstallPersistent()
+		say(u, ok, msg)
+		return rcOf(ok)
 	case *unblock:
+		if !platform.IsAdmin() {
+			return elevateOrHint(u, p, []string{"protect", "--unblock"})
+		}
 		nb.UnblockIPs()
 		nb.UnsinkholeHosts()
 		return 0
+	case *once:
+		if !platform.IsAdmin() {
+			return elevateOrHint(u, p, []string{"protect", "--block-c2"})
+		}
+		ok1, ok2 := nb.BlockIPs(), nb.SinkholeHosts()
+		return rcOf(ok1 || ok2)
 	}
+	_ = install
 	if !platform.IsAdmin() {
-		u.Err("Network blocking needs root/Administrator.  Linux/macOS: sudo threatscan protect   Windows: run an elevated terminal.")
-		return 2
+		return elevateOrHint(u, p, []string{"protect", "--install"})
 	}
-	ok1, ok2 := nb.BlockIPs(), nb.SinkholeHosts()
-	if ok1 || ok2 {
+	ok, msg := nb.InstallPersistent()
+	say(u, ok, msg)
+	return rcOf(ok)
+}
+
+func say(u *ui.UI, ok bool, msg string) {
+	if ok {
+		u.OK(msg)
+	} else {
+		u.Err(msg)
+	}
+}
+
+func rcOf(ok bool) int {
+	if ok {
 		return 0
 	}
 	return 1
+}
+
+// elevateOrHint asks the OS for administrator rights and re-runs this program
+// with args; when that is impossible it prints the command to run by hand.
+func elevateOrHint(u *ui.UI, p *platform.Info, args []string) int {
+	exe := platform.Exe()
+	u.Info("Asking for administrator rights to " + strings.Join(args, " ") + "...")
+	rc, how := protect.Elevate(p, exe, args, !isTTY())
+	if rc == 0 {
+		u.OK("done (via " + how + ")")
+		nb := &protect.NetBlocker{P: p}
+		u.Info("Firewall: " + nb.Describe())
+		return 0
+	}
+	u.Warn(how)
+	switch {
+	case p.IsWindows():
+		u.Info("Run in an elevated terminal:  threatscan " + strings.Join(args, " "))
+	default:
+		u.Info("Run:  sudo threatscan " + strings.Join(args, " "))
+	}
+	return 2
 }
 
 func cmdConfig(args []string) int {
@@ -324,7 +396,7 @@ func cmdStatus(args []string) int {
 		{"Indicators", c.I.Version + " (" + c.I.Source + ")"},
 		{"Action / auto-kill / prompt", fmt.Sprintf("%s / %v / %v", c.Cfg.Action, c.Cfg.AutoKill, c.Cfg.Prompt)},
 		{"Webhook", map[bool]string{true: "configured", false: "none"}[c.Cfg.WebhookURL != ""]},
-		{"Firewall", (&protect.NetBlocker{P: c.P, I: c.I}).Status()},
+		{"Firewall", (&protect.NetBlocker{P: c.P, I: c.I}).Describe()},
 		{"Data dir", c.DataDir},
 	}
 	rows = append(statusServiceRows(c), rows...)

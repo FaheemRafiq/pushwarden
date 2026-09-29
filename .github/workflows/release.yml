@@ -94,6 +94,8 @@ jobs:
       - run: chmod +x dist/threatscan-*
       - run: installers/macos/build-pkg.sh "${{ needs.build.outputs.version }}" dist
       - name: Smoke-test the package
+        env:
+          THREATSCAN_NO_BLOCK: "1"
         run: |
           installer -pkg dist/ThreatScan.pkg -target CurrentUserHomeDirectory
           exe="$HOME/Library/Application Support/ThreatScan/threatscan"
@@ -122,7 +124,7 @@ jobs:
           for i in $(seq 1 30); do [ -S "/run/user/$(id -u)/bus" ] && break; sleep 1; done
       - name: Smoke-test install.sh
         run: |
-          THREATSCAN_BASE_URL="file://$PWD/dist" sh installers/install.sh
+          THREATSCAN_NO_BLOCK=1 THREATSCAN_BASE_URL="file://$PWD/dist" sh installers/install.sh
           ts="$HOME/.local/bin/threatscan"
           for i in $(seq 1 40); do "$ts" status > status.txt 2>&1 || true; grep -Eq 'Guard:\s+alive' status.txt && break; sleep 3; done
           cat status.txt

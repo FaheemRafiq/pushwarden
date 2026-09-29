@@ -25,3 +25,4 @@ contents:
       mode: 0755
 scripts:
   postinstall: installers/linux/postinstall.sh
+  preremove: installers/linux/postremove.sh

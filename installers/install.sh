@@ -11,6 +11,7 @@
 #   THREATSCAN_WEBHOOK=URL          alert webhook to configure
 #   THREATSCAN_ROOTS="~/code ~/src" project dirs to watch (default: auto-discover)
 #   THREATSCAN_NO_INSTALL=1         only put the program in place; do not start the guard
+#   THREATSCAN_NO_BLOCK=1           do not ask for administrator rights to block the C2 servers
 set -eu
 
 REPO_URL="https://github.com/FaheemRafiq/threatscan"

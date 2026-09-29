@@ -86,7 +86,8 @@ func TestProcessAndC2FindingsCarryEvidence(t *testing.T) {
 	s := &System{P: platform.New(), UI: ui.New(true, true), I: testIOCs(t)}
 	re, kill := s.matchProcess("node", "node -e \"global['_V']='8-st17'\"")
 	f := processFinding(platform.Proc{PID: 42, Name: "node", Cmd: "node -e \"global['_V']='8-st17'\""}, re, kill, false)
-	if !f.Meta.Kill || len(f.Meta.Evidence) != 4 || !strings.Contains(f.Meta.Evidence[1], "strict kill marker") || !strings.Contains(f.Remediation, "kill -9 42") {
+	if !f.Meta.Kill || len(f.Meta.Evidence) != 4 || !strings.Contains(f.Meta.Evidence[1], "strict kill marker") || !strings.Contains(f.Remediation, "kill -9 42") ||
+		f.Meta.Matched != "global['_V']=" {
 		t.Fatalf("%+v", f)
 	}
 	re, kill = s.matchProcess("node", "node /home/x/.cache/font/l.js")

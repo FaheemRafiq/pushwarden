@@ -7,10 +7,12 @@ import (
 	"os"
 	"sort"
 	"strings"
+
+	"github.com/FaheemRafiq/threatscan/internal/protect"
 )
 
 // version is set at build time: -ldflags "-X main.version=0.1.0"
-var version = "0.2.3-dev"
+var version = "0.3.0-dev"
 
 type command struct {
 	name, help string
@@ -47,6 +49,8 @@ func usage() {
 }
 
 func main() { os.Exit(run(os.Args[1:])) }
+
+func init() { protect.Version = version }
 
 func run(args []string) int {
 	if len(args) > 0 {

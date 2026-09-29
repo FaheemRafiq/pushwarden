@@ -68,8 +68,10 @@ Options for the one-liner:
 | `THREATSCAN_VERSION=v0.2.0-rc1` | install a specific release (e.g. a pre-release) |
 | `THREATSCAN_NO_INSTALL=1` | install the program only, no guard |
 
-Firewall blocking of the C2 addresses needs admin rights, so it is a separate step:
-`sudo threatscan protect` (Linux/macOS) or `threatscan protect` in an elevated terminal (Windows).
+Blocking the C2 servers at the firewall needs administrator rights, so the installer asks for them
+once (native password dialog, polkit or UAC) and registers a small job that keeps the block across
+reboots and refreshes the address list daily. Decline it, or set `THREATSCAN_NO_BLOCK=1`, and add it
+later with `threatscan protect --install`. `threatscan protect --status` shows the state.
 
 Updates can be turned off with `threatscan config --set auto_update=false`; check by hand with `threatscan update --check`.
 
@@ -92,7 +94,7 @@ threatscan scan --deep ~/proj     # also descend into node_modules / vendor
 threatscan history                # protection history (restore / allow / remove), with the reason for each action
 threatscan alerts                 # recent alerts and why each one fired
 threatscan update-iocs            # pull the latest indicator file
-sudo threatscan protect --block-c2   # firewall + hosts sinkhole for all known C2
+threatscan protect --status       # is the C2 firewall block active and persistent?
 threatscan uninstall [--unblock] [--purge]
 threatscan help <command>         # full documentation for any command, offline
 ```

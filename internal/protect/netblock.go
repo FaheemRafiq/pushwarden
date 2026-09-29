@@ -25,6 +25,9 @@ type NetBlocker struct {
 	P  *platform.Info
 	I  *iocs.IOCs
 	UI *ui.UI
+	// SysDir overrides the root-owned state directory (tests); see SystemDir.
+	SysDir string
+	mode   string // firewall backend used by the last BlockIPs
 }
 
 func (n *NetBlocker) say(m string) {
@@ -48,6 +51,7 @@ func (n *NetBlocker) BlockIPs() bool {
 			n.sh("nft", "add", "chain", "inet", "threatscan", "out", "{ type filter hook output priority 0 ; }")
 			n.sh("nft", "flush", "chain", "inet", "threatscan", "out")
 			n.sh("nft", "add", "rule", "inet", "threatscan", "out", "ip", "daddr", "{ "+strings.Join(ips, ", ")+" }", "drop")
+			n.mode = "nftables"
 			n.say(fmt.Sprintf("nftables: dropped outbound traffic to %d C2 IPs (table inet threatscan)", len(ips)))
 			return true
 		}
@@ -66,6 +70,7 @@ func (n *NetBlocker) BlockIPs() bool {
 				return false
 			}
 		}
+		n.mode = "iptables"
 		n.say(fmt.Sprintf("iptables: chain %s drops outbound traffic to %d C2 IPs", chain, len(ips)))
 		return true
 	case n.P.IsMac():
@@ -75,7 +80,7 @@ func (n *NetBlocker) BlockIPs() bool {
 		}
 		af := "/etc/pf.anchors/" + pfAnchor
 		if err := os.WriteFile(af, []byte(rules.String()), 0o644); err != nil {
-			n.say("Need root: sudo threatscan protect --block-c2")
+			n.say("Need root: sudo threatscan protect --install")
 			return false
 		}
 		conf, _ := os.ReadFile("/etc/pf.conf")
@@ -85,6 +90,7 @@ func (n *NetBlocker) BlockIPs() bool {
 		}
 		n.sh("pfctl", "-a", pfAnchor, "-f", af)
 		n.sh("pfctl", "-e")
+		n.mode = "pf"
 		n.say(fmt.Sprintf("pf: anchor %s blocks %d C2 IPs", pfAnchor, len(ips)))
 		return true
 	case n.P.IsWindows():
@@ -94,6 +100,7 @@ func (n *NetBlocker) BlockIPs() bool {
 			n.say("netsh failed (run as Administrator): " + strings.TrimSpace(se))
 			return false
 		}
+		n.mode = "windows-firewall"
 		n.say(fmt.Sprintf("Windows Firewall: '%s' blocks %d C2 IPs", winRule, len(ips)))
 		return true
 	}

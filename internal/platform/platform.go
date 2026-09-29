@@ -325,6 +325,14 @@ func (p *Info) Kill(pid int) bool {
 
 func itoa(i int) string { return strconv.Itoa(i) }
 
+// BootTime is the host boot time as a unix timestamp (0 when unknown).
+func BootTime() int64 {
+	if t, err := host.BootTime(); err == nil {
+		return int64(t)
+	}
+	return 0
+}
+
 // Exe returns the path of the running executable (symlinks resolved).
 func Exe() string {
 	e, err := os.Executable()

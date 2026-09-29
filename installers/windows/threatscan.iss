@@ -32,14 +32,19 @@ WizardStyle=modern
 UninstallDisplayName=ThreatScan
 UninstallDisplayIcon={app}\threatscan.exe
 
+[Tasks]
+Name: "blockc2"; Description: "Block the PolinRider command servers in Windows Firewall (asks for administrator rights)"; Flags: checkedonce
+
 [Files]
 Source: "{#Dist}\threatscan-windows-amd64.exe"; DestDir: "{app}"; DestName: "threatscan.exe"; Check: not IsArm64; Flags: ignoreversion
 Source: "{#Dist}\threatscan-windows-arm64.exe"; DestDir: "{app}"; DestName: "threatscan.exe"; Check: IsArm64; Flags: ignoreversion
 
 [Run]
-Filename: "{app}\threatscan.exe"; Parameters: "install --unattended"; Flags: runhidden waituntilterminated; StatusMsg: "Starting ThreatScan protection..."
+Filename: "{app}\threatscan.exe"; Parameters: "install --unattended --no-block-c2"; Flags: runhidden waituntilterminated; StatusMsg: "Starting ThreatScan protection..."
+Filename: "{app}\threatscan.exe"; Parameters: "protect --install"; Verb: "runas"; Flags: shellexec runhidden waituntilterminated skipifsilent; Tasks: blockc2; StatusMsg: "Blocking the PolinRider command servers..."
 
 [UninstallRun]
+Filename: "{app}\threatscan.exe"; Parameters: "protect --uninstall"; Verb: "runas"; Flags: shellexec runhidden waituntilterminated; RunOnceId: "UninstallNetBlock"
 Filename: "{app}\threatscan.exe"; Parameters: "uninstall"; Flags: runhidden waituntilterminated; RunOnceId: "UninstallGuard"
 
 [UninstallDelete]

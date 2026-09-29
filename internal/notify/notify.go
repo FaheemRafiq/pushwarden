@@ -102,7 +102,7 @@ func BuildAlert(fs []*findings.Finding) (title, body string) {
 		}
 	}
 	if len(fs) == 1 {
-		return title, line(fs[0]) + "\n" + h.Trunc(reason(fs[0]), 110)
+		return title, line(fs[0]) + "\n" + h.Trunc(reason(fs[0]), 180)
 	}
 	var lines []string
 	for i, f := range fs {
