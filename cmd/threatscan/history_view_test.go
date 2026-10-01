@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -90,7 +91,7 @@ func TestHistoryCommandOverJournal(t *testing.T) {
 		t.Fatal("bad --since must exit 2")
 	}
 	// allow with a note records feedback
-	target := inf + "/public/fonts/fa-solid-900.woff2"
+	target := filepath.Join(inf, "public", "fonts", "fa-solid-900.woff2")
 	if rc := run([]string{"history", "--allow", target, "--note", "our own icon font"}); rc != 0 {
 		t.Fatal("allow failed")
 	}

@@ -151,28 +151,32 @@ func archive(p string) {
 	if err := os.Rename(p, plain); err != nil {
 		return
 	}
-	in, err := os.Open(plain)
-	if err != nil {
-		return
-	}
-	defer in.Close()
-	out, err := os.OpenFile(plain+".gz", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
-	if err != nil {
-		return
-	}
-	zw := gzip.NewWriter(out)
-	_, err = io.Copy(zw, in)
-	if e2 := zw.Close(); err == nil {
-		err = e2
-	}
-	if e2 := out.Close(); err == nil {
-		err = e2
-	}
-	if err != nil {
+	if gzipFile(plain, plain+".gz") != nil {
 		os.Remove(plain + ".gz") // keep the plain archive rather than lose data
 		return
 	}
-	os.Remove(plain)
+	os.Remove(plain) // every handle is closed by now, which Windows requires
+}
+
+func gzipFile(src, dst string) (err error) {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	zw := gzip.NewWriter(out)
+	_, err = io.Copy(zw, in)
+	if e := zw.Close(); err == nil {
+		err = e
+	}
+	if e := out.Close(); err == nil {
+		err = e
+	}
+	return err
 }
 
 // Finding records one sighting of a finding.
