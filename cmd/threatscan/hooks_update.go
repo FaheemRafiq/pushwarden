@@ -7,6 +7,7 @@ import (
 
 	"github.com/FaheemRafiq/threatscan/internal/config"
 	"github.com/FaheemRafiq/threatscan/internal/guard"
+	"github.com/FaheemRafiq/threatscan/internal/journal"
 	"github.com/FaheemRafiq/threatscan/internal/platform"
 	"github.com/FaheemRafiq/threatscan/internal/service"
 	"github.com/FaheemRafiq/threatscan/internal/ui"
@@ -58,6 +59,7 @@ func rollbackIfFailed(c *ctx, g *guard.Guard) bool {
 	if !rolled {
 		return false
 	}
+	g.J.Write(journal.Event{Ctx: "update", Kind: journal.KindError, Title: "program update rolled back: the new version did not start"})
 	if err := service.New(c.P, c.DataDir).RestartFromGuard(u.Exe); err != nil {
 		g.Log("update: restart after rollback failed: " + err.Error())
 	}
@@ -68,6 +70,7 @@ func confirmUpdate(g *guard.Guard) {
 	hbVersion, _ := lastHeartbeat(g.DataDir)
 	if v := guardUpdater(g).Confirm(hbVersion); v != "" {
 		g.Log("update: running " + v)
+		g.J.Write(journal.Event{Ctx: "update", Kind: journal.KindUpdate, Title: "program update confirmed: running " + v})
 		g.Notifier.Desktop("ThreatScan", "ThreatScan updated to v"+v)
 	}
 }
@@ -89,8 +92,11 @@ func selfUpdate(g *guard.Guard) {
 	}
 	if err := u.Apply(rel); err != nil {
 		g.Log("update: " + rel.Tag + " refused: " + err.Error())
+		g.J.Write(journal.Event{Ctx: "update", Kind: journal.KindError, Title: "program update " + rel.Tag + " refused", Note: err.Error()})
 		return
 	}
+	g.J.Write(journal.Event{Ctx: "update", Kind: journal.KindUpdate, Title: "program update " + rel.Tag + " installed; restarting",
+		Data: map[string]any{"from": g.Version, "to": rel.Version()}})
 	if err := m.RestartFromGuard(u.Exe); err != nil {
 		g.Log("update: installed " + rel.Tag + " but could not restart: " + err.Error())
 		return

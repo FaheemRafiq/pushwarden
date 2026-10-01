@@ -134,6 +134,7 @@ func runGitHubClean(c *ctx, o ghOpts) int {
 		WorkDir: o.keep, KeepClones: o.keep != "", Version: version,
 		Log: func(m string) { u.Progress(m) },
 	}, c.P, c.I, c.DataDir)
+	rem.Journal = openJournal(c)
 
 	start := time.Now()
 	var results []remediate.Result

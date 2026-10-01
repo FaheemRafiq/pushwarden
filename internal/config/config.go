@@ -32,6 +32,8 @@ type Config struct {
 	IOCUpdate          bool     `json:"ioc_update"`
 	IOCUpdateURL       string   `json:"ioc_update_url"`
 	ReportKeep         int      `json:"report_keep"`
+	Journal            bool     `json:"journal"`              // record every finding, action and decision in journal.jsonl
+	JournalMinSeverity string   `json:"journal_min_severity"` // lowest finding severity recorded
 	// program self-update (Go build)
 	AutoUpdate     bool   `json:"auto_update"`
 	UpdateChannel  string `json:"update_channel"`
@@ -46,6 +48,7 @@ func Default() *Config {
 		Realtime: true, Action: "quarantine", AutoKill: true, AutoClean: true,
 		Prompt: true, PromptTimeout: 180, NotifyDesktop: true, NotifySweeps: true, NotifyMinSeverity: "HIGH",
 		WebhookMinSeverity: "HIGH", BlockC2: true, IOCUpdate: true, ReportKeep: 60,
+		Journal: true, JournalMinSeverity: "WARNING",
 		AutoUpdate: true, UpdateChannel: "stable", UpdateInterval: 6 * 3600,
 	}
 }

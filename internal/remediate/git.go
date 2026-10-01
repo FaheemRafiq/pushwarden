@@ -18,6 +18,7 @@ import (
 
 	"github.com/FaheemRafiq/threatscan/internal/findings"
 	"github.com/FaheemRafiq/threatscan/internal/iocs"
+	"github.com/FaheemRafiq/threatscan/internal/journal"
 	"github.com/FaheemRafiq/threatscan/internal/platform"
 	"github.com/FaheemRafiq/threatscan/internal/prompt"
 	"github.com/FaheemRafiq/threatscan/internal/protect"
@@ -92,6 +93,8 @@ type Remediator struct {
 	P       *platform.Info
 	I       *iocs.IOCs
 	DataDir string
+	// Journal, when set, records every file fixed and every branch result.
+	Journal *journal.Journal
 	ui      *ui.UI
 }
 
@@ -276,13 +279,18 @@ func (m *Remediator) Run(ctx context.Context, fullName, cloneURL, defaultBranch 
 	res.History = hist.CheckHistoryPayloads(bare)
 
 	pr := protect.New(m.P, m.I, m.DataDir, nil, !m.Opts.Apply)
+	pr.AttachJournal(m.Journal, "github-clean")
 	ident := m.identity(ctx, bare)
 	for _, b := range branches {
 		if ctx.Err() != nil {
 			res.Branches = append(res.Branches, Branch{Name: b, Status: StatusError, Error: ctx.Err().Error()})
 			continue
 		}
-		res.Branches = append(res.Branches, m.branch(ctx, fullName, base, bare, b, pr, ident))
+		br := m.branch(ctx, fullName, base, bare, b, pr, ident)
+		res.Branches = append(res.Branches, br)
+		m.Journal.Write(journal.Event{Ctx: "github-clean", Kind: journal.KindSweep, Title: fullName + " @ " + b + ": " + br.Status,
+			Note: br.Error, Data: map[string]any{"repo": fullName, "branch": b, "status": br.Status, "fixed": br.Fixed,
+				"commit": br.Commit, "apply": m.Opts.Apply}})
 	}
 	return res
 }

@@ -7,9 +7,11 @@ import (
 	"testing"
 
 	"github.com/FaheemRafiq/threatscan/internal/findings"
+	"github.com/FaheemRafiq/threatscan/internal/journal"
 	"github.com/FaheemRafiq/threatscan/internal/notify"
 	"github.com/FaheemRafiq/threatscan/internal/platform"
 	"github.com/FaheemRafiq/threatscan/internal/protect"
+	"github.com/FaheemRafiq/threatscan/internal/testfixtures"
 )
 
 func TestFormatAlertsAndHistory(t *testing.T) {
@@ -82,5 +84,27 @@ func TestProtectDryRunAndStatusNeedNoRoot(t *testing.T) {
 	}
 	if ents, _ := os.ReadDir(os.Getenv("THREATSCAN_SYSTEM_DIR")); len(ents) != 0 {
 		t.Fatal("dry runs wrote to the system dir")
+	}
+}
+
+func TestScanWritesJournalUnlessNoReport(t *testing.T) {
+	home := isolate(t)
+	d := t.TempDir()
+	inf := testfixtures.Infected(t, d)
+	run([]string{"scan", "--ci", "--no-system", "--no-report", inf})
+	if journal.Exists(home) {
+		t.Fatal("--no-report must leave no journal")
+	}
+	run([]string{"scan", "--ci", "--no-system", "--fix", inf})
+	evs := journal.Read(home, journal.Filter{})
+	kinds := map[string]int{}
+	for _, e := range evs {
+		kinds[e.Kind]++
+		if e.Ctx != "scan" {
+			t.Fatalf("ctx: %+v", e)
+		}
+	}
+	if kinds[journal.KindSweep] != 2 || kinds[journal.KindFinding] < 4 || kinds[journal.KindAction] < 3 {
+		t.Fatalf("kinds: %v", kinds)
 	}
 }

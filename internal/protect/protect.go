@@ -69,8 +69,10 @@ type Protector struct {
 	Index     string
 	decisions map[string]decision
 	decPath   string
-	mu        sync.Mutex
-	seq       int
+	// OnRecord, when set, receives every history entry as it is written (journal).
+	OnRecord func(Entry)
+	mu       sync.Mutex
+	seq      int
 }
 
 func New(p *platform.Info, i *iocs.IOCs, dataDir string, u *ui.UI, dry bool) *Protector {
@@ -102,9 +104,12 @@ func (pr *Protector) record(e Entry) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
 	b, _ := json.Marshal(e)
 	f.Write(append(b, '\n'))
+	f.Close()
+	if pr.OnRecord != nil {
+		pr.OnRecord(e)
+	}
 }
 
 func (pr *Protector) slot(name string) string {

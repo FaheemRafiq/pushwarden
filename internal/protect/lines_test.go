@@ -9,6 +9,7 @@ import (
 
 	"github.com/FaheemRafiq/threatscan/internal/findings"
 	"github.com/FaheemRafiq/threatscan/internal/iocs"
+	"github.com/FaheemRafiq/threatscan/internal/journal"
 	"github.com/FaheemRafiq/threatscan/internal/platform"
 )
 
@@ -75,5 +76,36 @@ func TestEntriesCarryReasons(t *testing.T) {
 	k := entryFor(&findings.Finding{Category: "malicious_process", Title: "proc", Action: "killed PID 1", Meta: findings.Meta{Kill: true}}, "kill")
 	if !strings.HasPrefix(k.Reason, "Killed") || k.Type != "kill" {
 		t.Fatalf("%+v", k)
+	}
+}
+
+func TestJournalMirrorAndOneTimeImport(t *testing.T) {
+	i, _ := iocs.Load(t.TempDir())
+	data := t.TempDir()
+	// history written before the journal existed
+	old := New(platform.New(), i, data, nil, false)
+	f1 := filepath.Join(t.TempDir(), "a.woff2")
+	os.WriteFile(f1, []byte("var a = 1;"), 0o644)
+	old.Quarantine(&findings.Finding{Severity: findings.Critical, Category: "fake_font_loader", Title: "old", Path: f1, Meta: findings.Meta{Quarantine: true}})
+
+	j := journal.Open(data, "v", "i")
+	ImportHistory(j, data)
+	evs := journal.Read(data, journal.Filter{})
+	if len(evs) != 1 || evs[0].Ctx != "imported" || evs[0].Action != "quarantine" || evs[0].Path != f1 || evs[0].Time().IsZero() {
+		t.Fatalf("import: %+v", evs)
+	}
+	ImportHistory(j, data) // second call must not duplicate
+	if n := len(journal.Read(data, journal.Filter{})); n != 1 {
+		t.Fatalf("imported twice: %d", n)
+	}
+	pr := New(platform.New(), i, data, nil, false)
+	pr.AttachJournal(j, "guard")
+	f2 := filepath.Join(t.TempDir(), "b.woff2")
+	os.WriteFile(f2, []byte("var b = 2;"), 0o644)
+	pr.Quarantine(&findings.Finding{Severity: findings.Critical, Category: "fake_font_loader", Title: "new", Path: f2, Meta: findings.Meta{Quarantine: true}})
+	pr.Restore(f2)
+	evs = journal.Read(data, journal.Filter{Kinds: []string{journal.KindAction}})
+	if len(evs) != 3 || evs[1].Ctx != "guard" || evs[1].Action != "quarantine" || evs[1].Data["copy"] == nil || evs[2].Action != "restore" {
+		t.Fatalf("mirror: %+v", evs)
 	}
 }

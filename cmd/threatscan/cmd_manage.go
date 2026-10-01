@@ -41,6 +41,8 @@ func cmdHistory(args []string) int {
 	c := mustCtx()
 	u := ui.New(false, false)
 	pr := protect.New(c.P, c.I, c.DataDir, u, false)
+	jr := openJournal(c)
+	pr.AttachJournal(jr, "cli")
 	switch {
 	case *restore != "":
 		if pr.Restore(*restore) {

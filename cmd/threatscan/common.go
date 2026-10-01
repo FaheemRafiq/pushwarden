@@ -8,8 +8,11 @@ import (
 	"strings"
 
 	"github.com/FaheemRafiq/threatscan/internal/config"
+	"github.com/FaheemRafiq/threatscan/internal/findings"
 	"github.com/FaheemRafiq/threatscan/internal/iocs"
+	"github.com/FaheemRafiq/threatscan/internal/journal"
 	"github.com/FaheemRafiq/threatscan/internal/platform"
+	"github.com/FaheemRafiq/threatscan/internal/protect"
 )
 
 type ctx struct {
@@ -30,6 +33,16 @@ func newCtx() (*ctx, error) {
 		return nil, err
 	}
 	return &ctx{P: p, DataDir: d, Cfg: config.Load(d), I: i}, nil
+}
+
+// openJournal returns this machine's activity journal, honouring the config,
+// with the pre-journal history imported on first use.
+func openJournal(c *ctx) *journal.Journal {
+	j := journal.Open(c.DataDir, version, c.I.Version)
+	j.Disabled = !c.Cfg.Journal
+	j.MinSeverity = findings.ParseSeverity(c.Cfg.JournalMinSeverity)
+	protect.ImportHistory(j, c.DataDir)
+	return j
 }
 
 func mustCtx() *ctx {

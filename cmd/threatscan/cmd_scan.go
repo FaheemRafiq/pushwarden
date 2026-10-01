@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/FaheemRafiq/threatscan/internal/findings"
+	"github.com/FaheemRafiq/threatscan/internal/journal"
 	"github.com/FaheemRafiq/threatscan/internal/notify"
 	"github.com/FaheemRafiq/threatscan/internal/prompt"
 	"github.com/FaheemRafiq/threatscan/internal/protect"
@@ -88,6 +89,12 @@ func runScan(c *ctx, o scanOpts) int {
 			u.P("    %-22s %s", u.C("BOLD_CYAN", kv[0]+":"), kv[1])
 		}
 	}
+	// a scan that keeps no report (dry runs, CI probes) leaves no journal entries either
+	jr := openJournal(c)
+	jr.Disabled = jr.Disabled || o.noReport
+	sweep := start.Format("20060102-150405")
+	jr.Write(journal.Event{Ctx: "scan", Kind: journal.KindSweep, Sweep: sweep, Title: "scan started",
+		Data: map[string]any{"phase": "start", "dirs": len(dirs), "fix": o.fix, "dry_run": o.dryRun}})
 	var all []*findings.Finding
 	total, infected, files := 0, 0, 0
 	if !o.noRepos {
@@ -130,6 +137,7 @@ func runScan(c *ctx, o scanOpts) int {
 		}
 		u.Section(title)
 		pr := protect.New(c.P, c.I, c.DataDir, u, o.dryRun)
+		pr.AttachJournal(jr, "scan")
 		var decide protect.DecideFn
 		switch {
 		case o.fix || o.dryRun:
@@ -139,6 +147,15 @@ func runScan(c *ctx, o scanOpts) int {
 			}
 		default:
 			decide = prompt.AskTerminal
+		}
+		if decide != nil {
+			ask := decide
+			decide = func(f *findings.Finding, w string) prompt.Verdict {
+				v := ask(f, w)
+				jr.Write(journal.Event{Ctx: "scan", Kind: journal.KindDecision, Action: string(v), Path: f.Path, Title: f.Title,
+					Category: f.Category, Sev: f.Severity.String(), Key: f.Key(), Note: "asked before acting: " + w})
+				return v
+			}
 		}
 		acted := pr.Respond(all, c.Cfg.AutoKill, o.fix || o.dryRun, decide)
 		for _, f := range all {
@@ -160,6 +177,12 @@ func runScan(c *ctx, o scanOpts) int {
 		st.ScanDirs = []string{}
 	}
 	st.Count(all)
+	for _, f := range all {
+		jr.Finding("scan", sweep, f, prompt.ThreatName(f))
+	}
+	jr.Write(journal.Event{Ctx: "scan", Kind: journal.KindSweep, Sweep: sweep, Title: "scan finished",
+		Data: map[string]any{"phase": "end", "repos": total, "infected": infected, "files": files, "critical": st.Critical,
+			"high": st.High, "warning": st.Warning, "seconds": int(st.ScanDuration)}})
 	u.Summary(st)
 	if !o.ci {
 		u.Remediation(all)

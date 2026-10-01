@@ -22,6 +22,7 @@ import (
 	"github.com/FaheemRafiq/threatscan/internal/findings"
 	h "github.com/FaheemRafiq/threatscan/internal/helpers"
 	"github.com/FaheemRafiq/threatscan/internal/iocs"
+	"github.com/FaheemRafiq/threatscan/internal/journal"
 	"github.com/FaheemRafiq/threatscan/internal/notify"
 	"github.com/FaheemRafiq/threatscan/internal/platform"
 	"github.com/FaheemRafiq/threatscan/internal/prompt"
@@ -61,6 +62,8 @@ type Guard struct {
 	UI       *ui.UI
 	Notifier *notify.Notifier
 	Prot     *protect.Protector
+	J        *journal.Journal // complete activity record (journal.jsonl)
+	sweepID  string
 
 	stateDir  string
 	logPath   string
@@ -93,6 +96,11 @@ func New(p *platform.Info, dataDir, version string, once, dry, verbose bool) (*G
 		stateDir: filepath.Join(dataDir, "guard"), logPath: filepath.Join(dataDir, "guard.log"),
 		seen: map[string]float64{}, mtimes: map[string]time.Time{}, dialogs: make(chan *F, 64), stop: make(chan struct{})}
 	_ = os.MkdirAll(g.stateDir, 0o700)
+	g.J = journal.Open(dataDir, version, i.Version)
+	g.J.Disabled = !cfg.Journal
+	g.J.MinSeverity = findings.ParseSeverity(cfg.JournalMinSeverity)
+	protect.ImportHistory(g.J, dataDir)
+	g.Prot.AttachJournal(g.J, "guard")
 	if b, err := os.ReadFile(filepath.Join(g.stateDir, "seen.json")); err == nil {
 		_ = json.Unmarshal(b, &g.seen)
 	}
@@ -103,6 +111,7 @@ func New(p *platform.Info, dataDir, version string, once, dry, verbose bool) (*G
 
 func (g *Guard) Log(msg string) {
 	line := time.Now().Format("2006-01-02 15:04:05") + " " + msg
+	journal.RotateFile(g.logPath, 5<<20)
 	if f, err := os.OpenFile(g.logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
 		f.WriteString(line + "\n")
 		f.Close()
@@ -225,12 +234,16 @@ func (g *Guard) decide(f *F, action string) prompt.Verdict {
 	g.Log("asking user about " + f.Path + " (" + action + ")")
 	v := prompt.Ask(f, action, time.Duration(g.Cfg.PromptTimeout)*time.Second)
 	g.Log(fmt.Sprintf("user decision for %s: %s", f.Path, v))
+	g.J.Write(journal.Event{Ctx: "guard", Kind: journal.KindDecision, Action: string(v), Path: f.Path, Title: f.Title, Category: f.Category,
+		Sev: f.Severity.String(), Key: f.Key(), Note: "asked before acting: " + action})
 	return v
 }
 
 func (g *Guard) afterQuarantine(f *F) {
 	v := prompt.AskQuarantined(f, time.Duration(g.Cfg.PromptTimeout)*time.Second)
 	g.Log(fmt.Sprintf("post-quarantine decision for %s: %s", f.Path, v))
+	g.J.Write(journal.Event{Ctx: "guard", Kind: journal.KindDecision, Action: string(v), Path: f.Path, Title: f.Title, Category: f.Category,
+		Sev: f.Severity.String(), Key: f.Key(), Note: "asked after quarantine: remove / restore and allow"})
 	switch v {
 	case prompt.Delete:
 		g.Log(fmt.Sprintf("removed %d quarantined cop(ies) of %s", g.Prot.Purge(f.Path), f.Path))
@@ -300,6 +313,11 @@ func (g *Guard) Handle(fs []*F, context string) {
 	saveJSON(filepath.Join(g.stateDir, "seen.json"), g.seen)
 	g.mu.Unlock()
 	for _, f := range fs {
+		sweep := ""
+		if context == "guard-full" {
+			sweep = g.sweepID
+		}
+		g.J.Finding(context, sweep, f, prompt.ThreatName(f))
 		msg := fmt.Sprintf("[%s] %s %s", f.Severity, f.Title, f.Path)
 		if f.Action != "" {
 			msg += " -> " + f.Action + " | why: " + findings.WhyAction(f)
@@ -457,6 +475,8 @@ func (g *Guard) lightStart() {
 	age, _ := g.recentReport()
 	g.lastFull = time.Now().Add(-age)
 	g.heartbeat("idle", map[string]int{"repos": len(repos)})
+	g.J.Write(journal.Event{Ctx: "guard", Kind: journal.KindGuard, Title: "start-up sweep skipped: a recent scan report exists",
+		Data: map[string]any{"repos": len(repos), "report_age_seconds": int(age.Seconds())}})
 }
 
 // sweepHeartbeat refreshes the heartbeat while a long sweep runs, so status
@@ -505,6 +525,9 @@ func (g *Guard) FullPass() {
 		targets = append(targets, target{r, rp, pj})
 		planned += len(rp) + len(pj)
 	}
+	g.sweepID = start.Format("20060102-150405")
+	g.J.Write(journal.Event{Ctx: "guard-full", Kind: journal.KindSweep, Sweep: g.sweepID, Title: "full sweep started",
+		Data: map[string]any{"phase": "start", "repos": planned, "roots": len(roots)}})
 	if g.Cfg.NotifySweeps && !g.Once {
 		g.Notifier.Desktop("ThreatScan: full scan started",
 			fmt.Sprintf("%d repositories in %d folders. Progress: threatscan status", planned, len(roots)))
@@ -534,6 +557,9 @@ func (g *Guard) FullPass() {
 		total, infected, st.Critical, st.High, st.ScanDuration))
 	stopHB()
 	g.heartbeat("idle", map[string]int{"repos": total, "infected": infected, "critical": st.Critical, "high": st.High})
+	g.J.Write(journal.Event{Ctx: "guard-full", Kind: journal.KindSweep, Sweep: g.sweepID, Title: "full sweep finished",
+		Data: map[string]any{"phase": "end", "repos": total, "infected": infected, "files": files, "critical": st.Critical,
+			"high": st.High, "warning": st.Warning, "seconds": int(st.ScanDuration)}})
 	if g.Cfg.NotifySweeps && !g.Once {
 		g.Notifier.Desktop("ThreatScan: full scan finished", sweepSummary(total, st, time.Since(start)))
 	}
@@ -558,6 +584,7 @@ func (g *Guard) maybeUpdateIOCs() {
 	}
 	updated, msg := g.Hooks.UpdateIOCs(g.DataDir, g.I.Version, g.Cfg)
 	g.Log("ioc update: " + msg)
+	g.J.Write(journal.Event{Ctx: "update", Kind: journal.KindUpdate, Title: "indicator update: " + msg, Data: map[string]any{"updated": updated}})
 	if updated {
 		if i, err := iocs.Load(g.DataDir); err == nil {
 			g.I = i
@@ -575,6 +602,8 @@ func (g *Guard) startRealtime() {
 		return
 	}
 	g.backend, g.stopWatch = g.Hooks.StartRealtime(roots, g.SkipDir, g.OnEvents, g.Log)
+	g.J.Write(journal.Event{Ctx: "guard", Kind: journal.KindGuard, Title: "real-time watcher started",
+		Data: map[string]any{"backend": g.backend, "roots": len(roots)}})
 }
 
 // Stop ends Run (used by signals and tests).
@@ -583,6 +612,7 @@ func (g *Guard) Stop() { g.stopOnce.Do(func() { close(g.stop) }) }
 func (g *Guard) safely(name string, fn func()) {
 	defer func() {
 		if r := recover(); r != nil {
+			g.J.Write(journal.Event{Ctx: "guard", Kind: journal.KindError, Title: name + " panicked", Note: fmt.Sprint(r)})
 			g.Log(fmt.Sprintf("%s error: %v\n%s", name, r, debug.Stack()))
 		}
 	}()
@@ -603,6 +633,9 @@ func (g *Guard) Run() int {
 	}()
 	g.Log(fmt.Sprintf("guard v%s starting (iocs %s, action=%s, auto_kill=%v, prompt=%v, deep=%v, dry_run=%v)",
 		g.Version, g.I.Version, g.Cfg.Action, g.Cfg.AutoKill, g.Cfg.Prompt, g.Cfg.Deep, g.DryRun))
+	g.J.Write(journal.Event{Ctx: "guard", Kind: journal.KindGuard, Title: "guard started",
+		Data: map[string]any{"action": g.Cfg.Action, "auto_kill": g.Cfg.AutoKill, "prompt": g.Cfg.Prompt, "deep": g.Cfg.Deep,
+			"dry_run": g.DryRun, "once": g.Once, "os": g.P.OS, "roots": len(g.roots())}})
 	g.startDialogWorker()
 	defer func() {
 		close(g.dialogs)
@@ -639,6 +672,7 @@ func (g *Guard) Run() int {
 				g.stopWatch()
 			}
 			g.Log("guard stopped")
+			g.J.Write(journal.Event{Ctx: "guard", Kind: journal.KindGuard, Title: "guard stopped"})
 			return 0
 		case <-tick.C:
 			if time.Since(g.lastFull) >= time.Duration(g.Cfg.FullInterval)*time.Second {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/FaheemRafiq/threatscan/internal/config"
 	"github.com/FaheemRafiq/threatscan/internal/findings"
+	"github.com/FaheemRafiq/threatscan/internal/journal"
 	"github.com/FaheemRafiq/threatscan/internal/platform"
 	"github.com/FaheemRafiq/threatscan/internal/prompt"
 	"github.com/FaheemRafiq/threatscan/internal/protect"
@@ -197,5 +198,66 @@ func TestProgressInHeartbeatAndSweepSummary(t *testing.T) {
 	}
 	if s := sweepSummary(17, &findings.Stats{Critical: 1, High: 2}, time.Minute); !strings.Contains(s, "1 threat(s) handled, 2 need review") {
 		t.Fatal(s)
+	}
+}
+
+func TestGuardWritesCompleteJournal(t *testing.T) {
+	restore := prompt.SetDialogForTest(func(string, string, string, string, time.Duration) prompt.Verdict { return prompt.Timeout })
+	defer restore()
+	g, home, root := setup(t, nil)
+	testfixtures.Infected(t, root)
+	if rc := g.Run(); rc != 0 {
+		t.Fatal(rc)
+	}
+	evs := journal.Read(home, journal.Filter{})
+	kinds := map[string]int{}
+	var sweepIDs = map[string]bool{}
+	for _, e := range evs {
+		kinds[e.Kind]++
+		if e.Kind == journal.KindSweep {
+			sweepIDs[e.Sweep] = true
+		}
+	}
+	if kinds[journal.KindGuard] < 1 || kinds[journal.KindSweep] != 2 || kinds[journal.KindFinding] < 4 || kinds[journal.KindAction] < 3 {
+		t.Fatalf("event kinds: %v", kinds)
+	}
+	if len(sweepIDs) != 1 {
+		t.Fatalf("start and end must share one sweep id: %v", sweepIDs)
+	}
+	// every critical finding carries what was done and why, and matches an action on the same path
+	acted := map[string]bool{}
+	for _, e := range evs {
+		if e.Kind == journal.KindAction {
+			acted[e.Path] = true
+			if e.Response == "" || e.Threat == "" {
+				t.Errorf("action without reason or threat: %+v", e)
+			}
+		}
+	}
+	n := 0
+	for _, e := range evs {
+		if e.Kind == journal.KindFinding && e.Sev == "CRITICAL" && e.Action != "" && !strings.Contains(e.Action, "failed") {
+			n++
+			if e.Why == "" || e.Response == "" || e.Key == "" || e.Sweep == "" || e.Ctx != "guard-full" {
+				t.Errorf("incomplete finding event: %+v", e)
+			}
+			if !acted[e.Path] {
+				t.Errorf("no action event for %s", e.Path)
+			}
+		}
+	}
+	if n < 3 {
+		t.Fatalf("expected at least 3 acted critical findings, got %d", n)
+	}
+	// warnings are recorded too
+	if got := journal.Read(home, journal.Filter{Kinds: []string{journal.KindFinding}}); len(got) <= n {
+		t.Fatalf("only acted findings were recorded (%d)", len(got))
+	}
+	// a second pass records the remaining findings again: every sighting is kept
+	before := len(journal.Read(home, journal.Filter{Kinds: []string{journal.KindFinding}}))
+	g.FullPass()
+	after := len(journal.Read(home, journal.Filter{Kinds: []string{journal.KindFinding}}))
+	if after <= before {
+		t.Fatalf("second sweep added no finding events (%d -> %d)", before, after)
 	}
 }
