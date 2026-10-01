@@ -384,3 +384,19 @@ func TestPayloadCompanions(t *testing.T) {
 		t.Errorf("title: %s", f.Title)
 	}
 }
+
+func TestPayloadCompanionsSkipAllowlistedRepos(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git missing")
+	}
+	dir := t.TempDir()
+	gitT(t, dir, "init", "-q")
+	// a rule set that carries the indicators on purpose, plus a sibling
+	write(t, filepath.Join(dir, "rules_test.go"), "// threatscan:allow-signatures\npackage x\nvar s = \""+string(testfixtures.FakeWoff2[421:])+"\"\n")
+	write(t, filepath.Join(dir, "README.md"), "# rules\n")
+	gitT(t, dir, "add", "-A")
+	gitT(t, dir, "commit", "-q", "-m", "rules")
+	if fs := newRepo(t, dir).CheckPayloadCompanions(dir); len(fs) != 0 {
+		t.Fatalf("allowlisted repository flagged: %+v", fs[0])
+	}
+}

@@ -641,17 +641,23 @@ func (r *Repo) CheckPayloadCompanions(repo string) []*F {
 		seen[p[0]] = true
 		var present []string
 		dirs := map[string]int{}
+		allowlisted := false
 		for _, f := range strings.Split(strings.TrimSpace(git(30*time.Second, repo, "show", "--format=", "--name-only", "--diff-filter=A", p[0])), "\n") {
 			f = strings.TrimSpace(f)
 			if f == "" {
 				continue
 			}
-			if st, err := os.Stat(filepath.Join(repo, filepath.FromSlash(f))); err == nil && !st.IsDir() {
+			full := filepath.Join(repo, filepath.FromSlash(f))
+			if st, err := os.Stat(full); err == nil && !st.IsDir() {
+				if h.IsAllowlisted(full, r.I) {
+					allowlisted = true // a rule set or test suite that carries the indicators on purpose
+					break
+				}
 				present = append(present, f)
 				dirs[path.Dir(f)]++
 			}
 		}
-		if len(present) == 0 {
+		if len(present) == 0 || allowlisted {
 			continue
 		}
 		var lines []string

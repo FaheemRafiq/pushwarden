@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/FaheemRafiq/threatscan/internal/config"
+	"github.com/FaheemRafiq/threatscan/internal/findings"
 	"github.com/FaheemRafiq/threatscan/internal/platform"
 	"github.com/FaheemRafiq/threatscan/internal/prompt"
 	"github.com/FaheemRafiq/threatscan/internal/protect"
+	"github.com/FaheemRafiq/threatscan/internal/report"
 	"github.com/FaheemRafiq/threatscan/internal/testfixtures"
 )
 
@@ -148,4 +150,32 @@ func TestAlertDedup(t *testing.T) {
 		t.Fatal("seen timestamp refreshed without alerting (v5 review bug)")
 	}
 	_ = protect.ActionWord
+}
+
+func TestRecentReportSkipsInitialSweep(t *testing.T) {
+	g, home, root := setup(t, nil)
+	testfixtures.Infected(t, root)
+	if _, ok := g.recentReport(); ok {
+		t.Fatal("no report yet")
+	}
+	st := &findings.Stats{ReposScanned: 1}
+	if _, err := report.Save(home, report.New("0.1.0-test", g.I.Version, st, nil), 10, "scan"); err != nil {
+		t.Fatal(err)
+	}
+	age, ok := g.recentReport()
+	if !ok || age > time.Minute {
+		t.Fatalf("fresh report not recognised: %v %v", age, ok)
+	}
+	g.lightStart()
+	hb, _, alive := ReadHeartbeat(home)
+	if !alive || hb.Phase != "idle" || hb.Repos != 1 {
+		t.Fatalf("heartbeat after light start: %+v", hb)
+	}
+	if time.Since(g.lastFull) > time.Minute {
+		t.Fatal("lastFull not dated from the report")
+	}
+	// the infected fixture was NOT scanned: its propagation script is still there
+	if _, err := os.Stat(filepath.Join(root, "victim", "temp_auto_push.bat")); err != nil {
+		t.Fatal("light start must not scan")
+	}
 }

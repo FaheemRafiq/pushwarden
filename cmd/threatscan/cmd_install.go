@@ -114,6 +114,14 @@ func cmdInstall(args []string) int {
 		doHarden(c.P, u, *npm, *dry)
 	}
 
+	// Interactive installs scan first, in the foreground, so the guard that
+	// starts next finds a fresh report and skips a duplicate sweep.
+	if !*unattended && !*dry {
+		u.Section("FIRST SCAN")
+		u.Info("Running the first full scan now (this may take a few minutes)...")
+		runScan(c, scanOpts{home: true, deep: c.Cfg.Deep, gui: !isTTY(), notify: true})
+	}
+
 	u.Section("BACKGROUND GUARD")
 	m := service.New(c.P, c.DataDir)
 	m.Version = version
@@ -158,9 +166,15 @@ func cmdInstall(args []string) int {
 		u.Info("C2 blocking left to the package installer (" + protect.NoBlockEnv + " is set)")
 	}
 
-	u.Section("FIRST SCAN")
 	switch {
+	case *unattended && !*dry && ok:
+		// the guard's start-up sweep is the first scan; a second process would
+		// race it and double every quarantine and alert
+		u.Section("FIRST SCAN")
+		u.Info("The guard is running the first full scan now; results: threatscan status")
+		notify.New(c.P, c.Cfg, c.DataDir).Desktop("ThreatScan", "ThreatScan is protecting this computer")
 	case *unattended && !*dry:
+		u.Section("FIRST SCAN")
 		exe := m.Exe()
 		if _, err := os.Stat(exe); err != nil {
 			exe = platform.Exe()
@@ -173,13 +187,10 @@ func cmdInstall(args []string) int {
 			u.Info(fmt.Sprintf("First scan running in the background (pid %d); results: threatscan status", cmd.Process.Pid))
 			_ = cmd.Process.Release()
 		}
-		if ok {
-			notify.New(c.P, c.Cfg, c.DataDir).Desktop("ThreatScan", "ThreatScan is protecting this computer")
-		}
-	default:
-		u.Info("Running the first full scan now (this may take a minute)...")
-		// dry run: report only, so nothing is written (no report, no protection history)
-		runScan(c, scanOpts{home: true, deep: c.Cfg.Deep, gui: !isTTY(), noPrompt: *dry, noReport: *dry, notify: !*dry})
+	case *dry:
+		u.Section("FIRST SCAN")
+		u.Info("[dry-run] report-only scan; nothing is written")
+		runScan(c, scanOpts{home: true, deep: c.Cfg.Deep, gui: !isTTY(), noPrompt: true, noReport: true})
 	}
 	u.Info("Status any time:  threatscan status      Logs: " + m.Log)
 	if ok {

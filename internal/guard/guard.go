@@ -392,8 +392,61 @@ func (g *Guard) QuickPass() {
 	g.Handle(fs, "guard-quick")
 }
 
+// recentReport reports whether a full scan report younger than 15 minutes
+// exists, and how old it is.
+func (g *Guard) recentReport() (time.Duration, bool) {
+	rep, err := report.Latest(g.DataDir)
+	if err != nil || rep.Stats == nil || rep.Stats.ReposScanned == 0 {
+		return 0, false
+	}
+	t, err := time.ParseInLocation("2006-01-02T15:04:05", rep.Generated, time.Local)
+	if err != nil {
+		return 0, false
+	}
+	age := time.Since(t)
+	return age, age >= 0 && age < 15*time.Minute
+}
+
+// lightStart discovers the repositories to track without scanning them, and
+// dates the last full pass from the recent report.
+func (g *Guard) lightStart() {
+	var repos []string
+	for _, root := range g.roots() {
+		r := scan.NewRepo(root, g.UI, g.I)
+		r.Deep, r.Exclude = g.Cfg.Deep, g.Cfg.Exclude
+		rp, pj := r.Discover()
+		repos = append(append(repos, rp...), pj...)
+	}
+	g.setTargets(repos)
+	age, _ := g.recentReport()
+	g.lastFull = time.Now().Add(-age)
+	g.heartbeat("idle", map[string]int{"repos": len(repos)})
+}
+
+// sweepHeartbeat refreshes the heartbeat while a long sweep runs, so status
+// does not report the guard dead on a slow machine. Call the result to stop.
+func (g *Guard) sweepHeartbeat() func() {
+	done := make(chan struct{})
+	var once sync.Once
+	go func() {
+		t := time.NewTicker(time.Minute)
+		defer t.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-t.C:
+				g.heartbeat("full", nil)
+			}
+		}
+	}()
+	return func() { once.Do(func() { close(done) }) }
+}
+
 func (g *Guard) FullPass() {
 	g.heartbeat("full", nil)
+	stopHB := g.sweepHeartbeat()
+	defer stopHB()
 	start := time.Now()
 	var all []*F
 	var repos []string
@@ -420,6 +473,7 @@ func (g *Guard) FullPass() {
 	g.lastFull = time.Now()
 	g.Log(fmt.Sprintf("full pass: %d repos, %d infected, %d critical, %d high in %.1fs",
 		total, infected, st.Critical, st.High, st.ScanDuration))
+	stopHB()
 	g.heartbeat("idle", map[string]int{"repos": total, "infected": infected, "critical": st.Critical, "high": st.High})
 }
 
@@ -493,7 +547,14 @@ func (g *Guard) Run() int {
 		g.dialogWG.Wait()
 	}()
 	g.safely("ioc update", g.maybeUpdateIOCs)
-	g.safely("full pass", g.FullPass)
+	if age, ok := g.recentReport(); ok && !g.Once {
+		// `threatscan install` (or a restart after an update) just ran a full scan:
+		// a second sweep seconds later would double every quarantine and alert.
+		g.Log(fmt.Sprintf("full scan report from %s ago found; next sweep in %s", age.Round(time.Second), (time.Duration(g.Cfg.FullInterval)*time.Second - age).Round(time.Minute)))
+		g.safely("discovery", g.lightStart)
+	} else {
+		g.safely("full pass", g.FullPass)
+	}
 	if g.Once {
 		return 0
 	}
