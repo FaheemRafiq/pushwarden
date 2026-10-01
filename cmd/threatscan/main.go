@@ -12,7 +12,7 @@ import (
 )
 
 // version is set at build time: -ldflags "-X main.version=0.1.0"
-var version = "0.3.0-dev"
+var version = "0.3.1-dev"
 
 type command struct {
 	name, help string
