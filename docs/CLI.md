@@ -293,8 +293,11 @@ Install the background guard so it starts at sign-in, harden editors, run a firs
 threatscan install [options]
 ```
 
-Everything is per user: the binary is copied to a per-user install directory and put on your
-PATH, the guard is registered as a systemd `--user` service, a LaunchAgent or a Scheduled Task,
+Everything is per user: the binary is copied to a per-user install directory and linked from
+`~/.local/bin`. When that folder is not on your PATH (the macOS default), one line is appended to
+your shell start-up file (`~/.zshrc` on macOS, `~/.bashrc` or `~/.profile` on Linux), marked
+`# added by threatscan install`; open a new terminal afterwards. The guard is registered as a
+systemd `--user` service, a LaunchAgent or a Scheduled Task,
 and every VS Code-family editor found gets `task.allowAutomaticTasks = off` and workspace trust
 turned on.
 

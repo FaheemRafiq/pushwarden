@@ -172,3 +172,32 @@ func TestPlaceBinaryKeepsNewerInstalled(t *testing.T) {
 		}
 	}
 }
+
+func TestLinkCLIAddsLocalBinToShellPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("PATH is edited in the registry on Windows")
+	}
+	m := testManager(t)
+	t.Setenv("PATH", "/usr/bin:/bin")
+	os.WriteFile(filepath.Join(m.P.Home, ".zshrc"), []byte("alias ll='ls -l'"), 0o644) // no trailing newline
+	os.WriteFile(filepath.Join(m.P.Home, ".bashrc"), []byte("export PATH=\"$HOME/.local/bin:$PATH\"\n"), 0o644)
+	msg := m.LinkCLI(false)
+	if !strings.Contains(msg, "added ~/.local/bin to PATH in ~/.zshrc") || strings.Contains(msg, ".bashrc") {
+		t.Fatalf("msg: %s", msg)
+	}
+	z, _ := os.ReadFile(filepath.Join(m.P.Home, ".zshrc"))
+	if !strings.HasPrefix(string(z), "alias ll='ls -l'\n") || strings.Count(string(z), ".local/bin") != 1 || !strings.Contains(string(z), "# added by threatscan install") {
+		t.Fatalf("zshrc:\n%s", z)
+	}
+	// second install: nothing added again
+	if msg := m.LinkCLI(false); strings.Contains(msg, "added") {
+		t.Fatalf("second run added again: %s", msg)
+	}
+	// already on PATH: untouched
+	os.Remove(filepath.Join(m.P.Home, ".zshrc"))
+	t.Setenv("PATH", filepath.Join(m.P.Home, ".local", "bin")+":/usr/bin")
+	m.LinkCLI(false)
+	if _, err := os.Stat(filepath.Join(m.P.Home, ".zshrc")); err == nil {
+		t.Fatal("wrote .zshrc although ~/.local/bin is on PATH")
+	}
+}

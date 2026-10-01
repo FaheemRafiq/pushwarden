@@ -343,9 +343,56 @@ func (m *Manager) LinkCLI(dry bool) string {
 		onPath = onPath || filepath.Clean(d) == bin
 	}
 	if !onPath {
-		msg += fmt.Sprintf("\nadd %s to your PATH (e.g. echo 'export PATH=\"%s:$PATH\"' >> ~/.zshrc)", bin, bin)
+		if files := m.addToShellPath(); len(files) > 0 {
+			msg += "\nadded ~/.local/bin to PATH in " + strings.Join(files, ", ") + " (open a new terminal)"
+		} else {
+			msg += fmt.Sprintf("\nadd %s to your PATH (e.g. echo 'export PATH=\"%s:$PATH\"' >> ~/.zshrc)", bin, bin)
+		}
 	}
 	return msg
+}
+
+const pathLine = `export PATH="$HOME/.local/bin:$PATH"  # added by threatscan install`
+
+// addToShellPath appends the ~/.local/bin PATH line to the shell start-up
+// files that exist (zsh on macOS, bash/profile on Linux), once. It returns
+// the files it changed.
+func (m *Manager) addToShellPath() []string {
+	var candidates []string
+	switch {
+	case m.P.IsMac():
+		candidates = []string{".zshrc", ".zprofile", ".bash_profile"}
+	default:
+		candidates = []string{".zshrc", ".bashrc", ".profile"}
+	}
+	var done []string
+	wrote := false
+	for i, name := range candidates {
+		p := filepath.Join(m.P.Home, name)
+		b, err := os.ReadFile(p)
+		// create the default shell's file when nothing exists; others only if present
+		if err != nil && !(i == 0 && !wrote && os.IsNotExist(err)) {
+			continue
+		}
+		if strings.Contains(string(b), ".local/bin") {
+			wrote = true // already on the PATH for this shell
+			continue
+		}
+		fh, err := os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			continue
+		}
+		sep := ""
+		if len(b) > 0 && !strings.HasSuffix(string(b), "\n") {
+			sep = "\n"
+		}
+		if _, err := fh.WriteString(sep + "\n" + pathLine + "\n"); err == nil {
+			done = append(done, "~/"+name)
+			wrote = true
+		}
+		fh.Close()
+	}
+	return done
 }
 
 // UnlinkCLI removes the ~/.local/bin symlink (only if it points at our binary)
