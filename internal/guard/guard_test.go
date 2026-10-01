@@ -179,3 +179,23 @@ func TestRecentReportSkipsInitialSweep(t *testing.T) {
 		t.Fatal("light start must not scan")
 	}
 }
+
+func TestProgressInHeartbeatAndSweepSummary(t *testing.T) {
+	g, home, _ := setup(t, nil)
+	g.progress(7, 17, "/home/x/Coding/A-Bot-Ledger")
+	hb, _, _ := ReadHeartbeat(home)
+	if hb.Phase != "full" || hb.Done != 7 || hb.Total != 17 || hb.Current != "A-Bot-Ledger" {
+		t.Fatalf("%+v", hb)
+	}
+	g.heartbeat("idle", nil)
+	hb, _, _ = ReadHeartbeat(home)
+	if hb.Done != 0 || hb.Total != 0 || hb.Current != "" {
+		t.Fatalf("progress must be cleared outside a sweep: %+v", hb)
+	}
+	if s := sweepSummary(17, &findings.Stats{}, 3*time.Minute); !strings.Contains(s, "17 repositories in 3m0s. Nothing found.") {
+		t.Fatal(s)
+	}
+	if s := sweepSummary(17, &findings.Stats{Critical: 1, High: 2}, time.Minute); !strings.Contains(s, "1 threat(s) handled, 2 need review") {
+		t.Fatal(s)
+	}
+}

@@ -15,7 +15,14 @@ func init() {
 		hb, age, alive := guard.ReadHeartbeat(c.DataDir)
 		state := "not running"
 		if alive {
-			state = fmt.Sprintf("alive, %s, %ds ago, v%s, real-time: %s", hb.Phase, int(age.Seconds()), hb.Version, hb.Realtime)
+			phase := hb.Phase
+			if hb.Phase == "full" && hb.Total > 0 {
+				phase = fmt.Sprintf("scanning %d/%d repositories", hb.Done, hb.Total)
+				if hb.Current != "" {
+					phase += " (" + hb.Current + ")"
+				}
+			}
+			state = fmt.Sprintf("alive, %s, %ds ago, v%s, real-time: %s", phase, int(age.Seconds()), hb.Version, hb.Realtime)
 		}
 		last := "never"
 		if hb != nil && hb.LastFull > 0 {

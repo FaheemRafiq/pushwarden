@@ -67,7 +67,8 @@ One-off scan of repositories and of this computer.
 threatscan scan [options] [directories]
 ```
 
-With no directories it scans the current working directory. Each directory is walked for git
+With no directories it scans the current working directory. In a terminal a progress bar shows
+which repository is being scanned; in CI or a pipe, numbered progress lines are printed instead. Each directory is walked for git
 repositories and for projects with a `package.json`, `go.mod` or `composer.json`. Every script,
 config, font, image and `.vscode/*.json` file in them is checked. Then the host is checked:
 running processes, network connections to known command-and-control (C2) addresses, persistence
@@ -120,7 +121,8 @@ threatscan status
 ```
 
 Shows whether the guard is alive and which real-time backend it uses (inotify, kqueue,
-ReadDirectoryChangesW, or polling), the service state, the installed binary, the time of the
+ReadDirectoryChangesW, or polling); during a sweep the Guard line reads `scanning 7/17 repositories
+(name)` and updates as it goes. Then the service state, the installed binary, the time of the
 last full sweep, how many repositories are tracked, the indicator version, the configured
 action policy, webhook and firewall state, the data directory, the summary of the latest report,
 and each VS Code-family editor with its `task.allowAutomaticTasks` setting. Always exits `0`.
@@ -514,6 +516,7 @@ Stored in `config.json` in the data directory. Change them with `threatscan conf
 | `prompt_timeout` | `180` | seconds a dialog waits before the default applies |
 | `notify_desktop` | `true` | desktop notifications |
 | `notify_min_severity` | `HIGH` | lowest severity that notifies |
+| `notify_sweeps` | `true` | desktop notification when a background full sweep starts and when it finishes, with the result |
 | `webhook_url` | `""` | receives a JSON POST per alert |
 | `webhook_min_severity` | `HIGH` | lowest severity that posts |
 | `block_c2` | `true` | keep the system-wide C2 block installed; `install` asks for administrator rights once and the guard reminds you daily while it is missing |

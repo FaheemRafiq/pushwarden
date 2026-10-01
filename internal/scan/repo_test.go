@@ -4,6 +4,7 @@ package scan
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -398,5 +399,19 @@ func TestPayloadCompanionsSkipAllowlistedRepos(t *testing.T) {
 	gitT(t, dir, "commit", "-q", "-m", "rules")
 	if fs := newRepo(t, dir).CheckPayloadCompanions(dir); len(fs) != 0 {
 		t.Fatalf("allowlisted repository flagged: %+v", fs[0])
+	}
+}
+
+func TestScanAllReportsProgress(t *testing.T) {
+	d := t.TempDir()
+	testfixtures.Build(d)
+	r := newRepo(t, d)
+	var steps []string
+	r.OnProgress = func(done, total int, cur string) {
+		steps = append(steps, fmt.Sprintf("%d/%d %s", done, total, filepath.Base(cur)))
+	}
+	_, total, _ := r.ScanAll(nil, nil)
+	if total != 2 || len(steps) != 3 || steps[0][:3] != "0/2" || steps[2] != "2/2 ." {
+		t.Fatalf("progress steps: %v (total %d)", steps, total)
 	}
 }

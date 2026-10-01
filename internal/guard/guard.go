@@ -73,9 +73,12 @@ type Guard struct {
 	backend   string
 	stopWatch func()
 	dialogs   chan *F
-	dialogWG  sync.WaitGroup
-	stop      chan struct{}
-	stopOnce  sync.Once
+	// sweep progress, guarded by mu
+	progDone, progTotal int
+	progCurrent         string
+	dialogWG            sync.WaitGroup
+	stop                chan struct{}
+	stopOnce            sync.Once
 }
 
 func New(p *platform.Info, dataDir, version string, once, dry, verbose bool) (*Guard, error) {
@@ -128,6 +131,10 @@ type Heartbeat struct {
 	Realtime string         `json:"realtime"`
 	Action   string         `json:"action"`
 	Stats    map[string]int `json:"last_full_stats,omitempty"`
+	// sweep progress (phase "full")
+	Done    int    `json:"done,omitempty"`
+	Total   int    `json:"total,omitempty"`
+	Current string `json:"current,omitempty"`
 }
 
 func (g *Guard) heartbeat(phase string, stats map[string]int) {
@@ -139,9 +146,24 @@ func (g *Guard) heartbeat(phase string, stats map[string]int) {
 	if !g.lastFull.IsZero() {
 		lf = float64(g.lastFull.Unix())
 	}
+	g.mu.Lock()
+	done, total, cur := g.progDone, g.progTotal, g.progCurrent
+	g.mu.Unlock()
+	if phase != "full" {
+		done, total, cur = 0, 0, ""
+	}
 	saveJSON(filepath.Join(g.stateDir, "heartbeat.json"), Heartbeat{TS: float64(time.Now().UnixNano()) / 1e9, PID: os.Getpid(),
 		Phase: phase, Version: g.Version, IOCs: g.I.Version, LastFull: lf, Repos: len(g.repos), Realtime: rt,
-		Action: g.Cfg.Action, Stats: stats})
+		Action: g.Cfg.Action, Stats: stats, Done: done, Total: total, Current: cur})
+}
+
+// progress records how far the sweep is and refreshes the heartbeat, so
+// `threatscan status` can show "7/17 repositories, scanning X".
+func (g *Guard) progress(done, total int, current string) {
+	g.mu.Lock()
+	g.progDone, g.progTotal, g.progCurrent = done, total, filepath.Base(current)
+	g.mu.Unlock()
+	g.heartbeat("full", nil)
 }
 
 // ReadHeartbeat is used by `threatscan status` and the updater.
@@ -392,6 +414,20 @@ func (g *Guard) QuickPass() {
 	g.Handle(fs, "guard-quick")
 }
 
+// sweepSummary is the one-line result shown when a sweep ends.
+func sweepSummary(repos int, st *findings.Stats, d time.Duration) string {
+	s := fmt.Sprintf("%d repositories in %s. ", repos, d.Round(time.Second))
+	switch {
+	case st.Critical > 0:
+		s += fmt.Sprintf("%d threat(s) handled, %d need review. Details: threatscan alerts", st.Critical, st.High)
+	case st.High > 0:
+		s += fmt.Sprintf("%d finding(s) need review: threatscan alerts", st.High)
+	default:
+		s += "Nothing found."
+	}
+	return s
+}
+
 // recentReport reports whether a full scan report younger than 15 minutes
 // exists, and how old it is.
 func (g *Guard) recentReport() (time.Duration, bool) {
@@ -444,6 +480,9 @@ func (g *Guard) sweepHeartbeat() func() {
 }
 
 func (g *Guard) FullPass() {
+	g.mu.Lock()
+	g.progDone, g.progTotal, g.progCurrent = 0, 0, ""
+	g.mu.Unlock()
 	g.heartbeat("full", nil)
 	stopHB := g.sweepHeartbeat()
 	defer stopHB()
@@ -452,10 +491,30 @@ func (g *Guard) FullPass() {
 	var repos []string
 	total, infected, files := 0, 0, 0
 	roots := g.roots()
+	// discover first so the start notification and the progress bar know the total
+	type target struct {
+		r      *scan.Repo
+		rp, pj []string
+	}
+	var targets []target
+	planned := 0
 	for _, root := range roots {
 		r := scan.NewRepo(root, g.UI, g.I)
 		r.JSAll, r.Deep, r.Exclude = g.Cfg.JSAll, g.Cfg.Deep, g.Cfg.Exclude
 		rp, pj := r.Discover()
+		targets = append(targets, target{r, rp, pj})
+		planned += len(rp) + len(pj)
+	}
+	if g.Cfg.NotifySweeps && !g.Once {
+		g.Notifier.Desktop("ThreatScan: full scan started",
+			fmt.Sprintf("%d repositories in %d folders. Progress: threatscan status", planned, len(roots)))
+	}
+	offset := 0
+	for _, t := range targets {
+		r, rp, pj := t.r, t.rp, t.pj
+		base := offset
+		r.OnProgress = func(done, _ int, current string) { g.progress(base+done, planned, current) }
+		offset += len(rp) + len(pj)
 		fs, t, inf := r.ScanAll(rp, pj)
 		all = append(all, fs...)
 		repos = append(append(repos, rp...), pj...)
@@ -475,6 +534,9 @@ func (g *Guard) FullPass() {
 		total, infected, st.Critical, st.High, st.ScanDuration))
 	stopHB()
 	g.heartbeat("idle", map[string]int{"repos": total, "infected": infected, "critical": st.Critical, "high": st.High})
+	if g.Cfg.NotifySweeps && !g.Once {
+		g.Notifier.Desktop("ThreatScan: full scan finished", sweepSummary(total, st, time.Since(start)))
+	}
 }
 
 func (g *Guard) lastIOCCheck() time.Time {

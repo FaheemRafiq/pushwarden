@@ -24,6 +24,7 @@ type Config struct {
 	Prompt             bool     `json:"prompt"`
 	PromptTimeout      int      `json:"prompt_timeout"`
 	NotifyDesktop      bool     `json:"notify_desktop"`
+	NotifySweeps       bool     `json:"notify_sweeps"` // desktop note when a full sweep starts and finishes
 	NotifyMinSeverity  string   `json:"notify_min_severity"`
 	WebhookURL         string   `json:"webhook_url"`
 	WebhookMinSeverity string   `json:"webhook_min_severity"`
@@ -43,7 +44,7 @@ func Default() *Config {
 		ScanRoots: []string{}, Exclude: []string{}, JSAll: true,
 		QuickInterval: 5, FullInterval: 6 * 3600, IOCUpdateInterval: 24 * 3600,
 		Realtime: true, Action: "quarantine", AutoKill: true, AutoClean: true,
-		Prompt: true, PromptTimeout: 180, NotifyDesktop: true, NotifyMinSeverity: "HIGH",
+		Prompt: true, PromptTimeout: 180, NotifyDesktop: true, NotifySweeps: true, NotifyMinSeverity: "HIGH",
 		WebhookMinSeverity: "HIGH", BlockC2: true, IOCUpdate: true, ReportKeep: 60,
 		AutoUpdate: true, UpdateChannel: "stable", UpdateInterval: 6 * 3600,
 	}

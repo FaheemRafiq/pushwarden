@@ -43,6 +43,8 @@ type Repo struct {
 	Verbose      bool
 	Exclude      []string
 	FilesChecked int
+	// OnProgress is called before each repository is scanned (guard heartbeat).
+	OnProgress func(done, total int, current string)
 }
 
 func NewRepo(root string, u *ui.UI, i *iocs.IOCs) *Repo {
@@ -945,7 +947,9 @@ func (r *Repo) ScanFile(fp string) []*F {
 }
 
 func (r *Repo) ScanRepo(repo string, isGit bool) []*F {
-	r.UI.Progress("Scanning " + repo)
+	if !r.UI.Live() {
+		r.UI.Progress("Scanning " + repo)
+	}
 	var f []*F
 	done := map[string]bool{}
 	for _, n := range r.I.ConfigFiles {
@@ -1013,8 +1017,14 @@ func (r *Repo) ScanAll(repos, projects []string) ([]*F, int, int) {
 	r.UI.Progress(fmt.Sprintf("Found %d git repos + %d non-git projects", len(repos), len(projects)))
 	var all []*F
 	infected := 0
+	done := 0
 	scan := func(p string, isGit bool) {
+		if r.OnProgress != nil {
+			r.OnProgress(done, total, p)
+		}
+		r.UI.Step(done, total, filepath.Base(p))
 		rf := r.ScanRepo(p, isGit)
+		done++
 		switch {
 		case findings.AnyAtLeast(rf, high):
 			infected++
@@ -1037,6 +1047,10 @@ func (r *Repo) ScanAll(repos, projects []string) ([]*F, int, int) {
 	}
 	for _, p := range projects {
 		scan(p, false)
+	}
+	r.UI.Step(total, total, "done")
+	if r.OnProgress != nil {
+		r.OnProgress(total, total, "")
 	}
 	return all, total, infected
 }

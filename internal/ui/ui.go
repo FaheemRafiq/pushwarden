@@ -11,6 +11,7 @@ import (
 
 type UI struct {
 	CI, Quiet, color bool
+	barLive          bool // a progress bar occupies the current line
 }
 
 func New(ci, quiet bool) *UI {
@@ -31,10 +32,45 @@ func (u *UI) C(color, s string) string {
 }
 
 func (u *UI) P(format string, a ...any) {
-	if !u.Quiet {
-		fmt.Printf(format+"\n", a...)
+	if u.Quiet {
+		return
+	}
+	if u.barLive { // clear the bar before printing a line, redraw on the next Step
+		fmt.Print("\r\033[K")
+		u.barLive = false
+	}
+	fmt.Printf(format+"\n", a...)
+}
+
+// Step reports progress through a list: an in-place bar on a terminal, a
+// numbered line otherwise. done == total ends the bar.
+func (u *UI) Step(done, total int, label string) {
+	if u.Quiet || total <= 0 {
+		return
+	}
+	if !u.color { // CI, pipes, NO_COLOR
+		if !u.CI || done == total {
+			u.P("  > [%d/%d] %s", done, total, label)
+		}
+		return
+	}
+	width := 24
+	filled := done * width / total
+	bar := strings.Repeat("#", filled) + strings.Repeat("-", width-filled)
+	if len(label) > 50 {
+		label = "..." + label[len(label)-47:]
+	}
+	fmt.Printf("\r\033[K  [%s] %d/%d  %s", u.C("BOLD_GREEN", bar), done, total, u.C("DIM", label))
+	u.barLive = true
+	if done >= total {
+		fmt.Println()
+		u.barLive = false
 	}
 }
+
+// Live reports whether a progress bar is being drawn (callers skip their
+// own per-item progress lines then).
+func (u *UI) Live() bool { return u.barLive }
 
 func (u *UI) Banner(version, iocVersion string) {
 	line := strings.Repeat("=", 70)
