@@ -16,7 +16,7 @@ one-liner and a description of the threat, see the [README](../README.md).
 - [Conventions](#conventions)
 - [Quick start](#quick-start)
 - [Commands](#commands)
-  - [scan](#scan) · [status](#status) · [history and restore](#history-and-restore) · [alerts](#alerts)
+  - [scan](#scan) · [status](#status) · [history and restore](#history-and-restore) · [alerts](#alerts) · [feedback](#feedback)
   - [github-clean](#github-clean)
   - [guard](#guard) · [install](#install) · [uninstall](#uninstall)
   - [update](#update) · [update-iocs](#update-iocs)
@@ -129,31 +129,52 @@ and each VS Code-family editor with its `task.allowAutomaticTasks` setting. Alwa
 
 ### history and restore
 
-Protection history: everything the guard or `scan --fix` ever quarantined, stripped, killed or
-removed, newest last.
+Everything ThreatScan has seen and done on this machine: every detection, every kill, quarantine and
+strip, every answer you gave in a dialog, every error.
 
 ```
-threatscan history [--limit N]
+threatscan history [filters] [--all] [--details] [--json]
 threatscan history --restore PATH
-threatscan history --allow PATH
+threatscan history --allow PATH [--note "what it really is"]
 threatscan history --remove PATH
 threatscan restore PATH            # same as history --restore PATH
 ```
 
+**The default view** has two parts. *Detections* lists each distinct finding once, with when it
+was last seen, how many times (`14x`), and where it stands: `handled`, `open`, `allowed`, `dry-run`
+or `FAILED`. *Actions and decisions* lists what was done, in order, with the reason.
+
 | Option | Effect |
 |---|---|
-| `--limit N` | number of entries to show (default 50) |
-| `--details` | also print the evidence behind each entry and, for kills, the command line |
-| `--json` | print the raw entries as JSON |
+| `--all` | every recorded event in time order, nothing collapsed: each sighting, sweep, update and error |
+| `--details` | also the exact matched text, the evidence, the command line and which version recorded it |
+| `--severity LEVEL` | only findings at `warning`, `high` or `critical` and above |
+| `--kind KIND` | only this kind of event: `finding`, `action`, `decision`, `sweep`, `guard`, `update`, `error`, `feedback`. Repeatable |
+| `--since WHEN` | only newer events: `30m`, `24h`, `7d`, `2w`, or a date such as `2026-10-01` |
+| `--path TEXT` | only events whose path, title or command line contains the text |
+| `--archive` | also read the rotated journal archives |
+| `--limit N` | number of rows per part (default 50) |
+| `--json` | the raw events as JSON |
 | `--restore PATH` | put the original file back at `PATH`. It is still malicious and will be flagged again |
-| `--allow PATH` | restore and stop flagging this exact file content. The decision is remembered for 30 days and only for this content hash. Use it for a false positive |
+| `--allow PATH` | restore and stop flagging this exact file content, remembered for 30 days. With `--note` the reason is recorded as feedback |
 | `--remove PATH` | delete the quarantined copies permanently |
 
-`PATH` is the original location as shown by `threatscan history`.
+`PATH` is the original location as shown in the list.
 
-Every entry carries a `why:` line: the reason for the response, for example that a process was
-killed because its command line held a strict PolinRider marker, or that a file was quarantined
-whole because the payload was woven into it rather than appended.
+**Where it comes from.** The journal, `journal.jsonl` in the data directory, records every sighting
+of every finding at WARNING or above, with no deduplication, plus every action, decision, sweep,
+update and error. It is never pruned: at 10 MB it is rolled into a gzip archive beside it and a new
+file starts. Turn it off with `threatscan config --set journal=false`; history then shows only the
+actions kept in the quarantine index.
+
+Examples:
+
+```sh
+threatscan history --severity critical --since 7d     # what was serious this week
+threatscan history --all --kind sweep                 # every sweep with duration and counts
+threatscan history --kind error                       # anything ThreatScan itself got wrong
+threatscan history --all --path A-Bot-Ledger --details
+```
 
 ### alerts
 
@@ -258,6 +279,43 @@ threatscan github-clean --owner my-org --branch main --branch 'release/*' --appl
 GITHUB_TOKEN=... threatscan github-clean --ci --apply --json clean.json
 op read op://Vault/GitHub/token | threatscan github-clean --token-stdin --apply
 ```
+
+### feedback
+
+Package this machine's activity so whoever maintains ThreatScan for your team can analyse it, or
+report that a finding was wrong.
+
+```
+threatscan feedback [--days N] [--out FILE] [--no-redact]
+threatscan feedback --false-positive PATH [--note "what it really is"]
+threatscan feedback --digest
+```
+
+| Option | Effect |
+|---|---|
+| (none) | write `threatscan-feedback-DATE.zip` in the current folder: the journal for the last 14 days, the tail of the guard log, the latest report, the configuration and a status summary |
+| `--days N` | how many days of activity to include |
+| `--out FILE` | where to write the bundle |
+| `--no-redact` | keep paths, user and host names. Token-shaped strings are masked regardless |
+| `--false-positive PATH` | record that the finding on `PATH` was wrong, with an optional `--note`. Does not change the file; `history --allow` does that |
+| `--digest` | print the daily digest that `feedback_url` would receive |
+
+**Nothing is uploaded by this command.** It writes a file and tells you what is in it, so you can
+look before you send it.
+
+**Redaction, on by default.** The home folder is written as `~`, the user name and host name are
+removed, and anything shaped like a secret is masked: GitHub, AWS, Slack and API tokens, private
+keys, credentials inside URLs, and the values of `token`, `password`, `api_key`, `webhook_url` and
+similar keys.
+
+**The optional daily digest.** Off unless `feedback_url` is set, for example by the team lead at
+install time with `THREATSCAN_FEEDBACK_URL`. Once a day the guard then posts a summary to that
+URL (a Slack or Discord webhook works). It contains a random machine id, the version, the OS and
+counts: findings per severity and category, actions taken and failed, dialog answers, sweep
+durations, errors, and the notes written with false-positive reports. It never contains file
+contents, command lines or paths; a false-positive report carries the file's base name only. The
+host name is included only with `feedback_identify=true`. `threatscan feedback --digest` shows
+exactly what would be sent.
 
 ### guard
 
@@ -521,6 +579,10 @@ Stored in `config.json` in the data directory. Change them with `threatscan conf
 | `webhook_min_severity` | `HIGH` | lowest severity that posts |
 | `block_c2` | `true` | keep the system-wide C2 block installed; `install` asks for administrator rights once and the guard reminds you daily while it is missing |
 | `report_keep` | `60` | number of reports kept |
+| `journal` | `true` | record every finding, action, decision, sweep and error in `journal.jsonl` |
+| `journal_min_severity` | `WARNING` | lowest finding severity recorded in the journal |
+| `feedback_url` | `""` | opt-in: the guard posts a daily digest of counts here (no paths, no command lines) |
+| `feedback_identify` | `false` | include the host name in the digest instead of only a random machine id |
 | `auto_update` | `true` | update the binary automatically |
 | `update_channel` | `stable` | `stable` or `beta` |
 | `update_interval` | `21600` | seconds between update checks |
@@ -543,7 +605,9 @@ The data directory is `~/.threatscan` (override with `THREATSCAN_HOME`).
 |---|---|
 | `config.json` | settings |
 | `iocs.json` | downloaded indicators; the binary carries an embedded copy as fallback |
-| `guard.log` | the guard's log |
+| `journal.jsonl` | the complete activity record: every finding at every sighting, every action, decision, sweep, update and error. Rotated at 10 MB into `journal-DATE.jsonl.gz`; archives are never deleted |
+| `guard.log` | the guard's text log, rotated at 5 MB into `guard-DATE.log.gz` |
+| `machine-id` | a random identifier used only in the optional feedback digest |
 | `alerts.log` | one JSON line per alert, including the `why` and `response` texts as worded at the time |
 | `reports/` | timestamped JSON reports plus `latest.json` |
 | `quarantine/` | copies of every stripped or deleted file, and `index.jsonl`, the protection history |
@@ -571,6 +635,7 @@ with a link in `~/.local/bin` (override with `THREATSCAN_INSTALL_DIR`).
 | `THREATSCAN_NO_BLOCK` | `install`, `protect`, `uninstall` | never ask for administrator rights (package installers, CI) |
 | `THREATSCAN_ROOTS` | install script | space-separated project directories to watch |
 | `THREATSCAN_WEBHOOK` | install script | webhook URL |
+| `THREATSCAN_FEEDBACK_URL` | install script | opt in to the daily digest, see [feedback](#feedback) |
 | `THREATSCAN_VERSION` | install script | install this release instead of the latest |
 | `THREATSCAN_NO_INSTALL` | install script | download the binary only, do not register the guard |
 | `THREATSCAN_BASE_URL` | install script | download from a mirror |

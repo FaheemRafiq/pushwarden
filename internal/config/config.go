@@ -32,6 +32,8 @@ type Config struct {
 	IOCUpdate          bool     `json:"ioc_update"`
 	IOCUpdateURL       string   `json:"ioc_update_url"`
 	ReportKeep         int      `json:"report_keep"`
+	FeedbackURL        string   `json:"feedback_url"`         // opt-in: daily anonymised digest is POSTed here
+	FeedbackIdentify   bool     `json:"feedback_identify"`    // include the hostname in the digest
 	Journal            bool     `json:"journal"`              // record every finding, action and decision in journal.jsonl
 	JournalMinSeverity string   `json:"journal_min_severity"` // lowest finding severity recorded
 	// program self-update (Go build)

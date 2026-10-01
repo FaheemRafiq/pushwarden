@@ -44,6 +44,7 @@ func cmdInstall(args []string) int {
 	var roots stringList
 	fs.Var(&roots, "roots", "project `DIR` to watch (repeatable; default: auto-discover)")
 	webhook := fs.String("webhook", "", "`URL` that receives JSON alerts (Slack/Discord/Teams/custom)")
+	feedbackURL := fs.String("feedback-url", "", "opt in: `URL` that receives a daily anonymised digest (counts only, no paths)")
 	noKill := fs.Bool("no-kill", false, "never kill processes automatically")
 	noClean := fs.Bool("no-clean", false, "when no dialog can be shown, leave files in place instead of quarantining")
 	noPrompt := fs.Bool("no-prompt", false, "never show dialogs; rely on auto-clean (quarantine) only")
@@ -75,6 +76,9 @@ func cmdInstall(args []string) int {
 	fs.Visit(func(f *flag.Flag) {
 		if f.Name == "webhook" {
 			c.Cfg.WebhookURL, changed = *webhook, true
+		}
+		if f.Name == "feedback-url" {
+			c.Cfg.FeedbackURL, changed = *feedbackURL, true
 		}
 	})
 	if *noKill {

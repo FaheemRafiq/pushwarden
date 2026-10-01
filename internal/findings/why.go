@@ -8,31 +8,36 @@ import (
 
 var quoted = regexp.MustCompile(`"((?:[^"\\]|\\.)*)"`)
 
+// concrete evidence lines carry the exact matched text in quotes
+var concrete = []string{"literal signature ", "campaign marker ", "payload XOR key ", "strict kill marker ", "stage-1 hook ", "command line contains "}
+
 // Because returns the concrete trigger of a finding: the matched text when the
-// scanner recorded it, otherwise the quoted part of the first evidence line,
-// otherwise the first evidence line itself. Empty when there is none.
+// scanner recorded it, otherwise the quoted match of the first evidence line
+// that names one (signature, marker, key, hook), otherwise the first evidence
+// line as written. Empty when there is none.
 func Because(f *Finding) string {
 	if f.Meta.Matched != "" {
 		return f.Meta.Matched
 	}
-	if len(f.Meta.Evidence) == 0 {
-		return ""
-	}
-	e := f.Meta.Evidence[0]
-	if m := quoted.FindStringSubmatch(e); m != nil {
-		s, err := strconvUnquote(m[0])
-		if err == nil {
-			return s
+	for _, e := range f.Meta.Evidence {
+		for _, p := range concrete {
+			if strings.HasPrefix(e, p) {
+				if m := quoted.FindStringSubmatch(e); m != nil {
+					return unquote(m[1])
+				}
+			}
 		}
-		return m[1]
 	}
-	return e
+	if len(f.Meta.Evidence) > 0 {
+		return f.Meta.Evidence[0]
+	}
+	return ""
 }
 
-func strconvUnquote(s string) (string, error) {
+func unquote(s string) string {
 	var out strings.Builder
 	esc := false
-	for _, r := range strings.Trim(s, `"`) {
+	for _, r := range s {
 		switch {
 		case esc:
 			esc = false
@@ -50,7 +55,17 @@ func strconvUnquote(s string) (string, error) {
 			out.WriteRune(r)
 		}
 	}
-	return out.String(), nil
+	return out.String()
+}
+
+// show quotes a trigger for a sentence; text that already contains quotes is
+// left as it is rather than escaped.
+func show(s string, n int) string {
+	s = short(s, n)
+	if strings.Contains(s, `"`) {
+		return s
+	}
+	return `"` + s + `"`
 }
 
 func short(s string, n int) string {
@@ -120,7 +135,7 @@ func Why(f *Finding) string {
 		s += " " + strings.TrimSuffix(bySeverity[f.Severity], ".") + "."
 	}
 	if b := Because(f); b != "" {
-		s += fmt.Sprintf(" Found: %q.", short(b, 80))
+		s += " Found: " + show(b, 100) + "."
 	}
 	return s
 }
@@ -141,15 +156,15 @@ func WhyAction(f *Finding) string {
 	b := Because(f)
 	found := ""
 	if b != "" {
-		found = fmt.Sprintf(" It contains %q.", short(b, 80))
+		found = " Evidence: " + show(b, 100) + "."
 	}
 	switch f.Category {
 	case "malicious_process":
 		if f.Meta.Kill {
-			return past(fmt.Sprintf("Killed: its command line contains %q, a marker that only the PolinRider payload uses.", short(b, 80)),
-				fmt.Sprintf("Would kill: its command line contains %q, a marker that only the PolinRider payload uses.", short(b, 80)))
+			return past("Killed: its command line contains "+show(b, 80)+", a marker that only the PolinRider payload uses.",
+				"Would kill: its command line contains "+show(b, 80)+", a marker that only the PolinRider payload uses.")
 		}
-		return fmt.Sprintf("Not killed automatically: its command line contains %q, which matches a broad PolinRider indicator that legitimate tools can also produce; review it.", short(b, 80))
+		return "Not killed automatically: its command line contains " + show(b, 80) + ", which matches a broad PolinRider indicator that legitimate tools can also produce; review it."
 	case "c2_connection":
 		if f.Meta.PID <= 0 {
 			return fmt.Sprintf("Not killed: the process talking to %s is unknown. Block the address with: threatscan protect", f.Meta.IP)
@@ -175,8 +190,8 @@ func WhyAction(f *Finding) string {
 		if f.Meta.Cut > 0 {
 			at = fmt.Sprintf(" at byte %d", f.Meta.Cut)
 		}
-		return past(fmt.Sprintf("Payload stripped: %q was appended after the legitimate code%s, so only that tail was removed; original kept.", short(b, 80), at),
-			fmt.Sprintf("Would strip the payload %q appended after the legitimate code and keep the original in quarantine.", short(b, 80)))
+		return past("Payload stripped: "+show(b, 80)+" was appended after the legitimate code"+at+", so only that tail was removed; original kept.",
+			"Would strip the payload "+show(b, 80)+" appended after the legitimate code and keep the original in quarantine.")
 	case strings.HasPrefix(f.Category, "persistence_") || f.Category == "rat_footprint" || f.Category == "stage4_runtime":
 		return past("Start-up entry disabled and quarantined so the malware no longer relaunches at sign-in."+found,
 			"Would disable the start-up entry and quarantine it."+found)

@@ -380,7 +380,7 @@ func (r *Repo) CheckPropagation(repo string) []*F {
 			Title: ".gitignore hides PolinRider files: " + strings.Join(all, ", "), Path: gi,
 			Details:     "PolinRider adds its orchestrator and artefacts to .gitignore so they never show in git status.",
 			Remediation: "Remove these entries from " + gi + ", then run: git status --ignored",
-			Meta:        findings.Meta{Cleanable: true, StripLines: all, Evidence: ev}})
+			Meta:        findings.Meta{Cleanable: true, StripLines: all, Evidence: ev, Matched: strings.Join(all, ", ")}})
 		return out
 	}
 	for _, name := range weak {

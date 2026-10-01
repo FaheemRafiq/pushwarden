@@ -7,10 +7,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/FaheemRafiq/threatscan/internal/findings"
 	"github.com/FaheemRafiq/threatscan/internal/harden"
 	"github.com/FaheemRafiq/threatscan/internal/iocs"
+	"github.com/FaheemRafiq/threatscan/internal/journal"
 	"github.com/FaheemRafiq/threatscan/internal/platform"
 	"github.com/FaheemRafiq/threatscan/internal/prompt"
 	"github.com/FaheemRafiq/threatscan/internal/protect"
@@ -28,13 +30,21 @@ func init() {
 }
 
 func cmdHistory(args []string) int {
-	fs := newFlags("history", "[--restore PATH | --allow PATH | --remove PATH]")
+	fs := newFlags("history", "[filters] [--all] [--details] | --restore PATH | --allow PATH [--note TEXT] | --remove PATH")
 	restore := fs.String("restore", "", "put the original back (it is still malicious)")
 	allow := fs.String("allow", "", "restore and stop flagging this exact file content")
 	remove := fs.String("remove", "", "delete the quarantined copies permanently")
 	limit := fs.Int("limit", 50, "number of entries to show")
 	details := fs.Bool("details", false, "show the evidence behind each entry")
 	asJSON := fs.Bool("json", false, "print the raw entries as JSON")
+	all := fs.Bool("all", false, "every recorded event in time order, nothing collapsed")
+	sev := fs.String("severity", "", "only findings at this `LEVEL` or above (warning, high, critical)")
+	var kinds stringList
+	fs.Var(&kinds, "kind", "only this `KIND`: finding, action, decision, sweep, guard, update, error, feedback (repeatable)")
+	since := fs.String("since", "", "only events newer than `WHEN`: 30m, 24h, 7d, 2w or a date")
+	pathSub := fs.String("path", "", "only events whose path, title or command contains `TEXT`")
+	archive := fs.Bool("archive", false, "also read the rotated journal archives")
+	note := fs.String("note", "", "with --allow: why this is a false positive (recorded as feedback)")
 	if _, err := parseInterspersed(fs, args); err != nil {
 		return 2
 	}
@@ -57,6 +67,7 @@ func cmdHistory(args []string) int {
 			return 1
 		}
 		pr.Remember(*allow, "allowed by user", prompt.Keep)
+		jr.Write(journal.Event{Ctx: "cli", Kind: journal.KindFeedback, Title: "marked as a false positive", Path: *allow, Note: *note})
 		u.OK("Restored and allowed " + *allow + " (this exact content will not be flagged again for 30 days)")
 		return 0
 	case *remove != "":
@@ -68,6 +79,35 @@ func cmdHistory(args []string) int {
 		u.OK(fmt.Sprintf("Removed %d quarantined cop%s of %s", n, map[bool]string{true: "y", false: "ies"}[n == 1], *remove))
 		return 0
 	}
+	if journal.Exists(c.DataDir) {
+		f := journal.Filter{Kinds: kinds, PathSubstr: *pathSub, Archives: *archive}
+		if *sev != "" {
+			f.MinSeverity = findings.ParseSeverity(strings.ToUpper(*sev))
+			if len(f.Kinds) == 0 {
+				f.Kinds = []string{journal.KindFinding}
+			}
+		}
+		t, err := parseSince(*since, time.Now())
+		if err != nil {
+			u.Err(err.Error())
+			return 2
+		}
+		f.Since = t
+		evs := journal.Read(c.DataDir, f)
+		switch {
+		case *asJSON:
+			b, _ := json.MarshalIndent(tail(evs, *limit), "", "  ")
+			fmt.Println(string(b))
+		case len(evs) == 0:
+			u.Info("Nothing recorded for this selection.")
+		case *all || len(kinds) > 0:
+			fmt.Print(formatJournalAll(evs, *limit, *details))
+		default:
+			fmt.Print(formatJournal(evs, *limit, *details))
+		}
+		return 0
+	}
+	// no journal on this machine (disabled, or nothing recorded yet): the action history
 	es := pr.Entries()
 	if len(es) > *limit {
 		es = es[len(es)-*limit:]

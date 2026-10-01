@@ -93,6 +93,8 @@ threatscan scan --home --fix      # act without asking (quarantine / strip, reve
 threatscan scan --deep ~/proj     # also descend into node_modules / vendor
 threatscan history                # protection history (restore / allow / remove), with the reason for each action
 threatscan alerts                 # recent alerts and why each one fired
+threatscan history --all --since 7d   # everything it saw and did this week, nothing collapsed
+threatscan feedback               # zip this machine's activity (redacted) to send for analysis
 threatscan update-iocs            # pull the latest indicator file
 threatscan protect --status       # is the C2 firewall block active and persistent?
 threatscan uninstall [--unblock] [--purge]

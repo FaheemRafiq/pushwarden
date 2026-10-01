@@ -9,6 +9,7 @@
 #   THREATSCAN_VERSION=v0.2.0-rc1   install this release instead of the latest
 #   THREATSCAN_BASE_URL=URL         download assets from URL (a directory; file:// works)
 #   THREATSCAN_WEBHOOK=URL          alert webhook to configure
+#   THREATSCAN_FEEDBACK_URL=URL     opt in to a daily anonymised digest (counts only, no paths)
 #   THREATSCAN_ROOTS="~/code ~/src" project dirs to watch (default: auto-discover)
 #   THREATSCAN_NO_INSTALL=1         only put the program in place; do not start the guard
 #   THREATSCAN_NO_BLOCK=1           do not ask for administrator rights to block the C2 servers
@@ -83,6 +84,7 @@ fi
 
 set --
 [ -n "${THREATSCAN_WEBHOOK:-}" ] && set -- "$@" --webhook "$THREATSCAN_WEBHOOK"
+[ -n "${THREATSCAN_FEEDBACK_URL:-}" ] && set -- "$@" --feedback-url "$THREATSCAN_FEEDBACK_URL"
 for r in ${THREATSCAN_ROOTS:-}; do set -- "$@" --roots "$r"; done
 "$tmp/$asset" install --unattended "$@"
 say "Done.  Try:  threatscan status   (open a new terminal if the command is not found)"
