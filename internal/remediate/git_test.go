@@ -177,15 +177,13 @@ func TestBranchFilterAndPushFailure(t *testing.T) {
 	if len(res.Branches) != 1 || res.Branches[0].Name != "feature" {
 		t.Fatalf("filter: %+v", res.Branches)
 	}
-	// make the remote reject pushes
-	sh(t, origin, "config", "receive.denyCurrentBranch", "ignore")
-	if err := os.Chmod(filepath.Join(origin, "refs", "heads"), 0o555); err != nil {
-		t.Skip("chmod not supported")
+	// make the remote reject the update of main: a stale lock file on the ref
+	// (works on every OS and as root, unlike chmod)
+	lock := filepath.Join(origin, "refs", "heads", "main.lock")
+	if err := os.WriteFile(lock, []byte("0000000000000000000000000000000000000000\n"), 0o644); err != nil {
+		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Chmod(filepath.Join(origin, "refs", "heads"), 0o755) })
-	if os.Getuid() == 0 {
-		t.Skip("root ignores permissions")
-	}
+	t.Cleanup(func() { os.Remove(lock) })
 	m2 := newRemediator(t, true)
 	m2.Opts.Branches = []string{"main"}
 	res = m2.Run(context.Background(), "acme/app", origin, "main")

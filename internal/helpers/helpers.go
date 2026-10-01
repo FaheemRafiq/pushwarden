@@ -84,15 +84,27 @@ func IsUnder(path string, roots []string) bool {
 	return false
 }
 
+// clean makes p absolute and resolves symlinks (and Windows short names) on
+// the longest prefix that exists, so a path that does not exist yet still
+// compares equal to its resolved root (/var/x vs /private/var/x on macOS).
 func clean(p string) string {
 	a, err := filepath.Abs(p)
 	if err != nil {
 		a = p
 	}
-	if r, err := filepath.EvalSymlinks(a); err == nil {
-		a = r
+	a = filepath.Clean(a)
+	rest := ""
+	for cur := a; ; {
+		if r, err := filepath.EvalSymlinks(cur); err == nil {
+			return filepath.Clean(filepath.Join(r, rest))
+		}
+		parent, base := filepath.Dir(cur), filepath.Base(cur)
+		if parent == cur || base == "" {
+			return a
+		}
+		rest = filepath.Join(base, rest)
+		cur = parent
 	}
-	return filepath.Clean(a)
 }
 
 func expand(p string) string {

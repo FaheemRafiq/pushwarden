@@ -42,7 +42,9 @@ func fakeBins(t *testing.T) (old, good, broken string) {
 			{"good", "-X main.version=0.2.0"},
 			{"broken", "-X main.version=0.2.0 -X main.broken=1"},
 		} {
-			out, err := exec.Command(goBin, "build", "-o", filepath.Join(binDir, b.name+exeSuffix()),
+			// -buildvcs=false: CI containers run as root over a checkout owned by
+			// another user, and git then refuses to report the VCS status.
+			out, err := exec.Command(goBin, "build", "-buildvcs=false", "-o", filepath.Join(binDir, b.name+exeSuffix()),
 				"-ldflags", b.ldflags, "./testdata/fakebin").CombinedOutput()
 			if err != nil {
 				buildErr = fmt.Errorf("build %s: %v\n%s", b.name, err, out)

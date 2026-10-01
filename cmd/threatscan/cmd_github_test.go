@@ -55,7 +55,7 @@ func TestGitUsesBinaryAsAskpass(t *testing.T) {
 		t.Skip("git missing")
 	}
 	bin := filepath.Join(t.TempDir(), "threatscan")
-	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
+	if out, err := exec.Command("go", "build", "-buildvcs=false", "-o", bin, ".").CombinedOutput(); err != nil {
 		t.Skipf("cannot build binary: %v\n%s", err, out)
 	}
 	cmd := exec.Command("git", "-c", "credential.helper=", "credential", "fill")

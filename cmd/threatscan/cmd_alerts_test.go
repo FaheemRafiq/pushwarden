@@ -8,6 +8,7 @@ import (
 
 	"github.com/FaheemRafiq/threatscan/internal/findings"
 	"github.com/FaheemRafiq/threatscan/internal/notify"
+	"github.com/FaheemRafiq/threatscan/internal/platform"
 	"github.com/FaheemRafiq/threatscan/internal/protect"
 )
 
@@ -68,9 +69,12 @@ func TestProtectDryRunAndStatusNeedNoRoot(t *testing.T) {
 	if rc := run([]string{"protect", "--status"}); rc != 0 {
 		t.Fatal("status", rc)
 	}
-	// without root and with elevation disabled, --install explains and exits 2
-	if rc := run([]string{"protect", "--install"}); rc != 2 && os.Getuid() != 0 {
-		t.Fatal("install without root", rc)
+	// without admin rights and with elevation disabled, --install explains and exits 2.
+	// (Never run it as admin here: CI's Windows runner is one, and it would really install.)
+	if !platform.IsAdmin() {
+		if rc := run([]string{"protect", "--install"}); rc != 2 {
+			t.Fatal("install without root", rc)
+		}
 	}
 	if rc := run([]string{"install", "--dry-run"}); rc != 0 {
 		t.Fatal("install dry-run", rc)

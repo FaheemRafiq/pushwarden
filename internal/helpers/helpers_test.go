@@ -82,3 +82,27 @@ func TestEvidenceAndAllowlist(t *testing.T) {
 		t.Fatal("IsUnder boundary")
 	}
 }
+
+// A root reached through a symlink (macOS /var -> /private/var, Windows 8.3
+// names) must still contain a child that does not exist yet.
+func TestIsUnderResolvesPrefixOfMissingPath(t *testing.T) {
+	base := t.TempDir()
+	real := filepath.Join(base, "real")
+	if err := os.MkdirAll(filepath.Join(real, "third_party"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(base, "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skip("symlinks not supported here")
+	}
+	root := filepath.Join(link, "third_party")
+	if !IsUnder(filepath.Join(link, "third_party", "new", "file.js"), []string{root}) {
+		t.Fatal("missing child under a symlinked root not recognised")
+	}
+	if !IsUnder(filepath.Join(real, "third_party", "x"), []string{root}) {
+		t.Fatal("resolved path vs symlinked root")
+	}
+	if IsUnder(filepath.Join(link, "third_party-tools", "x"), []string{root}) {
+		t.Fatal("not component-aware")
+	}
+}
