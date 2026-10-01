@@ -60,6 +60,8 @@ jobs:
       - name: Install system packages
         run: dnf install -y -q git gcc tar gzip
       - uses: actions/checkout@v4
+      - name: Trust the checkout (the container runs as root over a runner-owned tree)
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24.13"
