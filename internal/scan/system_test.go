@@ -103,3 +103,33 @@ func TestProcessAndC2FindingsCarryEvidence(t *testing.T) {
 		t.Fatalf("%+v", c)
 	}
 }
+
+// The exact command the guard killed on 2026-09-29: its own history check.
+const ownGitLog = `git -C /home/faheem/Coding/erstech/bot/A-Bot-backend log --all -n 1000 --text -E -G global(\.i|\[.i.\]) ?= ?.A[0-9]+-\*?[0-9]+|global\[.(!|_V).\] ?= ?.A?[0-9a-z]+-|_\$_1e42|Cot%3t=shtP|rmcej%otb% --format=%h|%ad|%s --date=short`
+
+func TestOwnGitChildrenAndSearchPatternsAreNotFlagged(t *testing.T) {
+	s := &System{P: platform.New(), UI: ui.New(true, true), I: testIOCs(t)}
+	if re, _ := s.matchProcess("git", ownGitLog); re != nil {
+		t.Fatalf("git search pattern flagged via %s", re)
+	}
+	for _, c := range []string{`git log --grep=Cot%3t=shtP`, `git log -S"global['_V']='8-st17'" --oneline`, `git log -Gglobal\['!'\] -p`} {
+		if re, _ := s.matchProcess("git", c); re != nil {
+			t.Errorf("%q flagged via %s", c, re)
+		}
+	}
+	// a real loader run through git (git -c alias / hook) is still caught
+	if re, _ := s.matchProcess("git", `git -c core.fsmonitor="node /tmp/.x/fa-solid-900.woff2" status`); re == nil {
+		t.Error("fsmonitor loader through git must still match")
+	}
+	procs := []platform.Proc{
+		{PID: 1, PPID: 0, Name: "systemd", Cmd: "/sbin/init"},
+		{PID: 100, PPID: 1, Name: "threatscan", Cmd: "/home/x/.local/share/threatscan/threatscan guard"},
+		{PID: 200, PPID: 100, Name: "git", Cmd: ownGitLog},
+		{PID: 201, PPID: 200, Name: "git", Cmd: "git pack-objects"},
+		{PID: 300, PPID: 1, Name: "node", Cmd: "node -e \"global['_V']='8-st17'\""},
+	}
+	own := ownProcessTree(procs, 999)
+	if !own[999] || !own[100] || !own[200] || !own[201] || own[300] || own[1] {
+		t.Fatalf("own tree: %v", own)
+	}
+}

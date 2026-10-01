@@ -262,6 +262,7 @@ func (p *Info) RunInput(timeout time.Duration, input string, name string, args .
 
 type Proc struct {
 	PID  int
+	PPID int
 	Name string
 	Cmd  string
 }
@@ -278,7 +279,8 @@ func (p *Info) Processes() []Proc {
 			continue
 		}
 		name, _ := pr.Name()
-		out = append(out, Proc{PID: int(pr.Pid), Name: name, Cmd: cmd})
+		ppid, _ := pr.Ppid()
+		out = append(out, Proc{PID: int(pr.Pid), PPID: int(ppid), Name: name, Cmd: cmd})
 	}
 	return out
 }

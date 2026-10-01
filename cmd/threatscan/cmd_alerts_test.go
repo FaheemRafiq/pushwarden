@@ -76,7 +76,8 @@ func TestProtectDryRunAndStatusNeedNoRoot(t *testing.T) {
 			t.Fatal("install without root", rc)
 		}
 	}
-	if rc := run([]string{"install", "--dry-run"}); rc != 0 {
+	// --roots keeps the dry-run's report-only first scan away from the real home folder
+	if rc := run([]string{"install", "--dry-run", "--no-harden", "--roots", t.TempDir()}); rc != 0 {
 		t.Fatal("install dry-run", rc)
 	}
 	if ents, _ := os.ReadDir(os.Getenv("THREATSCAN_SYSTEM_DIR")); len(ents) != 0 {

@@ -29,9 +29,11 @@ var ownTools = map[string]bool{"zenity": true, "yad": true, "kdialog": true, "xm
 func (s *System) CheckProcesses() []*F {
 	s.UI.Progress("Checking running processes")
 	me := os.Getpid()
+	procs := s.P.Processes()
+	own := ownProcessTree(procs, me)
 	var out []*F
-	for _, pr := range s.P.Processes() {
-		if pr.PID == me {
+	for _, pr := range procs {
+		if own[pr.PID] {
 			continue
 		}
 		if re, kill := s.matchProcess(pr.Name, pr.Cmd); re != nil {
@@ -41,6 +43,70 @@ func (s *System) CheckProcesses() []*F {
 	return out
 }
 
+// ownProcessTree returns this process, every other threatscan process, and
+// all their descendants. The scanner's own `git log -G <indicator regex>`
+// children carry the indicators on their command line; killing them would
+// abort the history checks and raise false alerts.
+func ownProcessTree(procs []platform.Proc, me int) map[int]bool {
+	own := map[int]bool{me: true}
+	for _, p := range procs {
+		if strings.Contains(strings.ToLower(p.Cmd), "threatscan") {
+			own[p.PID] = true
+		}
+	}
+	children := map[int][]int{}
+	for _, p := range procs {
+		children[p.PPID] = append(children[p.PPID], p.PID)
+	}
+	var walk func(int)
+	walk = func(pid int) {
+		for _, c := range children[pid] {
+			if !own[c] {
+				own[c] = true
+				walk(c)
+			}
+		}
+	}
+	for pid := range own {
+		walk(pid)
+	}
+	return own
+}
+
+// gitPatternOpts are git options whose argument is a search pattern, not code
+// being run: a user grepping history for an indicator must not be flagged.
+var gitPatternOpts = map[string]bool{"-G": true, "-S": true, "--grep": true, "-e": true, "--author": true, "--committer": true}
+
+func stripGitPatterns(name, cmd string) string {
+	if strings.ToLower(strings.TrimSuffix(name, ".exe")) != "git" {
+		return cmd
+	}
+	fields := strings.Fields(cmd)
+	var out []string
+	for i := 0; i < len(fields); i++ {
+		f := fields[i]
+		if gitPatternOpts[f] {
+			// drop the pattern that follows; a regex may contain spaces, so
+			// swallow fields up to the next option
+			out = append(out, f)
+			for i+1 < len(fields) && !strings.HasPrefix(fields[i+1], "-") {
+				i++
+			}
+			continue
+		}
+		if j := strings.IndexByte(f, '='); j > 0 && gitPatternOpts[f[:j]] {
+			out = append(out, f[:j])
+			continue
+		}
+		if len(f) > 2 && (strings.HasPrefix(f, "-G") || strings.HasPrefix(f, "-S")) {
+			out = append(out, f[:2])
+			continue
+		}
+		out = append(out, f)
+	}
+	return strings.Join(out, " ")
+}
+
 // processFinding builds the malicious_process finding. kill is the strict
 // kill-list indicator that matched, nil when only a broad one did.
 func processFinding(pr platform.Proc, re, kill *regexp.Regexp, windows bool) *F {
@@ -48,7 +114,7 @@ func processFinding(pr platform.Proc, re, kill *regexp.Regexp, windows bool) *F 
 	if windows {
 		killCmd = fmt.Sprintf("taskkill /PID %d /F", pr.PID)
 	}
-	clean := stripSandboxMounts(pr.Name, pr.Cmd)
+	clean := stripGitPatterns(pr.Name, stripSandboxMounts(pr.Name, pr.Cmd))
 	matched := re.FindString(clean)
 	ev := []string{fmt.Sprintf("command line contains %q (indicator /%s/)", h.Trunc(matched, 80), h.Trunc(re.String(), 60))}
 	if kill != nil {
@@ -90,7 +156,7 @@ func (s *System) matchProcess(name, cmd string) (re, kill *regexp.Regexp) {
 	if strings.Contains(strings.ToLower(cmd), "threatscan") || ownTools[strings.ToLower(strings.TrimSuffix(name, ".exe"))] {
 		return nil, nil
 	}
-	cmd = stripSandboxMounts(name, cmd)
+	cmd = stripGitPatterns(name, stripSandboxMounts(name, cmd))
 	for _, re := range s.I.Process {
 		if !re.MatchString(cmd) {
 			continue
