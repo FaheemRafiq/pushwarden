@@ -314,29 +314,36 @@ func (m *Manager) LinkCLI(dry bool) string {
 	}
 	bin := filepath.Join(m.P.Home, ".local", "bin")
 	link := filepath.Join(bin, "threatscan")
+	linked := false
 	if st, err := os.Lstat(link); err == nil {
 		if st.Mode()&os.ModeSymlink == 0 {
 			return "kept existing launcher " + link + " (v5); it is replaced by the v5.2 migration"
 		}
-		if cur, _ := os.Readlink(link); cur == m.Exe() {
-			return link + " -> " + m.Exe()
-		}
+		cur, _ := os.Readlink(link)
+		linked = cur == m.Exe()
 	}
 	if dry {
+		if linked {
+			return link + " -> " + m.Exe()
+		}
 		return "would link " + link + " -> " + m.Exe()
 	}
-	if err := os.MkdirAll(bin, 0o755); err != nil {
-		return "could not create " + bin + ": " + err.Error()
-	}
-	tmp := link + ".new"
-	os.Remove(tmp)
-	if err := os.Symlink(m.Exe(), tmp); err != nil {
-		return "could not link " + link + ": " + err.Error()
-	}
-	if err := os.Rename(tmp, link); err != nil {
+	if !linked {
+		if err := os.MkdirAll(bin, 0o755); err != nil {
+			return "could not create " + bin + ": " + err.Error()
+		}
+		tmp := link + ".new"
 		os.Remove(tmp)
-		return "could not link " + link + ": " + err.Error()
+		if err := os.Symlink(m.Exe(), tmp); err != nil {
+			return "could not link " + link + ": " + err.Error()
+		}
+		if err := os.Rename(tmp, link); err != nil {
+			os.Remove(tmp)
+			return "could not link " + link + ": " + err.Error()
+		}
 	}
+	// the PATH check runs on every install, not only when the link is new:
+	// a machine upgrading from an older build has the link but not the PATH line
 	msg := link + " -> " + m.Exe()
 	onPath := false
 	for _, d := range filepath.SplitList(os.Getenv("PATH")) {

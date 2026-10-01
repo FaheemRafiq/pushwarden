@@ -201,3 +201,23 @@ func TestLinkCLIAddsLocalBinToShellPath(t *testing.T) {
 		t.Fatal("wrote .zshrc although ~/.local/bin is on PATH")
 	}
 }
+
+// Upgrading from a build that linked ~/.local/bin without touching the PATH:
+// the link already exists, and the PATH line must still be added.
+func TestLinkCLIAddsPathWhenLinkAlreadyExists(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("PATH is edited in the registry on Windows")
+	}
+	m := testManager(t)
+	t.Setenv("PATH", "/usr/bin:/bin")
+	bin := filepath.Join(m.P.Home, ".local", "bin")
+	os.MkdirAll(bin, 0o755)
+	os.Symlink(m.Exe(), filepath.Join(bin, "threatscan"))
+	msg := m.LinkCLI(false)
+	if !strings.Contains(msg, "added ~/.local/bin to PATH") {
+		t.Fatalf("existing link skipped the PATH step: %s", msg)
+	}
+	if b, _ := os.ReadFile(filepath.Join(m.P.Home, ".zshrc")); !strings.Contains(string(b), ".local/bin") {
+		t.Fatal("no PATH line written")
+	}
+}
