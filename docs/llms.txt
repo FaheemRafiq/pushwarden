@@ -1,0 +1,47 @@
+# ThreatScan
+
+> ThreatScan is a free, open-source tool that protects developer machines and GitHub repositories from the PolinRider / Contagious Interview supply-chain malware. It is a single program for Linux, macOS and Windows: a background guard with real-time file protection, an on-demand scanner, a C2 firewall block, editor hardening, and a command that cleans every branch of every GitHub repository you can push to.
+
+Every feature is a subcommand of `threatscan`. It installs per user without administrator rights, every destructive action is reversible through a quarantine, and nothing leaves the machine unless the user opts in. The links below are Markdown sources. The same pages are rendered at https://faheemrafiq.github.io/threatscan/guide/overview.html, and the whole documentation is one file at https://faheemrafiq.github.io/threatscan/llms-full.txt.
+
+## Start here
+
+- [Overview](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/overview.md): What ThreatScan is, the threat it protects against, every feature it has and the platforms it supports.
+- [Installation](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/installation.md): How to install, update and remove ThreatScan on Linux, macOS and Windows, and what the installer changes on the machine.
+- [Quick start](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/quick-start.md): The ThreatScan commands used most often, with one line on what each does.
+- [How it works](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/how-it-works.md): The architecture of ThreatScan: the four protection layers, the path from detection to response, and where data is stored.
+
+## Protection
+
+- [What it detects](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/detection.md): Every category of finding ThreatScan reports, in repositories and on the host, with severities, threat names and how indicators are managed.
+- [Scanning](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/scanning.md): How to run an on-demand scan of repositories and the host with threatscan scan: options, behaviour when something is found, reports and exit codes.
+- [Real-time guard](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/real-time-guard.md): The background guard: real-time file protection, process and network checks, scheduled sweeps, notifications, dialogs and how to check that it is running.
+- [Response and recovery](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/response-and-recovery.md): What ThreatScan does with a malicious file or process, how quarantine works, how to restore or allow a file, and the steps to take after an infection.
+- [Blocking C2 servers](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/network-block.md): How threatscan protect blocks the malware's command-and-control servers at the firewall and in the hosts file, system-wide and across reboots.
+- [Hardening](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/hardening.md): Preventive settings ThreatScan applies to VS Code-family editors and npm so that opening a malicious project does not run code.
+
+## GitHub
+
+- [Cleaning GitHub repositories](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/github-clean.md): How threatscan github-clean removes PolinRider from every branch of every GitHub repository you can push to, with dry run, resume, token handling and exit codes.
+- [CI and automation](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/ci-and-automation.md): Using ThreatScan in pipelines and scripts: the reusable GitHub Actions workflow, a CI gate, the pre-commit hook, JSON output and exit codes.
+
+## Operating it
+
+- [Activity history](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/activity-history.md): The journal that records every finding, action, decision, sweep and error, and how to read and filter it with threatscan history and threatscan alerts.
+- [Team reporting](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/team-reporting.md): The four ways information can leave a machine, all opt-in: webhook alerts, the feedback bundle, the daily digest and the central event upload to Supabase, with exactly what each contains.
+- [Updates](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/updates.md): How ThreatScan keeps its indicators and itself up to date: daily indicator refresh, signed program updates, rollback, channels and how to turn updates off.
+- [Disk use and cleanup](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/disk-and-cleanup.md): Every store ThreatScan keeps on disk, the size or age limit of each, and how threatscan cleanup and the daily housekeeping enforce them.
+- [Configuration](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/configuration.md): Every ThreatScan setting with its default, every file in the data directory, and every environment variable.
+
+## Reference
+
+- [Security and privacy](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/security-and-privacy.md): The trust model of ThreatScan: what runs with which privileges, how tokens and updates are protected, and exactly what data can leave the machine.
+- [Troubleshooting and FAQ](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/guide/troubleshooting.md): Solutions to common ThreatScan problems and answers to frequent questions about detection, performance, privacy and removal.
+- [Command-line reference](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/CLI.md): Every ThreatScan command with all options, exit codes, configuration keys, files and environment variables. The same text as threatscan help.
+
+## Optional
+
+- [Whole documentation in one file](https://faheemrafiq.github.io/threatscan/llms-full.txt): every page above, concatenated
+- [Indicator file](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/threatscan/iocs.json): every signature, key, hash and C2 address the scanner uses
+- [Supabase table definition](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs/supabase.sql): the SQL for the optional central event upload
+- [Source code](https://github.com/FaheemRafiq/threatscan): the repository

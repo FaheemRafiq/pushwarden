@@ -1,0 +1,26 @@
+# GitHub Pages (Jekyll) configuration for https://faheemrafiq.github.io/threatscan/
+# Source: the docs/ folder of the main branch. No theme: the layout is in _layouts/.
+title: ThreatScan
+description: >-
+  Real-time protection against the PolinRider / Contagious Interview supply-chain malware
+  for developer machines. Linux, macOS and Windows.
+url: https://faheemrafiq.github.io
+baseurl: /threatscan
+repo_url: https://github.com/FaheemRafiq/threatscan
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+
+# Go sources and working notes that live in this folder are not part of the site.
+# CLI.md is published through reference.md, which includes it.
+exclude:
+  - "*.go"
+  - GO-PORT-HANDOFF.md
+  - CLI.md
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default

@@ -1,0 +1,51 @@
+# Sidebar and page order. Also read by docs/site_test.go to build llms-full.txt.
+- section: Start here
+  pages:
+    - title: Overview
+      url: /guide/overview.html
+    - title: Installation
+      url: /guide/installation.html
+    - title: Quick start
+      url: /guide/quick-start.html
+    - title: How it works
+      url: /guide/how-it-works.html
+- section: Protection
+  pages:
+    - title: What it detects
+      url: /guide/detection.html
+    - title: Scanning
+      url: /guide/scanning.html
+    - title: Real-time guard
+      url: /guide/real-time-guard.html
+    - title: Response and recovery
+      url: /guide/response-and-recovery.html
+    - title: Blocking C2 servers
+      url: /guide/network-block.html
+    - title: Hardening
+      url: /guide/hardening.html
+- section: GitHub
+  pages:
+    - title: Cleaning GitHub repositories
+      url: /guide/github-clean.html
+    - title: CI and automation
+      url: /guide/ci-and-automation.html
+- section: Operating it
+  pages:
+    - title: Activity history
+      url: /guide/activity-history.html
+    - title: Team reporting
+      url: /guide/team-reporting.html
+    - title: Updates
+      url: /guide/updates.html
+    - title: Disk use and cleanup
+      url: /guide/disk-and-cleanup.html
+    - title: Configuration
+      url: /guide/configuration.html
+- section: Reference
+  pages:
+    - title: Security and privacy
+      url: /guide/security-and-privacy.html
+    - title: Troubleshooting and FAQ
+      url: /guide/troubleshooting.html
+    - title: Command-line reference
+      url: /reference.html
