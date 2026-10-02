@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -84,6 +86,13 @@ func Editor(path string, dry bool) (bool, []string, error) {
 		_ = os.MkdirAll(filepath.Dir(path), 0o755)
 		if len(raw) > 2 {
 			_ = os.WriteFile(fmt.Sprintf("%s.threatscan-%d.bak", path, time.Now().Unix()), raw, 0o600)
+			// keep the two newest backups of this file; older ones only pile up
+			if baks, _ := filepath.Glob(path + ".threatscan-*.bak"); len(baks) > 2 {
+				sort.Slice(baks, func(a, b int) bool { return bakTime(baks[a]) < bakTime(baks[b]) })
+				for _, old := range baks[:len(baks)-2] {
+					_ = os.Remove(old)
+				}
+			}
 		}
 		if err := os.WriteFile(path, v.Pack(), 0o644); err != nil {
 			return false, nil, err
@@ -206,4 +215,11 @@ func PreCommit(repo string, dry bool) (bool, string) {
 		}
 	}
 	return true, "installed " + hook
+}
+
+// bakTime reads the timestamp out of "<file>.threatscan-<unix>.bak".
+func bakTime(p string) int64 {
+	p = strings.TrimSuffix(p, ".bak")
+	n, _ := strconv.ParseInt(p[strings.LastIndex(p, "-")+1:], 10, 64)
+	return n
 }

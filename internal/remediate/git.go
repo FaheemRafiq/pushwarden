@@ -39,6 +39,14 @@ type Options struct {
 	KeepClones bool     // leave the clones on disk for inspection
 	Version    string   // ThreatScan version, mentioned in the commit message
 	Log        func(string)
+	// State, when set, remembers finished branches by commit so a later run
+	// skips what is verified and unchanged. Host tells apart the same
+	// owner/name on different GitHub servers.
+	State *State
+	Host  string
+	// CloneMaxBytes limits what is kept on disk for a later --apply: a clone
+	// larger than this is not kept (0 = no limit).
+	CloneMaxBytes int64
 }
 
 // Status values for a branch.
@@ -58,6 +66,9 @@ type Branch struct {
 	Fixed    []string            `json:"fixed,omitempty"` // "path: action"
 	Commit   string              `json:"commit,omitempty"`
 	Error    string              `json:"error,omitempty"`
+	SHA      string              `json:"sha,omitempty"`        // branch tip this result is valid for
+	Resumed  bool                `json:"resumed,omitempty"`    // taken from an earlier run: the tip has not moved since
+	At       string              `json:"checked_at,omitempty"` // when that earlier run verified it
 }
 
 type Result struct {
@@ -101,6 +112,15 @@ type Remediator struct {
 func New(o Options, p *platform.Info, i *iocs.IOCs, dataDir string) *Remediator {
 	if o.Log == nil {
 		o.Log = func(string) {}
+	}
+	if dataDir != "" {
+		// One private, empty folder for core.hooksPath, reused by every run:
+		// nothing is left behind in the system temp folder.
+		d := filepath.Join(dataDir, "guard", "nohooks")
+		_ = os.RemoveAll(d)
+		if os.MkdirAll(d, 0o700) == nil {
+			noHooks = d
+		}
 	}
 	return &Remediator{Opts: o, P: p, I: i, DataDir: dataDir, ui: ui.New(true, true)}
 }
@@ -229,47 +249,83 @@ func (m *Remediator) Run(ctx context.Context, fullName, cloneURL, defaultBranch 
 	res := Result{Repo: fullName}
 	defer func() { res.Duration = time.Since(start).Seconds() }()
 
-	parent := m.Opts.WorkDir
-	if parent == "" {
-		parent = os.TempDir()
+	// What earlier runs verified. If no branch moved since, there is nothing
+	// to clone.
+	var rs *RepoState
+	if m.Opts.State != nil {
+		rs = m.Opts.State.repo(m.Opts.Host+"/"+fullName, m.I.Version, m.Opts.Version)
+		if len(rs.Branches) > 0 {
+			m.Opts.Log("checking " + fullName + " for changes")
+			if tips, err := m.remoteTips(ctx, cloneURL); err == nil {
+				if done, ok := resumeAll(rs, tips, m.Opts.Branches, defaultBranch); ok {
+					res.Branches, res.History = done, rs.History
+					return res
+				}
+			}
+		}
 	}
-	if err := os.MkdirAll(parent, 0o700); err != nil {
-		res.Error = err.Error()
-		return res
-	}
-	base, err := os.MkdirTemp(parent, "threatscan-"+safeName(fullName)+"-")
-	if err != nil {
-		res.Error = err.Error()
-		return res
-	}
-	if m.Opts.KeepClones {
-		res.Clone = base
+
+	var base string
+	have := false // a clone kept by an earlier run was brought up to date
+	if rs != nil && !m.Opts.KeepClones {
+		// The clone lives in the data directory and stays there while the
+		// repository has branches left to fix: a dry run downloads it, the
+		// run that applies the fixes only fetches what is new.
+		base = m.Opts.State.clonePath(m.Opts.Host + "/" + fullName)
+		have = m.refresh(ctx, fullName, cloneURL, base)
+		if !have {
+			_ = os.RemoveAll(base)
+			if err := os.MkdirAll(base, 0o700); err != nil {
+				res.Error = err.Error()
+				return res
+			}
+		}
+		defer func() {
+			if res.Error == "" && workRemains(res.Branches) && (m.Opts.CloneMaxBytes <= 0 || treeSize(base) <= m.Opts.CloneMaxBytes) {
+				now := time.Now()
+				_ = os.Chtimes(base, now, now) // kept clones expire by age
+				return
+			}
+			_ = os.RemoveAll(base)
+		}()
 	} else {
-		defer os.RemoveAll(base)
+		parent := m.Opts.WorkDir
+		if parent == "" {
+			parent = os.TempDir()
+		}
+		if err := os.MkdirAll(parent, 0o700); err != nil {
+			res.Error = err.Error()
+			return res
+		}
+		var err error
+		if base, err = os.MkdirTemp(parent, "threatscan-"+safeName(fullName)+"-"); err != nil {
+			res.Error = err.Error()
+			return res
+		}
+		if m.Opts.KeepClones {
+			res.Clone = base
+		} else {
+			defer os.RemoveAll(base)
+		}
 	}
 	bare := filepath.Join(base, "repo.git")
-	m.Opts.Log("cloning " + fullName)
-	if _, err := m.git(ctx, "", 20*time.Minute, "clone", "--bare", "--quiet", "--no-tags", "--", cloneURL, bare); err != nil {
-		res.Error = "clone failed: " + err.Error()
-		return res
+	if !have {
+		m.Opts.Log("cloning " + fullName)
+		if _, err := m.git(ctx, "", 20*time.Minute, "clone", "--bare", "--quiet", "--no-tags", "--", cloneURL, bare); err != nil {
+			res.Error = "clone failed: " + err.Error()
+			return res
+		}
 	}
 	// bare clones keep hooks samples only; make sure nothing runs on commit
 	_ = os.RemoveAll(filepath.Join(bare, "hooks"))
 
-	out, err := m.git(ctx, bare, 30*time.Second, "for-each-ref", "--format=%(refname:short)", "refs/heads/")
+	out, err := m.git(ctx, bare, 30*time.Second, "for-each-ref", "--format=%(objectname) %(refname)", "refs/heads/")
 	if err != nil {
 		res.Error = err.Error()
 		return res
 	}
-	var branches []string
-	for _, b := range strings.Split(strings.TrimSpace(out), "\n") {
-		if b = strings.TrimSpace(b); b != "" && matchBranch(m.Opts.Branches, b) {
-			branches = append(branches, b)
-		}
-	}
-	sort.SliceStable(branches, func(i, j int) bool {
-		return branches[i] == defaultBranch && branches[j] != defaultBranch
-	})
+	tips := parseTips(out, " ") // the commits this clone holds: what is scanned is what is remembered
+	branches := selectBranches(tips, m.Opts.Branches, defaultBranch)
 	if len(branches) == 0 {
 		res.Error = "no branches matched"
 		return res
@@ -277,6 +333,9 @@ func (m *Remediator) Run(ctx context.Context, fullName, cloneURL, defaultBranch 
 
 	hist := scan.NewRepo(bare, m.ui, m.I)
 	res.History = hist.CheckHistoryPayloads(bare)
+	if rs != nil {
+		m.Opts.State.keep(rs, tips, res.History)
+	}
 
 	pr := protect.New(m.P, m.I, m.DataDir, nil, !m.Opts.Apply)
 	pr.AttachJournal(m.Journal, "github-clean")
@@ -286,13 +345,109 @@ func (m *Remediator) Run(ctx context.Context, fullName, cloneURL, defaultBranch 
 			res.Branches = append(res.Branches, Branch{Name: b, Status: StatusError, Error: ctx.Err().Error()})
 			continue
 		}
+		if rs != nil {
+			if done, ok := rs.reuse(b, tips[b]); ok {
+				res.Branches = append(res.Branches, done)
+				continue
+			}
+		}
 		br := m.branch(ctx, fullName, base, bare, b, pr, ident)
+		if br.SHA == "" && (br.Status == StatusClean || br.Status == StatusManual) {
+			br.SHA = tips[b] // unchanged branch: valid for the commit that was scanned
+		}
+		if rs != nil {
+			m.Opts.State.record(rs, br) // saved now, so an interruption after this point keeps it
+		}
 		res.Branches = append(res.Branches, br)
 		m.Journal.Write(journal.Event{Ctx: "github-clean", Kind: journal.KindSweep, Title: fullName + " @ " + b + ": " + br.Status,
 			Note: br.Error, Data: map[string]any{"repo": fullName, "branch": b, "status": br.Status, "fixed": br.Fixed,
 				"commit": br.Commit, "apply": m.Opts.Apply}})
 	}
 	return res
+}
+
+// refresh brings a clone kept by an earlier run up to date with the remote:
+// only new commits are downloaded. It reports false when there is no usable
+// clone, and the caller then clones afresh.
+func (m *Remediator) refresh(ctx context.Context, fullName, cloneURL, base string) bool {
+	bare := filepath.Join(base, "repo.git")
+	if st, err := os.Stat(filepath.Join(bare, "HEAD")); err != nil || st.IsDir() {
+		return false
+	}
+	m.Opts.Log("updating the kept copy of " + fullName)
+	_ = os.RemoveAll(filepath.Join(base, "wt")) // checkouts left by an interrupted run
+	_ = os.RemoveAll(filepath.Join(bare, "hooks"))
+	if _, err := m.git(ctx, bare, time.Minute, "worktree", "prune"); err != nil {
+		return false
+	}
+	// Every branch is set to what the remote has now, deleted ones are
+	// removed. What is scanned and fixed is the remote's current state.
+	_, err := m.git(ctx, bare, 20*time.Minute, "fetch", "--quiet", "--prune", "--no-tags", "--force", "--", cloneURL, "+refs/heads/*:refs/heads/*")
+	return err == nil
+}
+
+// workRemains reports whether a later run still has something to do here.
+func workRemains(branches []Branch) bool {
+	for _, b := range branches {
+		switch b.Status {
+		case StatusInfected, StatusPushFailed, StatusError:
+			return true
+		}
+	}
+	return false
+}
+
+// remoteTips asks the remote for its branch tips without cloning.
+func (m *Remediator) remoteTips(ctx context.Context, cloneURL string) (map[string]string, error) {
+	out, err := m.git(ctx, "", 2*time.Minute, "ls-remote", "--heads", "--", cloneURL)
+	if err != nil {
+		return nil, err
+	}
+	return parseTips(out, "\t"), nil
+}
+
+// parseTips reads "<sha><sep>refs/heads/<name>" lines into name -> sha.
+func parseTips(out, sep string) map[string]string {
+	tips := map[string]string{}
+	for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
+		sha, ref, ok := strings.Cut(strings.TrimSpace(l), sep)
+		if name := strings.TrimPrefix(strings.TrimSpace(ref), "refs/heads/"); ok && name != ref && name != "" {
+			tips[name] = strings.TrimSpace(sha)
+		}
+	}
+	return tips
+}
+
+// selectBranches returns the branches to handle: those matching the filter,
+// the default branch first, the rest by name.
+func selectBranches(tips map[string]string, globs []string, defaultBranch string) []string {
+	var out []string
+	for name := range tips {
+		if matchBranch(globs, name) {
+			out = append(out, name)
+		}
+	}
+	sort.Strings(out)
+	sort.SliceStable(out, func(i, j int) bool { return out[i] == defaultBranch && out[j] != defaultBranch })
+	return out
+}
+
+// resumeAll returns the remembered results when every selected branch is
+// still at its verified commit, so the repository needs no clone.
+func resumeAll(rs *RepoState, tips map[string]string, globs []string, defaultBranch string) ([]Branch, bool) {
+	names := selectBranches(tips, globs, defaultBranch)
+	if len(names) == 0 {
+		return nil, false
+	}
+	var out []Branch
+	for _, name := range names {
+		b, ok := rs.reuse(name, tips[name])
+		if !ok {
+			return nil, false
+		}
+		out = append(out, b)
+	}
+	return out, true
 }
 
 func (m *Remediator) branch(ctx context.Context, fullName, base, bare, name string, pr *protect.Protector, ident []string) Branch {
@@ -355,11 +510,12 @@ func (m *Remediator) branch(ctx context.Context, fullName, base, bare, name stri
 	}
 	sha, _ := m.git(ctx, wt, 30*time.Second, "rev-parse", "--short", "HEAD")
 	br.Commit = strings.TrimSpace(sha)
+	full, _ := m.git(ctx, wt, 30*time.Second, "rev-parse", "HEAD")
 	if _, err := m.git(ctx, wt, 10*time.Minute, "push", "--quiet", "origin", "HEAD:refs/heads/"+name); err != nil {
 		br.Status, br.Error = StatusPushFailed, err.Error()
 		return br
 	}
-	br.Status = StatusPushed
+	br.Status, br.SHA = StatusPushed, strings.TrimSpace(full) // the remote tip is now the fix commit
 	return br
 }
 

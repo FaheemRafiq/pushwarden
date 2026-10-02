@@ -15,6 +15,7 @@ import (
 	"github.com/FaheemRafiq/threatscan/internal/config"
 	"github.com/FaheemRafiq/threatscan/internal/findings"
 	h "github.com/FaheemRafiq/threatscan/internal/helpers"
+	"github.com/FaheemRafiq/threatscan/internal/journal"
 	"github.com/FaheemRafiq/threatscan/internal/platform"
 	"github.com/FaheemRafiq/threatscan/internal/prompt"
 	"github.com/ncruces/zenity"
@@ -116,6 +117,7 @@ func BuildAlert(fs []*findings.Finding) (title, body string) {
 }
 
 func (n *Notifier) log(fs []*findings.Finding, context string) {
+	journal.RotateFile(n.LogPath, 5<<20) // alerts-DATE.log.gz; housekeeping keeps the newest few
 	fh, err := os.OpenFile(n.LogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return

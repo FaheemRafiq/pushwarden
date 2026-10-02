@@ -53,6 +53,9 @@ func entryFor(f *F, typ string) Entry {
 		Reason: findings.WhyAction(f)}
 }
 
+// decisionTTL is how long an "allow" answer is honoured and stored.
+const decisionTTL = 30 * 24 * time.Hour
+
 type decision struct {
 	Decision string  `json:"decision"`
 	SHA256   string  `json:"sha256"`
@@ -82,6 +85,11 @@ func New(p *platform.Info, i *iocs.IOCs, dataDir string, u *ui.UI, dry bool) *Pr
 		decPath: filepath.Join(dataDir, "decisions.json"), decisions: map[string]decision{}}
 	if b, err := os.ReadFile(pr.decPath); err == nil {
 		_ = json.Unmarshal(b, &pr.decisions)
+	}
+	for path, d := range pr.decisions {
+		if time.Since(time.Unix(int64(d.TS), 0)) > decisionTTL {
+			delete(pr.decisions, path) // no longer honoured; gone from the file at the next save
+		}
 	}
 	return pr
 }
@@ -192,7 +200,7 @@ func (pr *Protector) KeptByUser(f *F) bool {
 	pr.mu.Lock()
 	d, ok := pr.decisions[f.Path]
 	pr.mu.Unlock()
-	if !ok || d.Decision != string(prompt.Keep) || time.Since(time.Unix(int64(d.TS), 0)) > 30*24*time.Hour {
+	if !ok || d.Decision != string(prompt.Keep) || time.Since(time.Unix(int64(d.TS), 0)) > decisionTTL {
 		return false
 	}
 	return h.SHA256(f.Path) == d.SHA256

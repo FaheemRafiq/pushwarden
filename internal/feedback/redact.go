@@ -1,6 +1,7 @@
 // Package feedback turns a machine's journal into something that can leave
-// it: a redacted bundle the user sends by hand, and an opt-in daily digest
-// of counts with no paths, command lines or file contents.
+// it: a redacted bundle the user sends by hand, an opt-in daily digest
+// of counts with no paths, command lines or file contents, and an opt-in
+// upload of redacted events to a central table.
 package feedback
 
 import (
@@ -20,12 +21,14 @@ var secretRes = []*regexp.Regexp{
 	regexp.MustCompile(`AKIA[0-9A-Z]{16}`),
 	regexp.MustCompile(`xox[abprs]-[A-Za-z0-9-]{10,}`),
 	regexp.MustCompile(`sk-[A-Za-z0-9_-]{20,}`),
+	regexp.MustCompile(`sb_(?:publishable|secret)_[A-Za-z0-9_-]{16,}`),                  // Supabase API keys
+	regexp.MustCompile(`eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}`), // JSON Web Tokens (older Supabase keys, sessions)
 	regexp.MustCompile(`-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----`),
 }
 
 var (
 	// key=value / "key": "value" pairs whose key says the value is a secret
-	keyValRe = regexp.MustCompile(`(?i)((?:token|secret|password|passwd|api[_-]?key|authorization|bearer|webhook_url|feedback_url)["']?\s*[:=]\s*["']?)([^\s"',&}]{6,})`)
+	keyValRe = regexp.MustCompile(`(?i)((?:token|secret|password|passwd|api[_-]?key|authorization|bearer|apikey|webhook_url|feedback_url|upload_url|upload_key)["']?\s*[:=]\s*["']?)([^\s"',&}]{6,})`)
 	// credentials inside a URL
 	urlCredRe = regexp.MustCompile(`(://)[^/\s:@]+:[^/\s@]+@`)
 )

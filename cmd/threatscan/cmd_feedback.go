@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/FaheemRafiq/threatscan/internal/config"
@@ -31,7 +32,84 @@ func init() {
 			return time.Hour // cheap check; posts at most once a day
 		},
 		Run: func(g *guard.Guard) { postDigest(g.DataDir, g.Cfg, g.I.Version, g.P.OS, g.P.Hostname, g.Log) },
+	}, guard.PeriodicTask{
+		Name: "event-upload",
+		Interval: func(cfg *config.Config) time.Duration {
+			if cfg.UploadURL == "" {
+				return 0 // opt-in only
+			}
+			return time.Minute // a cheap check; Due decides whether anything is sent
+		},
+		Run: func(g *guard.Guard) {
+			up, log := newUploader(g.DataDir, g.Cfg, g.P.Home, g.P.Hostname, g.P.OS), g.Log
+			if !up.Due(time.Now()) {
+				return
+			}
+			// Off the guard's loop: a slow or unreachable server must never
+			// delay protection. One upload at a time.
+			if !uploading.CompareAndSwap(false, true) {
+				return
+			}
+			go func() {
+				defer uploading.Store(false)
+				defer func() { _ = recover() }()
+				uploadEvents(up, log)
+			}()
+		},
 	})
+}
+
+var uploading atomic.Bool
+
+// redactorFor builds the redactor for this machine's home, user and host.
+func redactorFor(home, host string) *feedback.Redactor {
+	red := &feedback.Redactor{Home: home, Host: host}
+	if cu, err := user.Current(); err == nil {
+		red.User = cu.Username
+	}
+	return red
+}
+
+// newUploader configures the central-table uploader. Events are always
+// redacted on this path; there is no switch to turn that off.
+func newUploader(dataDir string, cfg *config.Config, home, host, goos string) *feedback.Uploader {
+	return &feedback.Uploader{DataDir: dataDir, URL: cfg.UploadURL, Key: cfg.UploadKey, MachineID: feedback.MachineID(dataDir),
+		OS: goos, Red: redactorFor(home, host)}
+}
+
+// uploadEvents runs one upload for the guard and logs the outcome: one line
+// when uploads start failing, one when they work again, none per retry.
+// Failures go to the guard log only: a journal entry per failure would itself
+// be uploaded later.
+func uploadEvents(up *feedback.Uploader, log func(string)) {
+	r := up.Run()
+	switch {
+	case r.Err != nil && r.Failures == 1:
+		log(fmt.Sprintf("event upload failed, %d events are kept and waiting; retrying after 1, 2, 4, 8 minutes, then every 10: %v", r.Waiting, r.Err))
+	case r.Err != nil:
+	case r.Recovered:
+		log(fmt.Sprintf("event upload: back online, %d redacted events sent, %d waiting", r.Sent, r.Waiting))
+	case r.Sent > 0:
+		log(fmt.Sprintf("event upload: %d redacted events sent, %d waiting", r.Sent, r.Waiting))
+	}
+}
+
+// uploadSummary is the `status` line for the central upload.
+func uploadSummary(up *feedback.Uploader) string {
+	if up.URL == "" {
+		return "off"
+	}
+	s := up.Status()
+	out := fmt.Sprintf("on, %d uploaded, %d waiting", s.Uploaded, s.Waiting)
+	switch {
+	case s.Failures > 0:
+		out += fmt.Sprintf("; server not reached since %s (%s), retrying", s.FailingSince.Local().Format("2006-01-02 15:04"), s.LastError)
+	case !s.LastSuccess.IsZero():
+		out += " (last upload " + s.LastSuccess.Local().Format("2006-01-02 15:04") + ")"
+	default:
+		out += " (no upload yet)"
+	}
+	return out + ". See: threatscan feedback --preview"
 }
 
 func lastDigest(dataDir string) time.Time {
@@ -74,13 +152,15 @@ func postDigest(dataDir string, cfg *config.Config, iocVersion, goos, host strin
 }
 
 func cmdFeedback(args []string) int {
-	fs := newFlags("feedback", "[--days N] [--out FILE] [--no-redact] | --false-positive PATH [--note TEXT] | --digest")
+	fs := newFlags("feedback", "[--days N] [--out FILE] [--no-redact] | --false-positive PATH [--note TEXT] | --digest | --preview | --upload")
 	days := fs.Int("days", 14, "how many days of activity to include")
 	out := fs.String("out", "", "write the bundle to `FILE` (default: ./threatscan-feedback-DATE.zip)")
 	noRedact := fs.Bool("no-redact", false, "keep paths, user and host names (secrets are still masked)")
 	fp := fs.String("false-positive", "", "record that the finding on `PATH` was wrong")
 	note := fs.String("note", "", "with --false-positive: what the file really is")
 	digest := fs.Bool("digest", false, "print the daily digest that feedback_url would receive")
+	preview := fs.Bool("preview", false, "show the next redacted events that upload_url would receive, without sending")
+	upload := fs.Bool("upload", false, "send the waiting events to upload_url now")
 	if _, err := parseInterspersed(fs, args); err != nil {
 		return 2
 	}
@@ -93,6 +173,35 @@ func cmdFeedback(args []string) int {
 		jr.Write(journal.Event{Ctx: "cli", Kind: journal.KindFeedback, Title: "marked as a false positive", Path: p, Note: *note})
 		u.OK("Recorded. It is included in the next feedback bundle" + map[bool]string{true: " and daily digest", false: ""}[c.Cfg.FeedbackURL != ""] + ".")
 		u.Info("To also restore the file and stop flagging it:  threatscan history --allow " + p)
+		return 0
+	case *preview:
+		rows, total := newUploader(c.DataDir, c.Cfg, c.P.Home, c.P.Hostname, c.P.OS).Pending(5)
+		if rows == nil {
+			rows = []feedback.Row{}
+		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		enc.SetEscapeHTML(false) // show <redacted> as it reads in the table
+		_ = enc.Encode(rows)
+		u.Info(fmt.Sprintf("%d events are waiting; these are the next %d exactly as they would be stored. Nothing was sent.", total, len(rows)))
+		if c.Cfg.UploadURL == "" {
+			u.Info("upload_url is not set, so nothing is ever uploaded from this machine.")
+		}
+		return 0
+	case *upload:
+		if c.Cfg.UploadURL == "" {
+			u.Err("upload_url is not set. See: threatscan help feedback")
+			return 2
+		}
+		up := newUploader(c.DataDir, c.Cfg, c.P.Home, c.P.Hostname, c.P.OS)
+		up.MaxEvents, up.Timeout = 1<<30, 10*time.Minute // the whole backlog in one go
+		r := up.Run()
+		if r.Err != nil {
+			u.Err(fmt.Sprintf("%d events sent, %d still waiting on this machine: %v", r.Sent, r.Waiting, r.Err))
+			u.Info("Nothing is lost: the guard retries by itself, or run this again when the server is reachable.")
+			return 1
+		}
+		u.OK(fmt.Sprintf("%d redacted events uploaded, %d waiting", r.Sent, r.Waiting))
 		return 0
 	case *digest:
 		d := buildDigest(c.DataDir, c.Cfg, c.I.Version, c.P.OS, c.P.Hostname, time.Now().Add(-24*time.Hour))
@@ -107,10 +216,7 @@ func cmdFeedback(args []string) int {
 	if path == "" {
 		path = "threatscan-feedback-" + time.Now().Format("20060102-1504") + ".zip"
 	}
-	red := &feedback.Redactor{Home: c.P.Home, Host: c.P.Hostname}
-	if cu, err := user.Current(); err == nil {
-		red.User = cu.Username
-	}
+	red := redactorFor(c.P.Home, c.P.Hostname)
 	if *noRedact {
 		red = &feedback.Redactor{} // paths stay; token shapes are still masked
 	}

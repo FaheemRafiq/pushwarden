@@ -44,6 +44,7 @@ func cmdHistory(args []string) int {
 	since := fs.String("since", "", "only events newer than `WHEN`: 30m, 24h, 7d, 2w or a date")
 	pathSub := fs.String("path", "", "only events whose path, title or command contains `TEXT`")
 	archive := fs.Bool("archive", false, "also read the rotated journal archives")
+	notUp := fs.Bool("not-uploaded", false, "only events still waiting to be uploaded to upload_url (implies --all --archive)")
 	note := fs.String("note", "", "with --allow: why this is a false positive (recorded as feedback)")
 	if _, err := parseInterspersed(fs, args); err != nil {
 		return 2
@@ -80,7 +81,7 @@ func cmdHistory(args []string) int {
 		return 0
 	}
 	if journal.Exists(c.DataDir) {
-		f := journal.Filter{Kinds: kinds, PathSubstr: *pathSub, Archives: *archive}
+		f := journal.Filter{Kinds: kinds, PathSubstr: *pathSub, Archives: *archive || *notUp}
 		if *sev != "" {
 			f.MinSeverity = findings.ParseSeverity(strings.ToUpper(*sev))
 			if len(f.Kinds) == 0 {
@@ -94,6 +95,23 @@ func cmdHistory(args []string) int {
 		}
 		f.Since = t
 		evs := journal.Read(c.DataDir, f)
+		if c.Cfg.UploadURL != "" {
+			// each event carries whether it is stored at upload_url
+			newUploader(c.DataDir, c.Cfg, c.P.Home, c.P.Hostname, c.P.OS).Mark(evs)
+		}
+		if *notUp {
+			if c.Cfg.UploadURL == "" {
+				u.Err("upload_url is not set, so nothing is uploaded from this machine. See: threatscan help feedback")
+				return 2
+			}
+			kept := evs[:0]
+			for _, e := range evs {
+				if e.Uploaded != nil && !*e.Uploaded {
+					kept = append(kept, e)
+				}
+			}
+			evs, *all = kept, true
+		}
 		switch {
 		case *asJSON:
 			b, _ := json.MarshalIndent(tail(evs, *limit), "", "  ")
@@ -438,8 +456,10 @@ func cmdStatus(args []string) int {
 		{"Indicators", c.I.Version + " (" + c.I.Source + ")"},
 		{"Action / auto-kill / prompt", fmt.Sprintf("%s / %v / %v", c.Cfg.Action, c.Cfg.AutoKill, c.Cfg.Prompt)},
 		{"Webhook", map[bool]string{true: "configured", false: "none"}[c.Cfg.WebhookURL != ""]},
+		{"Event upload", uploadSummary(newUploader(c.DataDir, c.Cfg, c.P.Home, c.P.Hostname, c.P.OS))},
 		{"Firewall", (&protect.NetBlocker{P: c.P, I: c.I}).Describe()},
 		{"Data dir", c.DataDir},
+		{"Disk use", diskSummary(c)},
 	}
 	rows = append(statusServiceRows(c), rows...)
 	for _, r := range rows {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/FaheemRafiq/threatscan/internal/remediate"
 	"github.com/FaheemRafiq/threatscan/internal/testfixtures"
+	"github.com/FaheemRafiq/threatscan/internal/ui"
 )
 
 func TestParseSelection(t *testing.T) {
@@ -115,6 +116,43 @@ func TestGitHubCleanEndToEnd(t *testing.T) {
 	if code := runGitHubClean(c, ghOpts{token: "tok", api: srv.URL, ci: true, json: js}); code != 1 {
 		t.Fatalf("dry run should exit 1 when infected, got %d", code)
 	}
+	clones := filepath.Join(c.DataDir, remediate.ClonesDir)
+	if ents, _ := os.ReadDir(clones); len(ents) != 1 {
+		t.Fatalf("the dry run should keep the infected repository for --apply, got %d", len(ents))
+	}
+	if text := stdout(t, func() { runGitHubClean(c, ghOpts{progress: true, ci: true}) }); !strings.Contains(text, "1 repositories with branches still to fix are kept on disk for --apply") {
+		t.Fatalf("--progress after a dry run:\n%s", text)
+	}
+	// --ci and --no-ask never ask; otherwise a dry run that found something offers to fix it
+	asked := 0
+	defer func(f func(*ui.UI, string) bool) { askApply = f }(askApply)
+	askApply = func(_ *ui.UI, q string) bool { asked++; return false }
+	runGitHubClean(c, ghOpts{token: "tok", api: srv.URL, ci: true})
+	runGitHubClean(c, ghOpts{token: "tok", api: srv.URL, noAsk: true})
+	if asked != 0 {
+		t.Fatal("--ci and --no-ask must not ask")
+	}
+	if code := runGitHubClean(c, ghOpts{token: "tok", api: srv.URL}); code != 1 || asked != 1 {
+		t.Fatalf("declined: code=%d asked=%d", code, asked)
+	}
+	// answering yes fixes and pushes in the same run, from the kept clone
+	var question string
+	askApply = func(_ *ui.UI, q string) bool { question = q; return true }
+	text := stdout(t, func() {
+		if code := runGitHubClean(c, ghOpts{token: "tok", api: srv.URL, author: "T <t@t>", json: js + ".apply"}); code != 0 {
+			t.Errorf("dry run answered with yes: exit %d", code)
+		}
+	})
+	if question != "Fix and push these 1 branches in 1 repositories now?" || !strings.Contains(text, "pushed") {
+		t.Fatalf("question=%q\n%s", question, text)
+	}
+	if ents, _ := os.ReadDir(clones); len(ents) != 0 {
+		t.Fatal("the kept clone should be removed once everything is fixed")
+	}
+	if b, _ := os.ReadFile(js + ".apply"); !strings.Contains(string(b), `"apply": true`) || !strings.Contains(string(b), `"status": "pushed"`) {
+		t.Fatalf("json after answering yes: %s", b)
+	}
+	askApply = func(_ *ui.UI, q string) bool { t.Error("asked although nothing is infected"); return false }
 	if code := runGitHubClean(c, ghOpts{token: "tok", api: srv.URL, ci: true, apply: true, author: "T <t@t>"}); code != 0 {
 		t.Fatalf("apply exit %d", code)
 	}
@@ -125,5 +163,45 @@ func TestGitHubCleanEndToEnd(t *testing.T) {
 	b, _ := os.ReadFile(js)
 	if !strings.Contains(string(b), `"status": "infected"`) {
 		t.Fatalf("json: %s", b)
+	}
+
+	// a later run remembers the work: nothing is cloned, the earlier fix is counted
+	tip, _ := exec.Command("git", "-C", origin, "rev-parse", "main").Output()
+	text = stdout(t, func() {
+		if code := runGitHubClean(c, ghOpts{token: "tok", api: srv.URL, ci: true, apply: true, author: "T <t@t>", json: js}); code != 0 {
+			t.Errorf("resumed apply exit %d", code)
+		}
+	})
+	for _, want := range []string{"fixed earlier", "1 (1 in earlier runs)", "Verified by earlier runs:"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("resumed run lacks %q:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "Pushed fixes. Now: rotate") {
+		t.Errorf("nothing was pushed by this run, so it must not say so:\n%s", text)
+	}
+	if now, _ := exec.Command("git", "-C", origin, "rev-parse", "main").Output(); string(now) != string(tip) {
+		t.Fatal("the resumed run pushed again")
+	}
+	if b, _ := os.ReadFile(js); !strings.Contains(string(b), `"resumed": true`) || !strings.Contains(string(b), `"sha": "`+strings.TrimSpace(string(tip))+`"`) {
+		t.Fatalf("json of a resumed run: %s", b)
+	}
+	// --progress needs no token and no network
+	text = stdout(t, func() {
+		if code := runGitHubClean(c, ghOpts{progress: true, ci: true, api: "http://127.0.0.1:1"}); code != 0 {
+			t.Errorf("--progress exit %d", code)
+		}
+	})
+	if !strings.Contains(text, "/me/app") || !strings.Contains(text, "1 repositories, 1 branches verified: 0 clean, 1 fixed and pushed, 0 need manual review.") {
+		t.Fatalf("--progress:\n%s", text)
+	}
+	// --fresh forgets it and checks again: the branch is clean now
+	text = stdout(t, func() {
+		if code := runGitHubClean(c, ghOpts{token: "tok", api: srv.URL, ci: true, apply: true, fresh: true}); code != 0 {
+			t.Errorf("--fresh exit %d", code)
+		}
+	})
+	if strings.Contains(text, "fixed earlier") || strings.Contains(text, "earlier runs") || !strings.Contains(text, "clean") {
+		t.Fatalf("--fresh must check everything again:\n%s", text)
 	}
 }

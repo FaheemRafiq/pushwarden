@@ -31,6 +31,7 @@ September 2026. Sources are listed at the bottom.
 ## Install
 
 Download page: https://faheemrafiq.github.io/threatscan/ (picks the right file for your system).
+Documentation: https://faheemrafiq.github.io/threatscan/guide/overview.html
 
 **macOS 11+ and Linux:** paste into Terminal (no sudo, no password):
 
@@ -95,6 +96,8 @@ threatscan history                # protection history (restore / allow / remove
 threatscan alerts                 # recent alerts and why each one fired
 threatscan history --all --since 7d   # everything it saw and did this week, nothing collapsed
 threatscan feedback               # zip this machine's activity (redacted) to send for analysis
+threatscan cleanup                # what ThreatScan occupies on disk; removes what is past its limits
+threatscan feedback --preview     # team setups: the redacted events the opt-in central upload would send
 threatscan update-iocs            # pull the latest indicator file
 threatscan protect --status       # is the C2 firewall block active and persistent?
 threatscan uninstall [--unblock] [--purge]
@@ -104,8 +107,10 @@ threatscan help <command>         # full documentation for any command, offline
 `threatscan [dirs]` is short for `threatscan scan [dirs]`. Every script file is scanned by default;
 `--configs-only` restores the v4 "known config names only" scope.
 
-The full command-line reference, with every option, the configuration keys, file locations and
-recipes for CI, hooks and webhooks, is in [docs/CLI.md](docs/CLI.md).
+The [documentation site](https://faheemrafiq.github.io/threatscan/guide/overview.html) has a guide for
+every feature. The full command-line reference, with every option, the configuration keys, file
+locations and recipes for CI, hooks and webhooks, is in [docs/CLI.md](docs/CLI.md). For language
+models there is [llms.txt](https://faheemrafiq.github.io/threatscan/llms.txt).
 
 ### Clean every GitHub repository and branch you own
 
@@ -323,7 +328,9 @@ installers/            install.sh, windows/ (Inno Setup), macos/ (pkg), linux/ (
 scripts/               release.sh, sign/, keygen/, fixtures/
 falco/                 Linux runtime rules + response handler
 analysis/              sandbox, deobfuscator, YARA, sample notes (do not run samples)
-docs/                  download page (GitHub Pages), Go port handoff notes
+docs/                  GitHub Pages site: download page, guide/ (one page per feature), CLI.md (embedded
+                       into the binary for `threatscan help`), llms.txt; site_test.go checks links and
+                       regenerates the llms files (UPDATE_SITE=1 go test ./docs -run TestSite)
 ```
 
 Tests never touch `~/.threatscan`; they run under a temporary `THREATSCAN_HOME`, and the malware

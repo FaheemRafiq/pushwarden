@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/FaheemRafiq/threatscan/internal/feedback"
 	"github.com/FaheemRafiq/threatscan/internal/helpers"
 	"github.com/FaheemRafiq/threatscan/internal/notify"
 	"github.com/FaheemRafiq/threatscan/internal/platform"
@@ -45,6 +46,8 @@ func cmdInstall(args []string) int {
 	fs.Var(&roots, "roots", "project `DIR` to watch (repeatable; default: auto-discover)")
 	webhook := fs.String("webhook", "", "`URL` that receives JSON alerts (Slack/Discord/Teams/custom)")
 	feedbackURL := fs.String("feedback-url", "", "opt in: `URL` that receives a daily anonymised digest (counts only, no paths)")
+	uploadURL := fs.String("upload-url", "", "opt in: table endpoint `URL` that receives redacted events (Supabase REST)")
+	uploadKey := fs.String("upload-key", "", "insert-only API `KEY` for --upload-url")
 	noKill := fs.Bool("no-kill", false, "never kill processes automatically")
 	noClean := fs.Bool("no-clean", false, "when no dialog can be shown, leave files in place instead of quarantining")
 	noPrompt := fs.Bool("no-prompt", false, "never show dialogs; rely on auto-clean (quarantine) only")
@@ -80,6 +83,12 @@ func cmdInstall(args []string) int {
 		if f.Name == "feedback-url" {
 			c.Cfg.FeedbackURL, changed = *feedbackURL, true
 		}
+		if f.Name == "upload-url" {
+			c.Cfg.UploadURL, changed = *uploadURL, true
+		}
+		if f.Name == "upload-key" {
+			c.Cfg.UploadKey, changed = *uploadKey, true
+		}
 	})
 	if *noKill {
 		c.Cfg.AutoKill, changed = false, true
@@ -105,6 +114,13 @@ func cmdInstall(args []string) int {
 		u.Err("Could not save config: " + err.Error())
 	} else {
 		u.Info("Config: " + p + map[bool]string{true: " (updated)", false: ""}[changed])
+	}
+	if c.Cfg.UploadURL != "" {
+		if err := feedback.CheckURL(c.Cfg.UploadURL); err != nil {
+			u.Warn("Event upload will not work: " + err.Error())
+		} else {
+			u.Info("Event upload: on. Redacted events go to your team's table; see them first with: threatscan feedback --preview")
+		}
 	}
 	rs := c.Cfg.Roots(c.P.CommonProjectDirs)
 	sweep := strings.Join(rs, ", ")

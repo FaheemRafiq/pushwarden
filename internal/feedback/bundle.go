@@ -69,7 +69,7 @@ func WriteBundle(out, dataDir, summary, configJSON string, since time.Time, red 
 		"journal.jsonl      every finding, action, decision, sweep, update and error in the period\n"+
 		"guard.log          the last 2000 lines of the guard's log\n"+
 		"latest-report.json the most recent full scan report\n"+
-		"config.json        settings (webhook and feedback URLs masked)\n"+
+		"config.json        settings (webhook, feedback and upload URLs and keys masked)\n"+
 		"summary.txt        version, system and protection status\n",
 		time.Now().Format(time.RFC3339), since.Format("2006-01-02 15:04"), len(evs), red != nil)
 	for _, f := range []struct{ name, content string }{

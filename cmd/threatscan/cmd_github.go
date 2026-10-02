@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -28,6 +29,7 @@ type ghOpts struct {
 	repos, owners, branches        stringList
 	apply, sel, list, forks        bool
 	archived, ci, tokenStdin       bool
+	fresh, progress, noAsk         bool
 }
 
 func cmdGitHubClean(args []string) int {
@@ -35,7 +37,9 @@ func cmdGitHubClean(args []string) int {
 	fs := newFlags("github-clean", "[options]\n\n"+
 		"Clones every repository the token can push to, checks every branch, strips or deletes\n"+
 		"PolinRider files, commits and pushes (one normal commit per branch; never a force-push).\n"+
-		"Without --apply it only reports what would change.")
+		"Without --apply it only reports what would change.\n"+
+		"Progress is remembered per commit: a re-run skips branches that were verified and have not\n"+
+		"moved since, so an interrupted run continues where it stopped. --fresh checks everything.")
 	fs.StringVar(&o.token, "token", "", "GitHub `PAT` (or GITHUB_TOKEN / GH_TOKEN env, or the gh CLI login)")
 	fs.BoolVar(&o.tokenStdin, "token-stdin", false, "read the token from standard input")
 	fs.StringVar(&o.api, "api", github.DefaultAPI, "GitHub API base URL (GitHub Enterprise)")
@@ -51,6 +55,9 @@ func cmdGitHubClean(args []string) int {
 	fs.StringVar(&o.keep, "keep-clones", "", "keep the clones under `DIR` for inspection")
 	fs.StringVar(&o.json, "json", "", "write the full result to `FILE`")
 	fs.BoolVar(&o.ci, "ci", false, "no colour, no interactive prompts")
+	fs.BoolVar(&o.fresh, "fresh", false, "forget the progress of earlier runs and check every branch again")
+	fs.BoolVar(&o.noAsk, "no-ask", false, "after a dry run, do not offer to fix what was found")
+	fs.BoolVar(&o.progress, "progress", false, "show what earlier runs already verified and exit (no token, no network)")
 	if _, err := parseInterspersed(fs, args); err != nil {
 		return 2
 	}
@@ -84,6 +91,11 @@ func runGitHubClean(c *ctx, o ghOpts) int {
 	u := ui.New(o.ci, false)
 	if !o.ci {
 		u.Banner(version, c.I.Version)
+	}
+	state := remediate.LoadState(c.DataDir)
+	if o.progress {
+		printProgress(u, state)
+		return 0
 	}
 	if _, err := exec.LookPath("git"); err != nil {
 		u.Err("git is not installed or not on PATH")
@@ -128,29 +140,56 @@ func runGitHubClean(c *ctx, o ghOpts) int {
 	u.Section("GITHUB CLEAN")
 	u.P("  %s", u.C("BOLD", mode))
 	u.P("  %d repositories, branches: %s", len(repos), orAll(o.branches))
-	self, _ := os.Executable()
-	rem := remediate.New(remediate.Options{
-		Apply: o.apply, Token: token, AskPass: self, Author: o.author, Branches: o.branches,
-		WorkDir: o.keep, KeepClones: o.keep != "", Version: version,
-		Log: func(m string) { u.Progress(m) },
-	}, c.P, c.I, c.DataDir)
-	rem.Journal = openJournal(c)
+	if o.fresh {
+		state.Reset()
+		u.Info("--fresh: earlier progress is forgotten, every branch is checked.")
+	} else if repos, branches := progressTotals(state); branches > 0 {
+		u.Info(fmt.Sprintf("Resuming: %d branches in %d repositories were verified by earlier runs. Only branches that changed since, or were not finished, are checked. --fresh checks everything.", branches, repos))
+	}
+	state.PruneClones(time.Duration(c.Cfg.CloneKeepDays)*24*time.Hour, int64(c.Cfg.CloneKeepMB)<<20, false)
+	pass := func(apply bool, repos []github.Repo) ([]remediate.Result, time.Time) {
+		self, _ := os.Executable()
+		rem := remediate.New(remediate.Options{
+			Apply: apply, Token: token, AskPass: self, Author: o.author, Branches: o.branches,
+			WorkDir: o.keep, KeepClones: o.keep != "", Version: version,
+			Log:   func(m string) { u.Progress(m) },
+			State: state, Host: apiHost(o.api), CloneMaxBytes: int64(c.Cfg.CloneKeepMB) << 20,
+		}, c.P, c.I, c.DataDir)
+		rem.Journal = openJournal(c)
+		start := time.Now()
+		var results []remediate.Result
+		for i, r := range repos {
+			u.P("")
+			u.P("  %s %s", u.C("BOLD_CYAN", fmt.Sprintf("[%d/%d]", i+1, len(repos))), u.C("BOLD", r.FullName))
+			res := rem.Run(ctx, r.FullName, r.CloneURL, r.DefaultBranch)
+			results = append(results, res)
+			printResult(u, res, apply)
+			if ctx.Err() != nil {
+				u.Warn("Interrupted. Progress is saved: run the same command again to continue where it stopped.")
+				break
+			}
+		}
+		return results, start
+	}
 
-	start := time.Now()
-	var results []remediate.Result
-	for i, r := range repos {
-		u.P("")
-		u.P("  %s %s", u.C("BOLD_CYAN", fmt.Sprintf("[%d/%d]", i+1, len(repos))), u.C("BOLD", r.FullName))
-		res := rem.Run(ctx, r.FullName, r.CloneURL, r.DefaultBranch)
-		results = append(results, res)
-		printResult(u, res, o.apply)
-		if ctx.Err() != nil {
-			u.Warn("Interrupted.")
-			break
+	apply := o.apply
+	results, start := pass(apply, repos)
+	code := summarize(u, results, apply, time.Since(start))
+
+	// A dry run that found something: offer to fix it now. The repositories
+	// with infected branches are still on disk, so nothing is cloned again.
+	if todo, branches := infectedRepos(repos, results); !apply && branches > 0 && ctx.Err() == nil && !o.ci && !o.noAsk {
+		if askApply(u, fmt.Sprintf("Fix and push these %d branches in %d repositories now?", branches, len(todo))) {
+			apply = true
+			u.Section("GITHUB CLEAN")
+			u.P("  %s", u.C("BOLD", "APPLY: fixes are committed and pushed to the infected branches found above."))
+			results, start = pass(true, todo)
+			code = summarize(u, results, true, time.Since(start))
+		} else {
+			u.Info(fmt.Sprintf("Nothing was changed. `threatscan github-clean --apply` reuses the downloaded repositories for %d days.", c.Cfg.CloneKeepDays))
 		}
 	}
 
-	code := summarize(u, results, o.apply, time.Since(start))
 	if o.json != "" {
 		out := struct {
 			Version string             `json:"version"`
@@ -158,7 +197,7 @@ func runGitHubClean(c *ctx, o ghOpts) int {
 			Apply   bool               `json:"apply"`
 			Started string             `json:"started"`
 			Results []remediate.Result `json:"results"`
-		}{version, login, o.apply, start.Format(time.RFC3339), results}
+		}{version, login, apply, start.Format(time.RFC3339), results}
 		b, _ := json.MarshalIndent(out, "", "  ")
 		if err := os.WriteFile(o.json, b, 0o600); err != nil {
 			u.Err("Could not write JSON: " + err.Error())
@@ -167,6 +206,74 @@ func runGitHubClean(c *ctx, o ghOpts) int {
 		u.Info("JSON written to " + o.json)
 	}
 	return code
+}
+
+// infectedRepos returns the repositories a dry run found infected branches
+// in, and how many such branches there are.
+func infectedRepos(repos []github.Repo, results []remediate.Result) (todo []github.Repo, branches int) {
+	for i, res := range results {
+		if _, infected, _, _, _ := res.Counts(); infected > 0 && i < len(repos) {
+			todo = append(todo, repos[i])
+			branches += infected
+		}
+	}
+	return
+}
+
+// askApply asks a yes/no question in the terminal; without one the answer is no.
+var askApply = func(u *ui.UI, question string) bool {
+	if !isTTY() {
+		return false
+	}
+	fmt.Printf("\n  %s [y/N] ", question)
+	line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	ans := strings.ToLower(strings.TrimSpace(line))
+	return ans == "y" || ans == "yes"
+}
+
+// apiHost names the GitHub server in the progress file.
+func apiHost(api string) string {
+	if p, err := url.Parse(api); err == nil && p.Host != "" {
+		return p.Host
+	}
+	return "api.github.com"
+}
+
+func progressTotals(s *remediate.State) (repos, branches int) {
+	for _, p := range s.Progress() {
+		repos++
+		branches += p.Clean + p.Pushed + p.Manual
+	}
+	return
+}
+
+// printProgress shows what earlier runs verified.
+func printProgress(u *ui.UI, s *remediate.State) {
+	ps := s.Progress()
+	u.Section("GITHUB CLEAN PROGRESS")
+	if len(ps) == 0 {
+		u.P("  Nothing is remembered yet. A run records every branch it finishes.")
+		if n, size := s.Clones(); n > 0 {
+			u.P("  %d repositories with branches still to fix are kept on disk for --apply (%.0f MB); removed after a few days (clone_keep_days) or by --fresh.", n, float64(size)/(1<<20))
+		}
+		return
+	}
+	w, clean, pushed, manual := 0, 0, 0, 0
+	for _, p := range ps {
+		w = max(w, len(p.Repo))
+	}
+	u.P("  %-*s  %6s %6s %6s  %s", w, "repository", "clean", "fixed", "review", "last verified")
+	for _, p := range ps {
+		u.P("  %-*s  %6d %6d %6d  %s", w, p.Repo, p.Clean, p.Pushed, p.Manual, short(p.Last))
+		clean, pushed, manual = clean+p.Clean, pushed+p.Pushed, manual+p.Manual
+	}
+	u.P("")
+	u.P("  %d repositories, %d branches verified: %d clean, %d fixed and pushed, %d need manual review.", len(ps), clean+pushed+manual, clean, pushed, manual)
+	u.P("  A branch is checked again when its tip commit changes, or when ThreatScan or its indicators are updated.")
+	if n, size := s.Clones(); n > 0 {
+		u.P("  %d repositories with branches still to fix are kept on disk for --apply (%.0f MB); removed after a few days (clone_keep_days) or by --fresh.", n, float64(size)/(1<<20))
+	}
+	u.P("  threatscan github-clean --fresh   forget this and check everything")
 }
 
 func orAll(b []string) string {
@@ -334,6 +441,14 @@ func printResult(u *ui.UI, res remediate.Result, apply bool) {
 	}
 	for _, b := range res.Branches {
 		var line string
+		switch {
+		case b.Resumed && b.Status == remediate.StatusClean:
+			u.P("    %-30s %s", u.C("BOLD", b.Name), u.C("DIM", "clean, unchanged since verified "+short(b.At)))
+			continue
+		case b.Resumed && b.Status == remediate.StatusPushed:
+			u.P("    %-30s %s", u.C("BOLD", b.Name), u.C("DIM", fmt.Sprintf("fixed earlier (%s, pushed %s), unchanged since", short(b.At), b.Commit)))
+			continue
+		}
 		switch b.Status {
 		case remediate.StatusClean:
 			line = u.C("BOLD_GREEN", "clean")
@@ -371,7 +486,7 @@ func printResult(u *ui.UI, res remediate.Result, apply bool) {
 
 func summarize(u *ui.UI, results []remediate.Result, apply bool, d time.Duration) int {
 	u.Section("SUMMARY")
-	var clean, infected, pushed, failed, manual, errs int
+	var clean, infected, pushed, failed, manual, errs, earlier, pushedEarlier int
 	var failedList, manualList []string
 	for _, r := range results {
 		if r.Error != "" {
@@ -382,6 +497,12 @@ func summarize(u *ui.UI, results []remediate.Result, apply bool, d time.Duration
 		c, i, p, f, m := r.Counts()
 		clean, infected, pushed, failed, manual = clean+c, infected+i, pushed+p, failed+f, manual+m
 		for _, b := range r.Branches {
+			if b.Resumed {
+				earlier++
+				if b.Status == remediate.StatusPushed {
+					pushedEarlier++
+				}
+			}
 			switch b.Status {
 			case remediate.StatusPushFailed, remediate.StatusError:
 				failedList = append(failedList, r.Repo+" @ "+b.Name+": "+b.Error)
@@ -392,10 +513,20 @@ func summarize(u *ui.UI, results []remediate.Result, apply bool, d time.Duration
 	}
 	u.P("  %-24s %d", "Repositories:", len(results))
 	u.P("  %-24s %d", "Branches clean:", clean)
+	fixed := strconv.Itoa(pushed)
+	if pushedEarlier > 0 {
+		fixed += fmt.Sprintf(" (%d in earlier runs)", pushedEarlier)
+	}
 	if apply {
-		u.P("  %-24s %s", "Branches fixed+pushed:", u.C("BOLD_GREEN", strconv.Itoa(pushed)))
+		u.P("  %-24s %s", "Branches fixed+pushed:", u.C("BOLD_GREEN", fixed))
 	} else {
 		u.P("  %-24s %s", "Branches infected:", u.C("BOLD_RED", strconv.Itoa(infected)))
+		if pushed > 0 {
+			u.P("  %-24s %s", "Branches fixed+pushed:", fixed)
+		}
+	}
+	if earlier > 0 {
+		u.P("  %-24s %d of the branches above, unchanged since", "Verified by earlier runs:", earlier)
 	}
 	if failed+errs > 0 {
 		u.P("  %-24s %s", "Failed:", u.C("BOLD_RED", strconv.Itoa(failed+errs)))
@@ -414,8 +545,8 @@ func summarize(u *ui.UI, results []remediate.Result, apply bool, d time.Duration
 	u.P("")
 	switch {
 	case !apply && infected > 0:
-		u.Warn("Dry run. Re-run with --apply to commit and push these fixes.")
-	case apply && pushed > 0:
+		u.Warn("Dry run. Re-run with --apply to commit and push these fixes. The downloaded repositories are kept, so nothing is cloned twice.")
+	case apply && pushed > pushedEarlier:
 		u.OK("Pushed fixes. Now: rotate this token and every secret those repos or their CI could read,")
 		u.P("      review GitHub > Settings > Applications and Deploy keys, and ask collaborators to git pull.")
 		u.Info("Quarantined originals: threatscan history")

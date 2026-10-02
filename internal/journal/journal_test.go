@@ -115,3 +115,31 @@ func TestConcurrentWriters(t *testing.T) {
 		t.Fatalf("lost or torn events: %d of 400", len(got))
 	}
 }
+
+func TestOldArchivesAreNotOpenedForRecentReads(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Now()
+	line := func(title string) []byte {
+		return []byte(`{"ts":"` + now.Format(time.RFC3339) + `","kind":"guard","title":"` + title + `"}` + "\n")
+	}
+	old := "journal-" + now.Add(-30*24*time.Hour).Format("20060102-150405") + "000.jsonl"
+	recent := "journal-" + now.Add(-time.Hour).Format("20060102-150405") + "000.jsonl"
+	os.WriteFile(filepath.Join(dir, old), line("in old archive"), 0o600)
+	os.WriteFile(filepath.Join(dir, recent), line("in recent archive"), 0o600)
+	os.WriteFile(filepath.Join(dir, "journal-imported.jsonl"), line("oddly named"), 0o600)
+	os.WriteFile(filepath.Join(dir, FileName), line("active"), 0o600)
+	titles := func(f Filter) string {
+		var out []string
+		for _, e := range Read(dir, f) {
+			out = append(out, e.Title)
+		}
+		return strings.Join(out, ", ")
+	}
+	if got := titles(Filter{Archives: true}); got != "in old archive, in recent archive, oddly named, active" {
+		t.Fatalf("without Since every archive is read: %s", got)
+	}
+	// rotated a month before the period asked for: it cannot hold such an event, so it is skipped unopened
+	if got := titles(Filter{Archives: true, Since: now.Add(-24 * time.Hour)}); got != "in recent archive, oddly named, active" {
+		t.Fatalf("with Since: %s", got)
+	}
+}

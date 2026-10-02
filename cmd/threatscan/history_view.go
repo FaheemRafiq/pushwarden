@@ -150,12 +150,32 @@ func details(b *strings.Builder, e journal.Event) {
 		fmt.Fprintf(b, "      note: %s\n", e.Note)
 	}
 	fmt.Fprintf(b, "      via: %s, v%s, indicators %s\n", e.Ctx, e.Ver, e.IOCs)
+	if s := uploadState(e); s != "" {
+		fmt.Fprintf(b, "      central upload: %s\n", s)
+	}
+}
+
+// uploadState says whether an event is stored at upload_url: "uploaded",
+// "waiting", or "" when the central upload is off.
+func uploadState(e journal.Event) string {
+	switch {
+	case e.Uploaded == nil:
+		return ""
+	case *e.Uploaded:
+		return "uploaded"
+	}
+	return "waiting"
 }
 
 // formatJournalAll prints every event in time order.
 func formatJournalAll(evs []journal.Event, limit int, det bool) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "  %-16s %-9s %-9s %s\n", "when", "kind", "severity", "what")
+	upCol := len(evs) > 0 && evs[0].Uploaded != nil // central upload is on: show each event's state
+	if upCol {
+		fmt.Fprintf(&b, "  %-16s %-9s %-9s %-9s %s\n", "when", "kind", "severity", "upload", "what")
+	} else {
+		fmt.Fprintf(&b, "  %-16s %-9s %-9s %s\n", "when", "kind", "severity", "what")
+	}
 	for _, e := range tail(evs, limit) {
 		what := e.Title
 		switch e.Kind {
@@ -176,7 +196,11 @@ func formatJournalAll(evs []journal.Event, limit int, det bool) string {
 				what = fmt.Sprintf("%s: %v repos, %v critical, %v high, %v warning in %vs", e.Title, e.Data["repos"], e.Data["critical"], e.Data["high"], e.Data["warning"], s)
 			}
 		}
-		fmt.Fprintf(&b, "  %-16s %-9s %-9s %s\n", short(e.TS), e.Kind, e.Sev, strings.TrimSpace(what))
+		if upCol {
+			fmt.Fprintf(&b, "  %-16s %-9s %-9s %-9s %s\n", short(e.TS), e.Kind, e.Sev, uploadState(e), strings.TrimSpace(what))
+		} else {
+			fmt.Fprintf(&b, "  %-16s %-9s %-9s %s\n", short(e.TS), e.Kind, e.Sev, strings.TrimSpace(what))
+		}
 		if e.Kind == journal.KindFinding || e.Kind == journal.KindAction {
 			if e.Why != "" {
 				fmt.Fprintf(&b, "      why: %s\n", e.Why)

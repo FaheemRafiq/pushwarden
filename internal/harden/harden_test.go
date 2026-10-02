@@ -41,3 +41,27 @@ func TestEditorDryRun(t *testing.T) {
 		t.Fatal("dry run wrote the file")
 	}
 }
+
+func TestOnlyTheTwoNewestSettingsBackupsAreKept(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "settings.json")
+	os.WriteFile(p, []byte(`{"editor.fontSize": 14}`), 0o644)
+	for _, ts := range []string{"1700000001", "1700000002", "1700000003"} {
+		os.WriteFile(p+".threatscan-"+ts+".bak", []byte("{}"), 0o600)
+	}
+	os.WriteFile(p+".mine.bak", []byte("{}"), 0o600) // not ours
+	if changed, _, err := Editor(p, false); err != nil || !changed {
+		t.Fatalf("changed=%v err=%v", changed, err)
+	}
+	baks, _ := filepath.Glob(p + ".threatscan-*.bak")
+	if len(baks) != 2 {
+		t.Fatalf("backups kept: %v", baks)
+	}
+	for _, b := range baks {
+		if strings.Contains(b, "1700000001") || strings.Contains(b, "1700000002") {
+			t.Fatalf("an old backup survived: %v", baks)
+		}
+	}
+	if _, err := os.Stat(p + ".mine.bak"); err != nil {
+		t.Fatal("a backup that is not ours was removed")
+	}
+}

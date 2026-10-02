@@ -34,8 +34,17 @@ type Config struct {
 	ReportKeep         int      `json:"report_keep"`
 	FeedbackURL        string   `json:"feedback_url"`         // opt-in: daily anonymised digest is POSTed here
 	FeedbackIdentify   bool     `json:"feedback_identify"`    // include the hostname in the digest
+	UploadURL          string   `json:"upload_url"`           // opt-in: redacted journal events are uploaded to this table endpoint
+	UploadKey          string   `json:"upload_key"`           // insert-only API key for upload_url
 	Journal            bool     `json:"journal"`              // record every finding, action and decision in journal.jsonl
 	JournalMinSeverity string   `json:"journal_min_severity"` // lowest finding severity recorded
+	// disk limits enforced by the daily housekeeping; 0 disables a limit
+	JournalKeepMB      int `json:"journal_keep_mb"`      // rotated journal archives, in total
+	JournalKeepDays    int `json:"journal_keep_days"`    // oldest journal archive kept
+	QuarantineKeepDays int `json:"quarantine_keep_days"` // quarantined originals are deleted after this
+	QuarantineKeepMB   int `json:"quarantine_keep_mb"`   // quarantine folder, oldest copies go first
+	CloneKeepDays      int `json:"clone_keep_days"`      // github-clean copies waiting for --apply
+	CloneKeepMB        int `json:"clone_keep_mb"`        // those copies, in total
 	// program self-update (Go build)
 	AutoUpdate     bool   `json:"auto_update"`
 	UpdateChannel  string `json:"update_channel"`
@@ -51,6 +60,8 @@ func Default() *Config {
 		Prompt: true, PromptTimeout: 180, NotifyDesktop: true, NotifySweeps: true, NotifyMinSeverity: "HIGH",
 		WebhookMinSeverity: "HIGH", BlockC2: true, IOCUpdate: true, ReportKeep: 60,
 		Journal: true, JournalMinSeverity: "WARNING",
+		JournalKeepMB: 100, JournalKeepDays: 365, QuarantineKeepDays: 90, QuarantineKeepMB: 500,
+		CloneKeepDays: 3, CloneKeepMB: 2048,
 		AutoUpdate: true, UpdateChannel: "stable", UpdateInterval: 6 * 3600,
 	}
 }

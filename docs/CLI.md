@@ -9,14 +9,15 @@ threatscan <command> [options]
 
 This page documents each command, its options, exit codes, the configuration keys,
 the files ThreatScan keeps, and the environment variables it reads. For the install
-one-liner and a description of the threat, see the [README](../README.md).
+one-liner and a description of the threat, see the [README](https://github.com/FaheemRafiq/threatscan#readme) and the
+[documentation site](https://faheemrafiq.github.io/threatscan/guide/overview.html).
 
 ## Contents
 
 - [Conventions](#conventions)
 - [Quick start](#quick-start)
 - [Commands](#commands)
-  - [scan](#scan) · [status](#status) · [history and restore](#history-and-restore) · [alerts](#alerts) · [feedback](#feedback)
+  - [scan](#scan) · [status](#status) · [history and restore](#history-and-restore) · [alerts](#alerts) · [feedback](#feedback) · [cleanup](#cleanup)
   - [github-clean](#github-clean)
   - [guard](#guard) · [install](#install) · [uninstall](#uninstall)
   - [update](#update) · [update-iocs](#update-iocs)
@@ -153,6 +154,7 @@ or `FAILED`. *Actions and decisions* lists what was done, in order, with the rea
 | `--since WHEN` | only newer events: `30m`, `24h`, `7d`, `2w`, or a date such as `2026-10-01` |
 | `--path TEXT` | only events whose path, title or command line contains the text |
 | `--archive` | also read the rotated journal archives |
+| `--not-uploaded` | only the events still waiting to be uploaded to `upload_url`, see [feedback](#feedback). Implies `--all --archive` |
 | `--limit N` | number of rows per part (default 50) |
 | `--json` | the raw events as JSON |
 | `--restore PATH` | put the original file back at `PATH`. It is still malicious and will be flagged again |
@@ -163,8 +165,9 @@ or `FAILED`. *Actions and decisions* lists what was done, in order, with the rea
 
 **Where it comes from.** The journal, `journal.jsonl` in the data directory, records every sighting
 of every finding at WARNING or above, with no deduplication, plus every action, decision, sweep,
-update and error. It is never pruned: at 10 MB it is rolled into a gzip archive beside it and a new
-file starts. Turn it off with `threatscan config --set journal=false`; history then shows only the
+update and error. At 10 MB it is rolled into a gzip archive beside it and a new file starts. The
+oldest archives are deleted once the archives pass 100 MB in total or are older than a year
+(`journal_keep_mb`, `journal_keep_days`; see [cleanup](#cleanup)). Turn it off with `threatscan config --set journal=false`; history then shows only the
 actions kept in the quarantine index.
 
 Examples:
@@ -219,6 +222,35 @@ branch, archived repository, permission) is reported, not forced.
 **Dry run is the default.** Without `--apply` nothing is committed or pushed; the output says what
 would change on each branch.
 
+**Progress is remembered.** Every branch that is finished (clean, fixed and pushed, or flagged for
+manual review) is recorded right away, together with the commit it was verified at. If a run is
+interrupted with Ctrl-C, hangs, or the machine goes to sleep, run the same command again: branches
+whose tip is still that commit are skipped, and a repository where nothing moved is not even
+cloned. The summary counts what this run did and what earlier runs did. A branch is checked again
+when its tip changes, because the attacker can push again, and when ThreatScan or its indicators
+are updated, because a newer version may find more. Dry-run findings, refused pushes and errors
+are never recorded as done. `--progress` shows what is remembered; `--fresh` forgets it and checks
+everything.
+
+**From dry run to fix without doing the work twice.** A dry run in a terminal that finds
+infected branches ends with a question: `Fix and push these 12 branches in 4 repositories now?`
+Answer `y` and the fixes are committed and pushed in the same run. Answer no, and a later
+`--apply` picks up from there:
+
+| After a dry run, `--apply` … | |
+|---|---|
+| branches found clean | are skipped, as long as their tip has not moved |
+| repositories where every branch was clean | are not cloned |
+| repositories with infected branches | are **not cloned again**: the dry run's copy is kept in the data directory and only new commits are fetched |
+| the infected branches | are scanned once more, then fixed, committed and pushed |
+
+The second scan of an infected branch is deliberate. The fix is made from the files as they are
+on the branch at that moment, so nothing stale is ever pushed, and it takes a moment per branch.
+A kept copy is a bare repository with no checked-out files and no token. It is deleted as soon
+as its repository has nothing left to fix, after 3 days without use (`clone_keep_days`), when the
+copies together pass 2 GB (`clone_keep_mb`, least recently used first), or by `--fresh`. A
+repository larger than that limit is not kept at all.
+
 | Option | Effect |
 |---|---|
 | `--apply` | commit and push the fixes |
@@ -236,6 +268,9 @@ would change on each branch.
 | `--json FILE` | write the full result to `FILE` |
 | `--api URL` | GitHub Enterprise API base, default `https://api.github.com` |
 | `--ci` | no colour, no interactive prompts |
+| `--progress` | show what earlier runs already verified, per repository, and exit. Needs no token and no network |
+| `--fresh` | forget the progress of earlier runs, delete the kept copies and check every branch again |
+| `--no-ask` | after a dry run, do not offer to fix what was found. `--ci` implies it |
 
 **The token.** Create a fine-grained personal access token with *Repository permissions,
 Contents: Read and write* on the repositories you want cleaned (a classic token needs the
@@ -252,6 +287,7 @@ first. `--repo` does the same non-interactively.
 | Status | Meaning |
 |---|---|
 | `clean` | nothing to do |
+| `clean, unchanged since verified …` / `fixed earlier …` | taken from an earlier run: the branch is still at the commit that was verified. In the JSON: `"resumed": true` |
 | `infected` | dry run: this branch needs fixes |
 | `pushed` | fixed and pushed; the short commit hash is shown |
 | `push-failed` | fixed locally, the remote refused the push. The error is shown |
@@ -274,6 +310,8 @@ Examples:
 threatscan github-clean --list
 threatscan github-clean                                     # dry run over everything
 threatscan github-clean --select --apply                    # pick from a list
+threatscan github-clean --apply                             # interrupted? the same command continues
+threatscan github-clean --progress                          # what is already verified
 threatscan github-clean --repo me/api --repo me/web --apply
 threatscan github-clean --owner my-org --branch main --branch 'release/*' --apply
 GITHUB_TOKEN=... threatscan github-clean --ci --apply --json clean.json
@@ -289,6 +327,8 @@ report that a finding was wrong.
 threatscan feedback [--days N] [--out FILE] [--no-redact]
 threatscan feedback --false-positive PATH [--note "what it really is"]
 threatscan feedback --digest
+threatscan feedback --preview
+threatscan feedback --upload
 ```
 
 | Option | Effect |
@@ -299,14 +339,17 @@ threatscan feedback --digest
 | `--no-redact` | keep paths, user and host names. Token-shaped strings are masked regardless |
 | `--false-positive PATH` | record that the finding on `PATH` was wrong, with an optional `--note`. Does not change the file; `history --allow` does that |
 | `--digest` | print the daily digest that `feedback_url` would receive |
+| `--preview` | print the next events that `upload_url` would receive, exactly as they would be stored, and how many are waiting. Sends nothing |
+| `--upload` | send every waiting event to `upload_url` now instead of waiting for the guard |
 
-**Nothing is uploaded by this command.** It writes a file and tells you what is in it, so you can
-look before you send it.
+**Nothing is uploaded unless you opted in.** Without options this command writes a file and tells
+you what is in it, so you can look before you send it. The digest and the central event upload
+below are both off until their URL is set, and `threatscan status` shows whether the upload is on.
 
 **Redaction, on by default.** The home folder is written as `~`, the user name and host name are
 removed, and anything shaped like a secret is masked: GitHub, AWS, Slack and API tokens, private
-keys, credentials inside URLs, and the values of `token`, `password`, `api_key`, `webhook_url` and
-similar keys.
+keys, Supabase keys and other JSON Web Tokens, credentials inside URLs, and the values of `token`,
+`password`, `api_key`, `webhook_url`, `upload_key` and similar keys.
 
 **The optional daily digest.** Off unless `feedback_url` is set, for example by the team lead at
 install time with `THREATSCAN_FEEDBACK_URL`. Once a day the guard then posts a summary to that
@@ -316,6 +359,116 @@ durations, errors, and the notes written with false-positive reports. It never c
 contents, command lines or paths; a false-positive report carries the file's base name only. The
 host name is included only with `feedback_identify=true`. `threatscan feedback --digest` shows
 exactly what would be sent.
+
+**The optional central event upload.** Off unless `upload_url` is set. It gives whoever maintains
+ThreatScan for a team the full record from every machine in one database table, so a false
+positive or a failed action on a colleague's machine can be diagnosed without asking for a
+bundle. Every 10 minutes the guard sends the journal events it has not sent yet: findings,
+actions, dialog answers, sweeps, guard starts, updates, errors and false-positive reports.
+No URL is built into the program: nothing is uploaded until `upload_url` is set on the machine.
+
+What is sent: each event with its severity, category, threat name, title, path, command line,
+matched text, evidence, the reason and response texts, the action and whether it worked, plus the
+ThreatScan version, the OS and the random machine id. What is removed first, always: the home
+folder becomes `~`, the user name and host name are taken out, and secrets are masked as
+described under redaction above. This path has no switch to turn redaction off. File contents
+are never sent, apart from the matched text and evidence lines of a finding.
+`threatscan feedback --preview` prints the rows before anything leaves the machine.
+
+Delivery: batches of 200 over HTTPS. A plain `http://` URL is refused unless it points at this
+machine, and redirects are not followed.
+
+**Every event is either `uploaded` or `waiting`.** An event counts as uploaded only after the
+server accepted the batch it was in. `threatscan status` shows the totals and the time of the
+last upload, `threatscan history --all` shows the state of each event in an `upload` column,
+`history --not-uploaded` lists what is still waiting, and `history --json` carries
+`"uploaded": true|false`. The state belongs to the URL that is set: after `upload_url` changes,
+every event is waiting again and the new destination receives the full record. The state is
+counted by an event's position in the journal, not by its timestamp, so a clock change cannot
+make an event look uploaded.
+
+**Offline.** Protection does not need the network, and every event is written to the local
+journal first. While the server cannot be reached the events stay `waiting`; `status` shows since
+when and why. The guard tries again after 1, 2, 4 and 8 minutes and then every 10 minutes, so a
+machine that is back online delivers its backlog within minutes, all of it in one run (up to
+20000 events). `guard.log` gets one line when uploads start failing and one when they work again.
+If a batch was stored but the answer was lost, it is sent again; each event has a fixed id and
+the table skips ids it already holds, so nothing is stored twice. Journal archives that still
+hold unsent events are kept until twice the journal limits, so an offline period has to be very
+long before events are dropped unsent; if that happens `guard.log` says how many.
+
+Setting it up with [Supabase](https://supabase.com) (hosted Postgres, no server to run):
+
+1. Create a project. Open the SQL editor, paste
+   [`docs/supabase.sql`](https://github.com/FaheemRafiq/threatscan/blob/main/docs/supabase.sql)
+   and run it. It creates the table `threatscan_events`, four views and the access rules.
+2. In the project's API settings copy the project URL and the public key, named `anon` or
+   `publishable`. Never use the `service_role` or `secret` key on a machine.
+3. On each machine, at install time:
+
+   ```
+   curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/installers/install.sh | \
+     THREATSCAN_UPLOAD_URL=https://PROJECT.supabase.co/rest/v1/threatscan_events THREATSCAN_UPLOAD_KEY=KEY sh
+   ```
+
+   or on a machine that already runs ThreatScan:
+
+   ```
+   threatscan config --set upload_url=https://PROJECT.supabase.co/rest/v1/threatscan_events upload_key=KEY
+   threatscan feedback --preview
+   threatscan feedback --upload
+   ```
+
+   The guard reads its settings when it starts, so restart it after `config --set`
+   (`systemctl --user restart threatscan-guard.service` on Linux, or sign out and in).
+4. Read the data in the Supabase dashboard:
+
+| View | Shows |
+|---|---|
+| `threatscan_false_positive_signals` | what users said was wrong: dialog answers "keep" and `--false-positive` reports, with their notes |
+| `threatscan_findings_summary` | each distinct finding with sightings and how many machines see it. One machine only is a hint of a false positive |
+| `threatscan_tool_errors` | failed actions, recovered panics, refused updates |
+| `threatscan_machines` | per machine: last event, last upload, version, OS, indicator version, average sweep time |
+
+The key on the machines can only add rows. The SQL turns row level security on with a single
+insert policy for that key, so it cannot read, change or delete anything, and the views are closed
+to it as well. Someone who extracts the key from a machine can add junk rows, nothing more. Any
+other server works too if it accepts a JSON array by POST with the key in the `apikey` and
+`Authorization: Bearer` headers and answers 2xx.
+
+### cleanup
+
+Show what ThreatScan occupies on disk and remove what is past its limits.
+
+```
+threatscan cleanup [--dry-run]
+```
+
+ThreatScan is meant to run for months without attention, so nothing it stores may grow without
+bound. Every store in the data directory has a limit. The guard enforces them once a day;
+this command does the same on demand and prints the sizes. `--dry-run` shows what would be
+removed and removes nothing. `threatscan status` shows the total in its `Disk use` line.
+
+| Store | Limit | Setting |
+|---|---|---|
+| journal archives (`journal-*.jsonl.gz`) | 100 MB in total and 365 days; oldest deleted first. The active `journal.jsonl` rotates at 10 MB | `journal_keep_mb`, `journal_keep_days` |
+| quarantined originals | 90 days and 500 MB; oldest deleted first. `history` then shows the entry as expired, and it can no longer be restored | `quarantine_keep_days`, `quarantine_keep_mb` |
+| repository copies kept by `github-clean` | 3 days without use and 2 GB in total | `clone_keep_days`, `clone_keep_mb` |
+| `github-clean` progress | repositories not seen for 90 days are forgotten | |
+| guard log | rotates at 5 MB, 5 archives kept | |
+| alerts log | rotates at 5 MB, 3 archives kept | |
+| reports | newest 60 | `report_keep` |
+| allow decisions | removed when they expire after 30 days | |
+| editor settings backups (`settings.json.threatscan-*.bak`) | newest 2 per file | |
+| leftovers in the system temp folder from an interrupted `github-clean` | removed after a day | |
+
+Set a limit to `0` to turn it off, for example `threatscan config --set quarantine_keep_days=0`
+to keep quarantined files until you remove them yourself.
+
+When the central upload is on, a journal archive whose events are not all uploaded yet is kept
+until twice the journal limits. Deleting an archive does not disturb the upload: a small marker
+(`journal-DATE.pruned`) keeps the count, so no event is sent twice and the uploaded/waiting state
+of the remaining events stays correct.
 
 ### guard
 
@@ -365,6 +518,9 @@ turned on.
 |---|---|
 | `--roots DIR` | project directory to watch. Repeatable. Default: auto-discover the usual places under your home folder |
 | `--webhook URL` | URL that receives JSON alerts (Slack, Discord, Teams or your own endpoint) |
+| `--feedback-url URL` | opt in to the daily digest of counts, see [feedback](#feedback) |
+| `--upload-url URL` | opt in to the central event upload: the table endpoint that receives redacted events, see [feedback](#feedback) |
+| `--upload-key KEY` | the insert-only key for `--upload-url` |
 | `--no-block-c2` | do not ask for administrator rights to block the C2 servers (default is to ask once; see [protect](#protect)) |
 | `--deep` | the guard also scans `node_modules` and `vendor` (slow) |
 | `--full-interval SECONDS` | seconds between full sweeps (default 21600) |
@@ -377,8 +533,8 @@ turned on.
 | `--dry-run` | show what would be done and change nothing |
 
 The one-line installer from the README calls this for you; its environment variables
-`THREATSCAN_ROOTS`, `THREATSCAN_WEBHOOK`, `THREATSCAN_VERSION` and `THREATSCAN_NO_INSTALL` map
-onto these options.
+`THREATSCAN_ROOTS`, `THREATSCAN_WEBHOOK`, `THREATSCAN_FEEDBACK_URL`, `THREATSCAN_UPLOAD_URL`,
+`THREATSCAN_UPLOAD_KEY`, `THREATSCAN_VERSION` and `THREATSCAN_NO_INSTALL` map onto these options.
 
 ### uninstall
 
@@ -581,8 +737,16 @@ Stored in `config.json` in the data directory. Change them with `threatscan conf
 | `report_keep` | `60` | number of reports kept |
 | `journal` | `true` | record every finding, action, decision, sweep and error in `journal.jsonl` |
 | `journal_min_severity` | `WARNING` | lowest finding severity recorded in the journal |
+| `journal_keep_mb` | `100` | journal archives kept, in total; the oldest are deleted first. `0` = no limit |
+| `journal_keep_days` | `365` | oldest journal archive kept. `0` = no limit |
+| `quarantine_keep_days` | `90` | quarantined originals are deleted after this many days. `0` = keep until removed by hand |
+| `quarantine_keep_mb` | `500` | size of the quarantine folder; the oldest copies are deleted first. `0` = no limit |
+| `clone_keep_days` | `3` | how long `github-clean` keeps a repository copy waiting for `--apply` |
+| `clone_keep_mb` | `2048` | those copies in total; a larger repository is not kept |
 | `feedback_url` | `""` | opt-in: the guard posts a daily digest of counts here (no paths, no command lines) |
 | `feedback_identify` | `false` | include the host name in the digest instead of only a random machine id |
+| `upload_url` | `""` | opt-in: the guard uploads redacted journal events to this table endpoint every 10 minutes and catches up after being offline, see [feedback](#feedback) |
+| `upload_key` | `""` | the insert-only API key sent with each upload |
 | `auto_update` | `true` | update the binary automatically |
 | `update_channel` | `stable` | `stable` or `beta` |
 | `update_interval` | `21600` | seconds between update checks |
@@ -605,13 +769,16 @@ The data directory is `~/.threatscan` (override with `THREATSCAN_HOME`).
 |---|---|
 | `config.json` | settings |
 | `iocs.json` | downloaded indicators; the binary carries an embedded copy as fallback |
-| `journal.jsonl` | the complete activity record: every finding at every sighting, every action, decision, sweep, update and error. Rotated at 10 MB into `journal-DATE.jsonl.gz`; archives are never deleted |
-| `guard.log` | the guard's text log, rotated at 5 MB into `guard-DATE.log.gz` |
-| `machine-id` | a random identifier used only in the optional feedback digest |
-| `alerts.log` | one JSON line per alert, including the `why` and `response` texts as worded at the time |
+| `journal.jsonl` | the complete activity record: every finding at every sighting, every action, decision, sweep, update and error. Rotated at 10 MB into `journal-DATE.jsonl.gz`; the oldest archives are deleted past 100 MB or one year, leaving a tiny `journal-DATE.pruned` marker with their event count |
+| `guard.log` | the guard's text log, rotated at 5 MB into `guard-DATE.log.gz`; the newest 5 archives are kept |
+| `machine-id` | a random identifier used only in the optional feedback digest and event upload |
+| `github-clean-state.json` | what `github-clean` already verified: per repository and branch the commit, the result and the time. No token. Deleted by `github-clean --fresh` |
+| `github-clean-clones/` | bare copies of repositories in which a `github-clean` dry run found infected branches, kept so `--apply` does not download them again. Removed when fixed, after 3 days without use, past 2 GB in total, or by `github-clean --fresh` |
+| `upload-state.json` | when `upload_url` is set: how many events are uploaded to that URL, the time of the last attempt and success, and the last error. Deleting it sends everything again; the table stores nothing twice |
+| `alerts.log` | one JSON line per alert, including the `why` and `response` texts as worded at the time. Rotated at 5 MB; the newest 3 archives are kept |
 | `reports/` | timestamped JSON reports plus `latest.json` |
-| `quarantine/` | copies of every stripped or deleted file, and `index.jsonl`, the protection history |
-| `decisions.json` | files you chose to allow, with their content hash |
+| `quarantine/` | copies of every stripped or deleted file, and `index.jsonl`, the protection history. Copies are deleted after 90 days or past 500 MB |
+| `decisions.json` | files you chose to allow, with their content hash; entries are removed when they expire after 30 days |
 | `ThreatScan Notifier.app` | macOS only, in the install directory: the helper that posts notifications so a click opens `threatscan alerts --gui` |
 | `guard/` | heartbeat and state of the running guard |
 
@@ -636,6 +803,8 @@ with a link in `~/.local/bin` (override with `THREATSCAN_INSTALL_DIR`).
 | `THREATSCAN_ROOTS` | install script | space-separated project directories to watch |
 | `THREATSCAN_WEBHOOK` | install script | webhook URL |
 | `THREATSCAN_FEEDBACK_URL` | install script | opt in to the daily digest, see [feedback](#feedback) |
+| `THREATSCAN_UPLOAD_URL` | install script | opt in to the central event upload, see [feedback](#feedback) |
+| `THREATSCAN_UPLOAD_KEY` | install script | the insert-only key for `THREATSCAN_UPLOAD_URL` |
 | `THREATSCAN_VERSION` | install script | install this release instead of the latest |
 | `THREATSCAN_NO_INSTALL` | install script | download the binary only, do not register the guard |
 | `THREATSCAN_BASE_URL` | install script | download from a mirror |

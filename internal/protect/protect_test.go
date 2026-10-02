@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/FaheemRafiq/threatscan/internal/iocs"
 	"github.com/FaheemRafiq/threatscan/internal/platform"
@@ -184,5 +185,24 @@ func TestMidFileInjectionQuarantinedWhole(t *testing.T) {
 	}
 	if got, _ := os.ReadFile(idx); string(got) != body {
 		t.Error("restored bytes differ")
+	}
+}
+
+func TestExpiredDecisionsAreDropped(t *testing.T) {
+	dir := t.TempDir()
+	old := time.Now().Add(-decisionTTL - time.Hour).Unix()
+	fresh := time.Now().Add(-time.Hour).Unix()
+	os.WriteFile(filepath.Join(dir, "decisions.json"), []byte(fmt.Sprintf(
+		`{"/a/old.js":{"decision":"keep","sha256":"x","ts":%d,"title":"t"},"/a/new.js":{"decision":"keep","sha256":"y","ts":%d,"title":"t"}}`, old, fresh)), 0o600)
+	pr := New(platform.New(), nil, dir, nil, false)
+	if _, ok := pr.decisions["/a/old.js"]; ok || len(pr.decisions) != 1 {
+		t.Fatalf("expired decision still loaded: %v", pr.decisions)
+	}
+	target := filepath.Join(dir, "x.js")
+	os.WriteFile(target, []byte("x"), 0o600)
+	pr.Remember(target, "t", prompt.Keep)
+	b, _ := os.ReadFile(filepath.Join(dir, "decisions.json"))
+	if strings.Contains(string(b), "/a/old.js") || !strings.Contains(string(b), "/a/new.js") {
+		t.Fatalf("decisions.json after a save:\n%s", b)
 	}
 }
