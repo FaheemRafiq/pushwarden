@@ -34,15 +34,22 @@ var (
 	mdLink     = regexp.MustCompile(`\]\(([^)\s]+)\)`)
 )
 
+// readText reads a file with Unix line endings, whatever the checkout used
+// (git on Windows may convert to CRLF).
+func readText(p string) (string, error) {
+	b, err := os.ReadFile(p)
+	return strings.ReplaceAll(string(b), "\r\n", "\n"), err
+}
+
 func loadSite(t *testing.T) []sitePage {
 	t.Helper()
-	nav, err := os.ReadFile(filepath.Join("_data", "nav.yml"))
+	nav, err := readText(filepath.Join("_data", "nav.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var pages []sitePage
 	section, title := "", ""
-	for _, l := range strings.Split(string(nav), "\n") {
+	for _, l := range strings.Split(nav, "\n") {
 		if m := navSection.FindStringSubmatch(l); m != nil {
 			section = m[1]
 		} else if m := navTitle.FindStringSubmatch(l); m != nil {
@@ -50,11 +57,11 @@ func loadSite(t *testing.T) []sitePage {
 		} else if m := navURL.FindStringSubmatch(l); m != nil {
 			p := sitePage{section: section, title: title, url: m[1]}
 			p.file = strings.TrimSuffix(strings.TrimPrefix(m[1], "/"), ".html") + ".md"
-			raw, err := os.ReadFile(filepath.FromSlash(p.file))
+			raw, err := readText(filepath.FromSlash(p.file))
 			if err != nil {
 				t.Fatalf("navigation entry %q: %v", title, err)
 			}
-			parts := strings.SplitN(string(raw), "---\n", 3)
+			parts := strings.SplitN(raw, "---\n", 3)
 			if len(parts) != 3 || parts[0] != "" {
 				t.Fatalf("%s: front matter missing", p.file)
 			}
@@ -140,7 +147,7 @@ func llms(pages []sitePage) (index, full string) {
 		}
 		src, body := p.file, p.body
 		if p.file == "reference.md" {
-			src, body = "CLI.md", strings.TrimPrefix(CLI, "<!-- threatscan:allow-signatures -->\n")
+			src, body = "CLI.md", strings.TrimPrefix(strings.ReplaceAll(CLI, "\r\n", "\n"), "<!-- threatscan:allow-signatures -->\n")
 		}
 		a.WriteString("- [" + p.title + "](" + rawURL + "/" + src + "): " + p.desc + "\n")
 		head, rest, _ := strings.Cut(strings.TrimSpace(body), "\n")
@@ -163,8 +170,7 @@ func TestSiteLLMSFilesAreCurrent(t *testing.T) {
 			}
 			continue
 		}
-		got, _ := os.ReadFile(name)
-		if strings.ReplaceAll(string(got), "\r\n", "\n") != want {
+		if got, _ := readText(name); got != want {
 			t.Errorf("%s is out of date; run: UPDATE_SITE=1 go test ./docs -run TestSite", name)
 		}
 	}

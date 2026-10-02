@@ -93,7 +93,7 @@ func ExpireQuarantine(dataDir string, maxAge time.Duration, maxBytes int64, dry 
 		seen := map[string]bool{}
 		prefix := s.path + string(filepath.Separator)
 		for _, e := range index {
-			if e.Copy != "" && strings.HasPrefix(e.Copy, prefix) && !seen[e.Original] {
+			if e.Copy != "" && strings.HasPrefix(filepath.Clean(e.Copy), prefix) && !seen[e.Original] {
 				seen[e.Original] = true
 				pr.record(Entry{Type: "purge", Original: e.Original, Copies: 1, Title: reason})
 			}

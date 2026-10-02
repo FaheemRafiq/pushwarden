@@ -2,6 +2,7 @@ package housekeep
 
 import (
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -135,8 +136,9 @@ func TestLogsQuarantineTempAndUsage(t *testing.T) {
 		return d
 	}
 	expired, older, newer := slot(100*24*time.Hour, 100), slot(5*24*time.Hour, 700<<10), slot(24*time.Hour, 700<<10)
-	os.WriteFile(filepath.Join(q, "index.jsonl"), []byte(
-		`{"ts":"2026-06-24T12:00:00","type":"quarantine","original":"/home/u/app/fa.woff2","copy":"`+filepath.ToSlash(filepath.Join(expired, "123", "file.js"))+`"}`+"\n"), 0o600)
+	entry, _ := json.Marshal(map[string]string{"ts": "2026-06-24T12:00:00", "type": "quarantine", "original": "/home/u/app/fa.woff2",
+		"copy": filepath.Join(expired, "123", "file.js")}) // the path as the protector records it on this OS
+	os.WriteFile(filepath.Join(q, "index.jsonl"), append(entry, '\n'), 0o600)
 	write(t, filepath.Join(q, "notes-from-user"), 10, 200*24*time.Hour) // not a slot: never touched
 	// temp folder: ours and old, ours and fresh, someone else's
 	write(t, filepath.Join(tmp, "threatscan-acme_app-1", "repo.git", "HEAD"), 10, 0)
