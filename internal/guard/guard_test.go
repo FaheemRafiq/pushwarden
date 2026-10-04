@@ -71,7 +71,11 @@ func TestOnceQuarantinesAndWritesState(t *testing.T) {
 func TestQuarantineThenDialogDecisions(t *testing.T) {
 	var mu sync.Mutex
 	asked := map[string]int{}
+	// The dialogs are answered only once the test has seen what was done
+	// before any answer; otherwise "Restore & allow" can win the race.
+	answer := make(chan struct{})
 	restore := prompt.SetDialogForTest(func(title, msg, ok, cancel string, _ time.Duration) prompt.Verdict {
+		<-answer
 		mu.Lock()
 		defer mu.Unlock()
 		if ok != "Remove" || cancel != "Restore & allow" || !strings.Contains(msg, "Evidence:") {
@@ -106,6 +110,7 @@ func TestQuarantineThenDialogDecisions(t *testing.T) {
 	if _, err := os.Stat(font); err == nil {
 		t.Fatal("font not quarantined before the dialog")
 	}
+	close(answer)
 	close(g.dialogs)
 	g.dialogWG.Wait()
 	if asked["font"] != 1 || asked["postcss"] != 1 {
