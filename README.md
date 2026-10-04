@@ -360,7 +360,3 @@ with a signed `checksums.txt`. Installed copies pick the release up within 6 hou
 - https://research.jfrog.com/post/hijacked-npm-vscode-tasks-blockchain/
 - https://socket.dev/blog/joyfill-npm-beta-releases-compromised
 - https://thehackernews.com/2026/07/north-korean-hackers-publish-108.html
-
-## License
-
-MIT

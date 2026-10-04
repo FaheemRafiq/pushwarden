@@ -128,7 +128,7 @@ func TestSitePagesAreConsistent(t *testing.T) {
 func llms(pages []sitePage) (index, full string) {
 	var a, b strings.Builder
 	a.WriteString("# PushWarden\n\n" +
-		"> PushWarden is a free, open-source tool that protects developer machines and GitHub repositories from the " +
+		"> PushWarden is a free tool that protects developer machines and GitHub repositories from the " +
 		"PolinRider / Contagious Interview supply-chain malware. It is a single program for Linux, macOS and Windows: " +
 		"a background guard with real-time file protection, an on-demand scanner, a C2 firewall block, editor hardening, " +
 		"and a command that cleans every branch of every GitHub repository you can push to.\n\n" +

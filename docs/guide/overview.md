@@ -4,7 +4,7 @@ description: "What PushWarden is, the threat it protects against, every feature 
 ---
 # PushWarden overview
 
-PushWarden is a free, open-source security tool that protects developer machines and GitHub repositories from the PolinRider / Contagious Interview supply-chain malware. It runs on Linux, macOS and Windows as a single program with no dependencies.
+PushWarden is a free security tool that protects developer machines and GitHub repositories from the PolinRider / Contagious Interview supply-chain malware. It runs on Linux, macOS and Windows as a single program with no dependencies.
 
 It works like an antivirus that knows one malware family very well. It catches a malicious file the moment it is written, moves it to quarantine before it can run, names the threat, and lets you decide in a native dialog whether to remove it for good or restore it.
 
@@ -33,7 +33,7 @@ The malware:
 | C2 firewall block | Outgoing traffic to the C2 servers is dropped system-wide and the block survives reboots | [Blocking C2 servers](network-block.md) |
 | Editor and npm hardening | Turns off automatic tasks and turns on workspace trust in every VS Code-family editor | [Hardening](hardening.md) |
 | GitHub clean-up | Removes the malware from every branch of every repository you can push to, without rewriting history | [Cleaning GitHub repositories](github-clean.md) |
-| Guided screens | The GitHub clean-up without command-line options: sign in, tick repositories, check, review, fix. Opens from the Start menu on Windows and the Applications folder on macOS | [Guided screens](guided-screens.md) |
+| Guided screens | The easy way to clean your GitHub repositories: sign in, tick repositories, check, review, fix. Opens from the Start menu on Windows and the Applications folder on macOS | [Guided screens](guided-screens.md) |
 | CI gate and pre-commit hook | Fails a pipeline or refuses a commit that carries an indicator | [CI and automation](ci-and-automation.md) |
 | Complete activity record | Every finding, action, decision, sweep and error is journaled and searchable | [Activity history](activity-history.md) |
 | Team reporting | Webhook alerts, a redacted feedback bundle, an opt-in daily digest and an opt-in central event upload | [Team reporting](team-reporting.md) |
@@ -67,6 +67,6 @@ PushWarden is in early development (version 0.x). Releases are frequent while de
 
 - [Installation](installation.md) to set it up.
 - [Quick start](quick-start.md) for the commands you will use most.
-- [Guided screens](guided-screens.md) to clean your GitHub repositories without command-line options.
+- [Guided screens](guided-screens.md) to clean your GitHub repositories with ease.
 - [How it works](how-it-works.md) for the architecture.
 - [Command-line reference](../reference.md) for every option of every command.

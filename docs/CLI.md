@@ -54,7 +54,7 @@ pushwarden status               # is everything running?
 pushwarden scan --home          # audit every project under your home folder now
 pushwarden github-clean         # dry run: which of my GitHub repos and branches are infected?
 pushwarden github-clean --apply # fix and push them
-pushwarden ui                   # the GitHub clean-up on guided screens instead of options
+pushwarden ui                   # clean your GitHub repositories the easy way, on guided screens
 ```
 
 ---
@@ -346,13 +346,14 @@ op read op://Vault/GitHub/token | pushwarden github-clean --token-stdin --apply
 
 ### ui
 
-The same work as [github-clean](#github-clean), on guided screens instead of flags.
+The easy way to clean your GitHub repositories: guided screens walk you through what
+[github-clean](#github-clean) does.
 
 ```
 pushwarden ui [options]
 ```
 
-Made for people who would rather not type commands. The Windows installer adds a **PushWarden**
+There are no commands to remember. The Windows installer adds a **PushWarden**
 entry to the Start menu and `pushwarden install` on macOS builds `~/Applications/PushWarden.app`;
 both open a terminal window on these screens. On Linux, run `pushwarden ui`.
 

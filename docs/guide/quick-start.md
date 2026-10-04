@@ -4,7 +4,7 @@ description: "The PushWarden commands used most often, with one line on what eac
 ---
 # Quick start
 
-Five commands cover most needs. If you would rather not type options, `pushwarden ui` cleans your GitHub repositories on [guided screens](guided-screens.md).
+Five commands cover most needs. Prefer to be guided? `pushwarden ui` walks you through cleaning your GitHub repositories on [guided screens](guided-screens.md).
 
 ```sh
 pushwarden install              # background guard + editor hardening + first scan

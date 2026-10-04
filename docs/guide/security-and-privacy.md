@@ -94,6 +94,6 @@ The data directory and the files in it are created with user-only permissions (`
 
 Open an issue at <https://github.com/FaheemRafiq/pushwarden/issues>. For anything that should not be public, contact the maintainer through the GitHub profile first.
 
-## License
+## Source
 
-PushWarden is released under the MIT license. The source is at <https://github.com/FaheemRafiq/pushwarden>.
+The source code can be read at <https://github.com/FaheemRafiq/pushwarden>.

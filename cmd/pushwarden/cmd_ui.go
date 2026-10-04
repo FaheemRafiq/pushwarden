@@ -23,9 +23,9 @@ func cmdUI(args []string) int {
 	var api string
 	var fresh, pause bool
 	fs := newFlags("ui", "[options]\n\n"+
-		"The same work as github-clean, on guided screens instead of flags: sign in, choose the\n"+
-		"repositories, check them (nothing is changed), review what was found, then fix and push\n"+
-		"after you confirm. An interrupted run continues where it stopped.")
+		"The easy way to clean your GitHub repositories. Guided screens walk you through it:\n"+
+		"sign in, choose the repositories, check them (nothing is changed), review what was\n"+
+		"found, then fix and push after you confirm. An interrupted run continues where it stopped.")
 	fs.StringVar(&api, "api", github.DefaultAPI, "GitHub API base URL (GitHub Enterprise)")
 	fs.BoolVar(&fresh, "fresh", false, "forget the progress of earlier runs and check every branch again")
 	fs.BoolVar(&pause, "pause", false, "if it cannot start, wait for Enter before closing (the desktop shortcuts use this)")

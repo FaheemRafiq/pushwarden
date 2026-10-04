@@ -1,10 +1,10 @@
 ---
 title: Guided screens
-description: "pushwarden ui: check and clean your GitHub repositories on guided screens instead of command-line options, from the Start menu on Windows or the Applications folder on macOS."
+description: "pushwarden ui: the easy way to check and clean your GitHub repositories. Guided screens walk you through it, from the Start menu on Windows or the Applications folder on macOS."
 ---
 # Guided screens
 
-`pushwarden ui` does the work of [github-clean](github-clean.md) on screens you move through with the keyboard: sign in, tick the repositories, check them, read what was found, then fix and push after you confirm. It is made for people who would rather not type commands and options.
+`pushwarden ui` does the work of [github-clean](github-clean.md) on screens you move through with the keyboard: sign in, tick the repositories, check them, read what was found, then fix and push after you confirm. There are no commands to remember.
 
 ## Opening it
 

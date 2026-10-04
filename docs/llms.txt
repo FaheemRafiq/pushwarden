@@ -1,6 +1,6 @@
 # PushWarden
 
-> PushWarden is a free, open-source tool that protects developer machines and GitHub repositories from the PolinRider / Contagious Interview supply-chain malware. It is a single program for Linux, macOS and Windows: a background guard with real-time file protection, an on-demand scanner, a C2 firewall block, editor hardening, and a command that cleans every branch of every GitHub repository you can push to.
+> PushWarden is a free tool that protects developer machines and GitHub repositories from the PolinRider / Contagious Interview supply-chain malware. It is a single program for Linux, macOS and Windows: a background guard with real-time file protection, an on-demand scanner, a C2 firewall block, editor hardening, and a command that cleans every branch of every GitHub repository you can push to.
 
 Every feature is a subcommand of `pushwarden`. It installs per user without administrator rights, every destructive action is reversible through a quarantine, and nothing leaves the machine unless the user opts in. The links below are Markdown sources. The same pages are rendered at https://faheemrafiq.github.io/pushwarden/guide/overview.html, and the whole documentation is one file at https://faheemrafiq.github.io/pushwarden/llms-full.txt.
 
@@ -24,7 +24,7 @@ Every feature is a subcommand of `pushwarden`. It installs per user without admi
 ## GitHub
 
 - [Cleaning GitHub repositories](https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/docs/guide/github-clean.md): How pushwarden github-clean removes PolinRider from every branch of every GitHub repository you can push to, with dry run, resume, token handling and exit codes.
-- [Guided screens](https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/docs/guide/guided-screens.md): pushwarden ui: check and clean your GitHub repositories on guided screens instead of command-line options, from the Start menu on Windows or the Applications folder on macOS.
+- [Guided screens](https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/docs/guide/guided-screens.md): pushwarden ui: the easy way to check and clean your GitHub repositories. Guided screens walk you through it, from the Start menu on Windows or the Applications folder on macOS.
 - [CI and automation](https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/docs/guide/ci-and-automation.md): Using PushWarden in pipelines and scripts: the reusable GitHub Actions workflow, a CI gate, the pre-commit hook, JSON output and exit codes.
 
 ## Operating it

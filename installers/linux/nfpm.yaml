@@ -17,7 +17,6 @@ description: |
   Detects, removes and blocks the PolinRider / Contagious Interview
   supply-chain malware on developer machines.
 homepage: https://github.com/FaheemRafiq/pushwarden
-license: MIT
 contents:
   - src: @BINARY@
     dst: /usr/lib/pushwarden/pushwarden
