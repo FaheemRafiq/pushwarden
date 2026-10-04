@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
 )
 
 // parseSince accepts 30m, 24h, 7d, 2w or a date (2026-10-01).
@@ -288,7 +288,7 @@ func formatJournal(evs []journal.Event, limit int, det bool) string {
 	if b.Len() == 0 {
 		return "  Nothing recorded for this selection.\n"
 	}
-	b.WriteString("  threatscan history --all | --details | --severity critical | --since 7d | --kind sweep | --path TEXT | --archive\n")
-	b.WriteString("  threatscan history --restore <path> | --allow <path> [--note \"why\"] | --remove <path>\n")
+	b.WriteString("  pushwarden history --all | --details | --severity critical | --since 7d | --kind sweep | --path TEXT | --archive\n")
+	b.WriteString("  pushwarden history --restore <path> | --allow <path> [--note \"why\"] | --remove <path>\n")
 	return b.String()
 }

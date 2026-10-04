@@ -1,4 +1,4 @@
-// threatscan:allow-signatures
+// pushwarden:allow-signatures
 package guard
 
 import (
@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/config"
-	"github.com/FaheemRafiq/threatscan/internal/findings"
-	"github.com/FaheemRafiq/threatscan/internal/journal"
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/prompt"
-	"github.com/FaheemRafiq/threatscan/internal/protect"
-	"github.com/FaheemRafiq/threatscan/internal/report"
-	"github.com/FaheemRafiq/threatscan/internal/testfixtures"
+	"github.com/FaheemRafiq/pushwarden/internal/config"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/prompt"
+	"github.com/FaheemRafiq/pushwarden/internal/protect"
+	"github.com/FaheemRafiq/pushwarden/internal/report"
+	"github.com/FaheemRafiq/pushwarden/internal/testfixtures"
 )
 
 func setup(t *testing.T, mutate func(*config.Config)) (*Guard, string, string) {

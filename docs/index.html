@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ThreatScan Download</title>
-<meta name="description" content="ThreatScan protects developer machines from the PolinRider / Contagious Interview supply-chain malware. Free, per user, no administrator rights.">
+<title>PushWarden Download</title>
+<meta name="description" content="PushWarden protects developer machines from the PolinRider / Contagious Interview supply-chain malware. Free, per user, no administrator rights.">
 <style>
   :root {
     --bg: #f7f7f5; --card: #ffffff; --text: #1d1d1b; --muted: #5d5d58; --line: #e2e1dc;
@@ -48,63 +48,63 @@
 </head>
 <body>
 <main>
-  <h1>ThreatScan</h1>
+  <h1>PushWarden</h1>
   <p class="lede">Finds, removes and blocks the PolinRider / Contagious Interview malware that hides in
     developer projects. Installs for your user only, needs no administrator password, and keeps itself up to date.</p>
   <p><a href="guide/overview.html">Read the documentation</a></p>
 
   <section class="card primary" id="primary">
-    <h2 id="primary-title">Download ThreatScan</h2>
-    <p><a class="button" id="primary-button" href="https://github.com/FaheemRafiq/threatscan/releases/latest">Download</a></p>
+    <h2 id="primary-title">Download PushWarden</h2>
+    <p><a class="button" id="primary-button" href="https://github.com/FaheemRafiq/pushwarden/releases/latest">Download</a></p>
     <p class="note" id="primary-note">Choose your system below.</p>
-    <pre id="primary-cmd" hidden><code>curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/installers/install.sh | sh</code></pre>
+    <pre id="primary-cmd" hidden><code>curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/installers/install.sh | sh</code></pre>
   </section>
 
   <div class="others">
     <section class="card" id="windows">
       <h2>Windows 10 and 11</h2>
-      <p><a href="https://github.com/FaheemRafiq/threatscan/releases/latest/download/ThreatScan-Setup.exe">ThreatScan-Setup.exe</a></p>
+      <p><a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/PushWarden-Setup.exe">PushWarden-Setup.exe</a></p>
       <p class="note">The installer is not code-signed yet. If SmartScreen appears, choose <em>More info</em>, then <em>Run anyway</em>.</p>
     </section>
 
     <section class="card" id="macos">
       <h2>macOS 11 or later (Intel and Apple silicon)</h2>
       <p>Open Terminal (Applications, Utilities, Terminal), paste this and press Return. No password needed:</p>
-      <pre><code>curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/installers/install.sh | sh</code></pre>
-      <p class="note">It downloads ThreatScan, checks its SHA-256 against the published list, and sets it up for your user.</p>
-      <p>Prefer an installer? <a href="https://github.com/FaheemRafiq/threatscan/releases/latest/download/ThreatScan.pkg">ThreatScan.pkg</a></p>
+      <pre><code>curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/installers/install.sh | sh</code></pre>
+      <p class="note">It downloads PushWarden, checks its SHA-256 against the published list, and sets it up for your user.</p>
+      <p>Prefer an installer? <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/PushWarden.pkg">PushWarden.pkg</a></p>
       <p class="note">The package is not notarized yet, so macOS blocks it the first time ("unidentified developer").
         Try to open it once, then go to System Settings, Privacy &amp; Security, and click <em>Open Anyway</em> (it appears for about an hour).
-        Or install it from Terminal: <code>installer -pkg ~/Downloads/ThreatScan.pkg -target CurrentUserHomeDirectory</code></p>
+        Or install it from Terminal: <code>installer -pkg ~/Downloads/PushWarden.pkg -target CurrentUserHomeDirectory</code></p>
     </section>
 
     <section class="card" id="linux">
       <h2>Linux</h2>
       <p>Run in a terminal (no sudo):</p>
-      <pre><code>curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/installers/install.sh | sh</code></pre>
-      <p>Or install a package (with sudo; it sets ThreatScan up for your user):</p>
+      <pre><code>curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/installers/install.sh | sh</code></pre>
+      <p>Or install a package (with sudo; it sets PushWarden up for your user):</p>
       <ul>
-        <li>x86-64: <a href="https://github.com/FaheemRafiq/threatscan/releases/latest/download/threatscan-linux-amd64.deb">.deb</a>
-          · <a href="https://github.com/FaheemRafiq/threatscan/releases/latest/download/threatscan-linux-amd64.rpm">.rpm</a></li>
-        <li>ARM64: <a href="https://github.com/FaheemRafiq/threatscan/releases/latest/download/threatscan-linux-arm64.deb">.deb</a>
-          · <a href="https://github.com/FaheemRafiq/threatscan/releases/latest/download/threatscan-linux-arm64.rpm">.rpm</a></li>
+        <li>x86-64: <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/pushwarden-linux-amd64.deb">.deb</a>
+          · <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/pushwarden-linux-amd64.rpm">.rpm</a></li>
+        <li>ARM64: <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/pushwarden-linux-arm64.deb">.deb</a>
+          · <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/pushwarden-linux-arm64.rpm">.rpm</a></li>
       </ul>
     </section>
   </div>
 
   <footer>
-    After installing, check it any time with <code>threatscan status</code>.
-    Every download is listed with its SHA-256 in <a href="https://github.com/FaheemRafiq/threatscan/releases/latest">checksums.txt</a>.
+    After installing, check it any time with <code>pushwarden status</code>.
+    Every download is listed with its SHA-256 in <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest">checksums.txt</a>.
     <a href="guide/overview.html">Documentation</a> ·
     <a href="guide/quick-start.html">Quick start</a> ·
     <a href="reference.html">Command reference</a> ·
-    Source: <a href="https://github.com/FaheemRafiq/threatscan">github.com/FaheemRafiq/threatscan</a>.
+    Source: <a href="https://github.com/FaheemRafiq/pushwarden">github.com/FaheemRafiq/pushwarden</a>.
   </footer>
 </main>
 <script>
   (function () {
     var ua = navigator.userAgent || "";
-    var base = "https://github.com/FaheemRafiq/threatscan/releases/latest/download/";
+    var base = "https://github.com/FaheemRafiq/pushwarden/releases/latest/download/";
     var os = /Windows/i.test(ua) ? "windows"
       : /Macintosh|Mac OS X/i.test(ua) && !/iPhone|iPad/i.test(ua) ? "macos"
       : /Linux|X11/i.test(ua) && !/Android/i.test(ua) ? "linux" : "";
@@ -113,8 +113,8 @@
     var note = document.getElementById("primary-note");
     if (os === "windows") {
       title.textContent = "Download for Windows";
-      button.href = base + "ThreatScan-Setup.exe";
-      button.textContent = "Download ThreatScan-Setup.exe";
+      button.href = base + "PushWarden-Setup.exe";
+      button.textContent = "Download PushWarden-Setup.exe";
       note.textContent = "Open the file and follow the prompts. No administrator password needed.";
     } else if (os === "macos" || os === "linux") {
       // Terminal install: files fetched by curl are not blocked by Gatekeeper

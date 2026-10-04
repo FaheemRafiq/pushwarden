@@ -9,22 +9,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/iocs"
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/update"
+	"github.com/FaheemRafiq/pushwarden/internal/iocs"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/update"
 )
 
 // The C2 block must survive reboots and follow new indicators, and both need
 // root. A small privileged job (systemd oneshot + timer, LaunchDaemon, or a
-// SYSTEM scheduled task) runs `threatscan protect --refresh` at boot and once a
+// SYSTEM scheduled task) runs `pushwarden protect --refresh` at boot and once a
 // day. It reads only root-owned files: a user-writable iocs.json or binary
 // must never drive a hosts-file edit or a firewall rule as root.
 
 const (
-	NetblockUnit  = "threatscan-netblock"
-	NetblockLabel = "com.threatscan.netblock"
-	NetblockTask  = "ThreatScan NetBlock"
-	SysDirEnv     = "THREATSCAN_SYSTEM_DIR" // tests only
+	NetblockUnit  = "pushwarden-netblock"
+	NetblockLabel = "com.pushwarden.netblock"
+	NetblockTask  = "PushWarden NetBlock"
+	SysDirEnv     = "PUSHWARDEN_SYSTEM_DIR" // tests only
 )
 
 // State is what the last refresh did; readable without root, so `status`
@@ -56,11 +56,11 @@ func (n *NetBlocker) SystemDir() string {
 		if pd == "" {
 			pd = `C:\ProgramData`
 		}
-		return filepath.Join(pd, "ThreatScan")
+		return filepath.Join(pd, "PushWarden")
 	case n.P.IsMac():
-		return "/Library/Application Support/ThreatScan"
+		return "/Library/Application Support/PushWarden"
 	}
-	return "/etc/threatscan"
+	return "/etc/pushwarden"
 }
 
 // SystemBin is where the privileged copy of the program lives.
@@ -71,11 +71,11 @@ func (n *NetBlocker) SystemBin() string {
 		if pf == "" {
 			pf = `C:\Program Files`
 		}
-		return filepath.Join(pf, "ThreatScan", "threatscan.exe")
+		return filepath.Join(pf, "PushWarden", "pushwarden.exe")
 	case n.P.IsMac():
-		return "/usr/local/libexec/threatscan/threatscan"
+		return "/usr/local/libexec/pushwarden/pushwarden"
 	}
-	return "/usr/local/lib/threatscan/threatscan"
+	return "/usr/local/lib/pushwarden/pushwarden"
 }
 
 func (n *NetBlocker) statePath() string { return filepath.Join(n.SystemDir(), "netblock-state.json") }
@@ -112,7 +112,7 @@ var Version = "dev"
 
 func NetblockService(bin string) string {
 	return `[Unit]
-Description=ThreatScan: block PolinRider C2 servers at the firewall
+Description=PushWarden: block PolinRider C2 servers at the firewall
 After=network.target
 Wants=network-online.target
 
@@ -128,7 +128,7 @@ WantedBy=multi-user.target
 
 func NetblockTimer() string {
 	return `[Unit]
-Description=ThreatScan: refresh the C2 block daily
+Description=PushWarden: refresh the C2 block daily
 
 [Timer]
 OnBootSec=15min
@@ -174,7 +174,7 @@ func NetblockLaunchd(bin, log string) string {
 func NetblockTaskXML(bin string) string {
 	return `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
-  <RegistrationInfo><Description>ThreatScan: block PolinRider C2 servers in Windows Firewall</Description></RegistrationInfo>
+  <RegistrationInfo><Description>PushWarden: block PolinRider C2 servers in Windows Firewall</Description></RegistrationInfo>
   <Triggers>
     <BootTrigger><Enabled>true</Enabled><Delay>PT2M</Delay></BootTrigger>
     <CalendarTrigger><StartBoundary>2026-01-01T03:00:00</StartBoundary><Enabled>true</Enabled><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger>
@@ -199,7 +199,7 @@ func (n *NetBlocker) unitPaths() (service, timer string) {
 }
 
 const launchdPlist = "/Library/LaunchDaemons/" + NetblockLabel + ".plist"
-const launchdLog = "/var/log/threatscan-netblock.log"
+const launchdLog = "/var/log/pushwarden-netblock.log"
 
 // JobInstalled reports whether the privileged job is registered.
 func (n *NetBlocker) JobInstalled() bool {
@@ -421,11 +421,11 @@ func (n *NetBlocker) UninstallPersistent() (bool, string) {
 	return true, "persistent C2 block removed"
 }
 
-// Describe is the one-line firewall status for `threatscan status`.
+// Describe is the one-line firewall status for `pushwarden status`.
 func (n *NetBlocker) Describe() string {
 	st, ok := n.ReadState()
 	job := n.JobInstalled()
-	hint := "run: threatscan protect --install (asks for administrator rights)"
+	hint := "run: pushwarden protect --install (asks for administrator rights)"
 	switch {
 	case ok && st.Persistent && job:
 		age := "unknown age"
@@ -437,11 +437,11 @@ func (n *NetBlocker) Describe() string {
 			s += " - last refresh failed: " + st.Error
 		}
 		if platform.IsAdmin() && n.Status() == "not active" {
-			s += " - RULES MISSING; run: threatscan protect --refresh"
+			s += " - RULES MISSING; run: pushwarden protect --refresh"
 		}
 		return s
 	case ok && st.BootTime != 0 && st.BootTime == platform.BootTime():
-		return fmt.Sprintf("active until reboot (%d IPs, %d hosts) - make it permanent: threatscan protect --install", st.IPs, st.Hosts)
+		return fmt.Sprintf("active until reboot (%d IPs, %d hosts) - make it permanent: pushwarden protect --install", st.IPs, st.Hosts)
 	case ok:
 		return "not active (rules from a previous boot were lost) - " + hint
 	case platform.IsAdmin() && n.Status() != "not active":

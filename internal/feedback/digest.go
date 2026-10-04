@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
 )
 
 // Digest is what the opt-in daily report contains. By construction it has no
@@ -139,7 +139,7 @@ func (d Digest) Text() string {
 	if d.Host != "" {
 		who = d.Host
 	}
-	fmt.Fprintf(&b, "ThreatScan daily digest: %s, v%s on %s, indicators %s\n", who, d.Version, d.OS, d.IOCs)
+	fmt.Fprintf(&b, "PushWarden daily digest: %s, v%s on %s, indicators %s\n", who, d.Version, d.OS, d.IOCs)
 	fmt.Fprintf(&b, "findings: %d critical, %d high, %d warning sightings; %d sweeps (avg %ds, max %ds)\n",
 		d.BySeverity["CRITICAL"], d.BySeverity["HIGH"], d.BySeverity["WARNING"], d.Sweeps, d.SweepAvgSec, d.SweepMaxSec)
 	if len(d.ByCategory) > 0 {
@@ -179,7 +179,7 @@ func Post(url string, d Digest) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "threatscan")
+	req.Header.Set("User-Agent", "pushwarden")
 	resp, err := (&http.Client{Timeout: 20 * time.Second}).Do(req)
 	if err != nil {
 		return err

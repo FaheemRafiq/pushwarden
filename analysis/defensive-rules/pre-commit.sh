@@ -1,6 +1,6 @@
 #!/bin/bash
-# threatscan:allow-signatures
-# ThreatScan Pre-Commit Hook
+# pushwarden:allow-signatures
+# PushWarden Pre-Commit Hook
 # Detects malware signatures before they're committed
 # Install: cp pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 
@@ -11,7 +11,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo -e "${YELLOW}[ThreatScan] Pre-commit hook active${NC}"
+echo -e "${YELLOW}[PushWarden] Pre-commit hook active${NC}"
 
 INFECTED=0
 
@@ -79,7 +79,7 @@ check_file() {
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
 
 if [ -z "$STAGED_FILES" ]; then
-    echo -e "${GREEN}[ThreatScan] No files to check${NC}"
+    echo -e "${GREEN}[PushWarden] No files to check${NC}"
     exit 0
 fi
 
@@ -97,9 +97,9 @@ if [ "$INFECTED" -eq 1 ]; then
     echo -e "${RED}========================================${NC}"
     echo ""
     echo "To bypass (NOT recommended): git commit --no-verify"
-    echo "To scan: python3 ~/Coding/threatscan/threat_scanner.py ."
+    echo "To scan: python3 ~/Coding/pushwarden/threat_scanner.py ."
     exit 1
 fi
 
-echo -e "${GREEN}[ThreatScan] All files passed - no malware detected${NC}"
+echo -e "${GREEN}[PushWarden] All files passed - no malware detected${NC}"
 exit 0

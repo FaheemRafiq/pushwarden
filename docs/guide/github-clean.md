@@ -1,18 +1,18 @@
 ---
 title: Cleaning GitHub repositories
-description: "How threatscan github-clean removes PolinRider from every branch of every GitHub repository you can push to, with dry run, resume, token handling and exit codes."
+description: "How pushwarden github-clean removes PolinRider from every branch of every GitHub repository you can push to, with dry run, resume, token handling and exit codes."
 ---
 # Cleaning GitHub repositories
 
-PolinRider steals a token, rewrites your repositories and force-pushes its backdoor to every branch it can reach. `threatscan github-clean` undoes that at the same scale: it removes the malware from every branch of every repository your token can push to.
+PolinRider steals a token, rewrites your repositories and force-pushes its backdoor to every branch it can reach. `pushwarden github-clean` undoes that at the same scale: it removes the malware from every branch of every repository your token can push to.
 
 ```sh
-threatscan github-clean [options]
+pushwarden github-clean [options]
 ```
 
 ## Prefer screens to commands?
 
-`threatscan ui` does the same work on guided screens: sign in, tick the repositories, check them, review what was found, then fix and push after you confirm. On Windows open **ThreatScan** from the Start menu; on macOS open **ThreatScan** from `~/Applications` (the first time, macOS asks whether it may control Terminal: allow it). Progress is shared with `github-clean`, so you can stop in one and continue in the other.
+`pushwarden ui` does the same work on guided screens: sign in, tick the repositories, check them, review what was found, then fix and push after you confirm. On Windows open **PushWarden** from the Start menu; on macOS open **PushWarden** from `~/Applications` (the first time, macOS asks whether it may control Terminal: allow it). Progress is shared with `github-clean`, so you can stop in one and continue in the other.
 
 ## What it does for each repository
 
@@ -29,8 +29,8 @@ threatscan github-clean [options]
 Without `--apply` nothing is committed or pushed. The output says what would change on each branch.
 
 ```sh
-threatscan github-clean                    # dry run over everything
-threatscan github-clean --apply            # fix and push every infected branch
+pushwarden github-clean                    # dry run over everything
+pushwarden github-clean --apply            # fix and push every infected branch
 ```
 
 A dry run in a terminal that finds infected branches ends with a question, for example *Fix and push these 12 branches in 4 repositories now?* Answer `y` and the fixes are committed and pushed in the same run. `--no-ask` and `--ci` suppress the question.
@@ -49,7 +49,7 @@ A dry run in a terminal that finds infected branches ends with a question, for e
 | `--branch GLOB` | only branches matching this glob, for example `release/*`. Repeatable. Default: all |
 | `--include-forks` | also clean forks (skipped by default) |
 | `--include-archived` | also clean archived repositories. GitHub rejects pushes to them until they are unarchived |
-| `--author "Name <email>"` | identity for the fix commits. Default: your git config, then `ThreatScan <threatscan@users.noreply.github.com>` |
+| `--author "Name <email>"` | identity for the fix commits. Default: your git config, then `PushWarden <pushwarden@users.noreply.github.com>` |
 | `--keep-clones DIR` | keep the clones under `DIR` for inspection instead of deleting them |
 | `--json FILE` | write the full result to `FILE` |
 | `--api URL` | GitHub Enterprise API base. Default `https://api.github.com` |
@@ -73,10 +73,10 @@ Rotate the token after the clean-up.
 ## Selecting repositories
 
 ```sh
-threatscan github-clean --list
-threatscan github-clean --select --apply
-threatscan github-clean --repo me/api --repo me/web --apply
-threatscan github-clean --owner my-org --branch main --branch 'release/*' --apply
+pushwarden github-clean --list
+pushwarden github-clean --select --apply
+pushwarden github-clean --repo me/api --repo me/web --apply
+pushwarden github-clean --owner my-org --branch main --branch 'release/*' --apply
 ```
 
 `--select` prints a numbered list. Type `3`, `1,4,2`, `5-9` or `all`. The order you type is the order the repositories are processed, so put the important one first.
@@ -94,13 +94,13 @@ If a run is interrupted with Ctrl-C, hangs, or the machine goes to sleep, run th
 A branch is checked again when:
 
 - its tip commit changes, because the attacker can push again
-- ThreatScan or its indicators are updated, because a newer version may find more
+- PushWarden or its indicators are updated, because a newer version may find more
 
 Dry-run findings, refused pushes and errors are never recorded as done.
 
 ```sh
-threatscan github-clean --progress     # what is already verified, per repository
-threatscan github-clean --fresh        # forget it and check everything
+pushwarden github-clean --progress     # what is already verified, per repository
+pushwarden github-clean --fresh        # forget it and check everything
 ```
 
 The reason progress is tied to the commit and not to the branch name: the attacker force-pushes with a stolen token, so "this branch was cleaned yesterday" proves nothing about today.
@@ -127,7 +127,7 @@ A kept copy is a bare repository with no checked-out files and no token. It is d
 | `infected` | dry run: this branch needs fixes |
 | `pushed` | fixed and pushed; the short commit hash is shown |
 | `push-failed` | fixed locally, the remote refused the push. The error is shown |
-| `manual` | HIGH or CRITICAL findings ThreatScan does not fix automatically. Review them |
+| `manual` | HIGH or CRITICAL findings PushWarden does not fix automatically. Review them |
 | `error` | clone, worktree, commit or scan failure |
 
 Repository-wide findings about commits in history that touch payload code are listed under `history`. They are informational; removing them would need a force-push.
@@ -153,29 +153,29 @@ Each infected branch gets one normal commit on top, titled `security: remove Pol
 1. Rotate the token you used and every secret those repositories or their CI could read.
 2. Check *Settings, Applications* and *Deploy keys* on GitHub for anything you did not add.
 3. Tell collaborators to `git pull`.
-4. Quarantined originals are in `threatscan history`.
+4. Quarantined originals are in `pushwarden history`.
 
 ## Recipes
 
 Organisation-wide clean-up after a compromise:
 
 ```sh
-threatscan github-clean --owner my-org --list
-threatscan github-clean --owner my-org --json dryrun.json     # review dryrun.json
-threatscan github-clean --owner my-org --apply --json applied.json
+pushwarden github-clean --owner my-org --list
+pushwarden github-clean --owner my-org --json dryrun.json     # review dryrun.json
+pushwarden github-clean --owner my-org --apply --json applied.json
 ```
 
 In CI or with a secret manager:
 
 ```sh
-GITHUB_TOKEN=... threatscan github-clean --ci --apply --json clean.json
-op read op://Vault/GitHub/token | threatscan github-clean --token-stdin --apply
+GITHUB_TOKEN=... pushwarden github-clean --ci --apply --json clean.json
+op read op://Vault/GitHub/token | pushwarden github-clean --token-stdin --apply
 ```
 
 GitHub Enterprise:
 
 ```sh
-threatscan github-clean --api https://github.example.com/api/v3 --owner my-org
+pushwarden github-clean --api https://github.example.com/api/v3 --owner my-org
 ```
 
 ## Troubleshooting

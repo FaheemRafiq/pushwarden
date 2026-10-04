@@ -1,16 +1,16 @@
-<!-- threatscan:allow-signatures -->
-# ThreatScan command-line reference
+<!-- pushwarden:allow-signatures -->
+# PushWarden command-line reference
 
-ThreatScan is a single binary. Every feature is a subcommand:
+PushWarden is a single binary. Every feature is a subcommand:
 
 ```
-threatscan <command> [options]
+pushwarden <command> [options]
 ```
 
 This page documents each command, its options, exit codes, the configuration keys,
-the files ThreatScan keeps, and the environment variables it reads. For the install
-one-liner and a description of the threat, see the [README](https://github.com/FaheemRafiq/threatscan#readme) and the
-[documentation site](https://faheemrafiq.github.io/threatscan/guide/overview.html).
+the files PushWarden keeps, and the environment variables it reads. For the install
+one-liner and a description of the threat, see the [README](https://github.com/FaheemRafiq/pushwarden#readme) and the
+[documentation site](https://faheemrafiq.github.io/pushwarden/guide/overview.html).
 
 ## Contents
 
@@ -36,24 +36,24 @@ one-liner and a description of the threat, see the [README](https://github.com/F
 
 - **Flags** accept one or two dashes: `-fix` and `--fix` are the same. Flags may come before or
   after positional arguments.
-- **`threatscan [dirs]`** with no command is short for `threatscan scan [dirs]`.
-- **`threatscan <command> -h`** prints that command's options. **`threatscan help <command>`**
+- **`pushwarden [dirs]`** with no command is short for `pushwarden scan [dirs]`.
+- **`pushwarden <command> -h`** prints that command's options. **`pushwarden help <command>`**
   prints this documentation for it, in the terminal, offline.
 - **Exit codes** follow one rule everywhere: `0` clean or done, `1` threats found or not fully
   fixed, `2` usage error, nothing scanned, or an internal failure. Commands that only display
   information return `0`.
 - **Nothing needs root** except `protect`, which edits the firewall and the hosts file.
 - **Every destructive step is reversible.** Files are copied to the quarantine before they are
-  stripped or deleted, and `threatscan history` puts them back.
+  stripped or deleted, and `pushwarden history` puts them back.
 
 ## Quick start
 
 ```sh
-threatscan install              # background guard + editor hardening + first scan
-threatscan status               # is everything running?
-threatscan scan --home          # audit every project under your home folder now
-threatscan github-clean         # dry run: which of my GitHub repos and branches are infected?
-threatscan github-clean --apply # fix and push them
+pushwarden install              # background guard + editor hardening + first scan
+pushwarden status               # is everything running?
+pushwarden scan --home          # audit every project under your home folder now
+pushwarden github-clean         # dry run: which of my GitHub repos and branches are infected?
+pushwarden github-clean --apply # fix and push them
 ```
 
 ---
@@ -65,7 +65,7 @@ threatscan github-clean --apply # fix and push them
 One-off scan of repositories and of this computer.
 
 ```
-threatscan scan [options] [directories]
+pushwarden scan [options] [directories]
 ```
 
 With no directories it scans the current working directory. In a terminal a progress bar shows
@@ -97,7 +97,7 @@ footprints, editor injection and exposed credentials.
 **What happens when something is found.** In an interactive terminal, a CRITICAL finding with
 strong evidence triggers a question per file: remove, or keep and allow. With `--gui` the question
 is a native dialog. With `--fix` the reversible action is taken without asking. With `--no-prompt`
-or `--ci` nothing is touched. Findings that ThreatScan cannot fix on its own (for example a
+or `--ci` nothing is touched. Findings that PushWarden cannot fix on its own (for example a
 compromised package version in a lockfile) are printed with a remediation hint.
 
 **Exit codes:** `0` clean, `1` HIGH or CRITICAL findings, `2` error or nothing scanned.
@@ -105,12 +105,12 @@ compromised package version in a lockfile) are printed with a remediation hint.
 Examples:
 
 ```sh
-threatscan scan                          # this directory
-threatscan scan ~/code ~/work            # specific directories
-threatscan scan --home --no-system       # repositories only
-threatscan scan --home --fix             # clean up without questions
-threatscan scan --ci --json report.json  # in a pipeline; exit 1 fails the job
-threatscan --deep ~/proj                 # same as `threatscan scan --deep ~/proj`
+pushwarden scan                          # this directory
+pushwarden scan ~/code ~/work            # specific directories
+pushwarden scan --home --no-system       # repositories only
+pushwarden scan --home --fix             # clean up without questions
+pushwarden scan --ci --json report.json  # in a pipeline; exit 1 fails the job
+pushwarden --deep ~/proj                 # same as `pushwarden scan --deep ~/proj`
 ```
 
 ### status
@@ -118,7 +118,7 @@ threatscan --deep ~/proj                 # same as `threatscan scan --deep ~/pro
 Protection status, editor hardening state and the latest report.
 
 ```
-threatscan status
+pushwarden status
 ```
 
 Shows whether the guard is alive and which real-time backend it uses (inotify, kqueue,
@@ -130,15 +130,15 @@ and each VS Code-family editor with its `task.allowAutomaticTasks` setting. Alwa
 
 ### history and restore
 
-Everything ThreatScan has seen and done on this machine: every detection, every kill, quarantine and
+Everything PushWarden has seen and done on this machine: every detection, every kill, quarantine and
 strip, every answer you gave in a dialog, every error.
 
 ```
-threatscan history [filters] [--all] [--details] [--json]
-threatscan history --restore PATH
-threatscan history --allow PATH [--note "what it really is"]
-threatscan history --remove PATH
-threatscan restore PATH            # same as history --restore PATH
+pushwarden history [filters] [--all] [--details] [--json]
+pushwarden history --restore PATH
+pushwarden history --allow PATH [--note "what it really is"]
+pushwarden history --remove PATH
+pushwarden restore PATH            # same as history --restore PATH
 ```
 
 **The default view** has two parts. *Detections* lists each distinct finding once, with when it
@@ -167,16 +167,16 @@ or `FAILED`. *Actions and decisions* lists what was done, in order, with the rea
 of every finding at WARNING or above, with no deduplication, plus every action, decision, sweep,
 update and error. At 10 MB it is rolled into a gzip archive beside it and a new file starts. The
 oldest archives are deleted once the archives pass 100 MB in total or are older than a year
-(`journal_keep_mb`, `journal_keep_days`; see [cleanup](#cleanup)). Turn it off with `threatscan config --set journal=false`; history then shows only the
+(`journal_keep_mb`, `journal_keep_days`; see [cleanup](#cleanup)). Turn it off with `pushwarden config --set journal=false`; history then shows only the
 actions kept in the quarantine index.
 
 Examples:
 
 ```sh
-threatscan history --severity critical --since 7d     # what was serious this week
-threatscan history --all --kind sweep                 # every sweep with duration and counts
-threatscan history --kind error                       # anything ThreatScan itself got wrong
-threatscan history --all --path A-Bot-Ledger --details
+pushwarden history --severity critical --since 7d     # what was serious this week
+pushwarden history --all --kind sweep                 # every sweep with duration and counts
+pushwarden history --kind error                       # anything PushWarden itself got wrong
+pushwarden history --all --path A-Bot-Ledger --details
 ```
 
 ### alerts
@@ -184,7 +184,7 @@ threatscan history --all --path A-Bot-Ledger --details
 Recent alerts with the reason for each one. This is what a click on a desktop notification opens.
 
 ```
-threatscan alerts [--last N] [--gui] [--json]
+pushwarden alerts [--last N] [--gui] [--json]
 ```
 
 | Option | Effect |
@@ -202,7 +202,7 @@ what was done and why (killed, stripped, quarantined, or left for you to decide)
 Remove PolinRider from every branch of every GitHub repository you can push to.
 
 ```
-threatscan github-clean [options]
+pushwarden github-clean [options]
 ```
 
 PolinRider steals a token, rewrites your repositories and force-pushes the backdoor to every
@@ -227,7 +227,7 @@ manual review) is recorded right away, together with the commit it was verified 
 interrupted with Ctrl-C, hangs, or the machine goes to sleep, run the same command again: branches
 whose tip is still that commit are skipped, and a repository where nothing moved is not even
 cloned. The summary counts what this run did and what earlier runs did. A branch is checked again
-when its tip changes, because the attacker can push again, and when ThreatScan or its indicators
+when its tip changes, because the attacker can push again, and when PushWarden or its indicators
 are updated, because a newer version may find more. Dry-run findings, refused pushes and errors
 are never recorded as done. `--progress` shows what is remembered; `--fresh` forgets it and checks
 everything.
@@ -263,7 +263,7 @@ repository larger than that limit is not kept at all.
 | `--list` | print the repositories the token can push to and exit |
 | `--include-forks` | also clean forks (skipped by default) |
 | `--include-archived` | also clean archived repositories. GitHub rejects pushes to them until they are unarchived |
-| `--author "Name <email>"` | identity for the fix commits. Default: your git config, then `ThreatScan <threatscan@users.noreply.github.com>` |
+| `--author "Name <email>"` | identity for the fix commits. Default: your git config, then `PushWarden <pushwarden@users.noreply.github.com>` |
 | `--keep-clones DIR` | keep the clones under `DIR` for inspection instead of deleting them |
 | `--json FILE` | write the full result to `FILE` |
 | `--api URL` | GitHub Enterprise API base, default `https://api.github.com` |
@@ -291,7 +291,7 @@ first. `--repo` does the same non-interactively.
 | `infected` | dry run: this branch needs fixes |
 | `pushed` | fixed and pushed; the short commit hash is shown |
 | `push-failed` | fixed locally, the remote refused the push. The error is shown |
-| `manual` | HIGH or CRITICAL findings ThreatScan does not fix automatically. Review them |
+| `manual` | HIGH or CRITICAL findings PushWarden does not fix automatically. Review them |
 | `error` | clone, worktree, commit or scan failure |
 
 Repository-wide findings about commits in history that touch payload code are listed under
@@ -302,20 +302,20 @@ refused pushes, errors), `2` no token, bad token, or an API failure.
 
 **Afterwards.** Rotate the token you used and every secret those repositories or their CI could
 read. Check *Settings, Applications* and *Deploy keys* on GitHub for anything you did not add.
-Tell collaborators to `git pull`. Quarantined originals are in `threatscan history`.
+Tell collaborators to `git pull`. Quarantined originals are in `pushwarden history`.
 
 Examples:
 
 ```sh
-threatscan github-clean --list
-threatscan github-clean                                     # dry run over everything
-threatscan github-clean --select --apply                    # pick from a list
-threatscan github-clean --apply                             # interrupted? the same command continues
-threatscan github-clean --progress                          # what is already verified
-threatscan github-clean --repo me/api --repo me/web --apply
-threatscan github-clean --owner my-org --branch main --branch 'release/*' --apply
-GITHUB_TOKEN=... threatscan github-clean --ci --apply --json clean.json
-op read op://Vault/GitHub/token | threatscan github-clean --token-stdin --apply
+pushwarden github-clean --list
+pushwarden github-clean                                     # dry run over everything
+pushwarden github-clean --select --apply                    # pick from a list
+pushwarden github-clean --apply                             # interrupted? the same command continues
+pushwarden github-clean --progress                          # what is already verified
+pushwarden github-clean --repo me/api --repo me/web --apply
+pushwarden github-clean --owner my-org --branch main --branch 'release/*' --apply
+GITHUB_TOKEN=... pushwarden github-clean --ci --apply --json clean.json
+op read op://Vault/GitHub/token | pushwarden github-clean --token-stdin --apply
 ```
 
 ### ui
@@ -323,12 +323,12 @@ op read op://Vault/GitHub/token | threatscan github-clean --token-stdin --apply
 The same work as [github-clean](#github-clean), on guided screens instead of flags.
 
 ```
-threatscan ui [options]
+pushwarden ui [options]
 ```
 
-Made for people who would rather not type commands. The Windows installer adds a **ThreatScan**
-entry to the Start menu and `threatscan install` on macOS builds `~/Applications/ThreatScan.app`;
-both open a terminal window on these screens. On Linux, run `threatscan ui`.
+Made for people who would rather not type commands. The Windows installer adds a **PushWarden**
+entry to the Start menu and `pushwarden install` on macOS builds `~/Applications/PushWarden.app`;
+both open a terminal window on these screens. On Linux, run `pushwarden ui`.
 
 1. **Sign in.** A token from `GITHUB_TOKEN`, `GH_TOKEN` or a `gh` login is used when there is
    one. Otherwise the screen explains how to create a token and takes it in a masked field. It
@@ -354,20 +354,20 @@ For scripts and CI use `github-clean`.
 
 ### feedback
 
-Package this machine's activity so whoever maintains ThreatScan for your team can analyse it, or
+Package this machine's activity so whoever maintains PushWarden for your team can analyse it, or
 report that a finding was wrong.
 
 ```
-threatscan feedback [--days N] [--out FILE] [--no-redact]
-threatscan feedback --false-positive PATH [--note "what it really is"]
-threatscan feedback --digest
-threatscan feedback --preview
-threatscan feedback --upload
+pushwarden feedback [--days N] [--out FILE] [--no-redact]
+pushwarden feedback --false-positive PATH [--note "what it really is"]
+pushwarden feedback --digest
+pushwarden feedback --preview
+pushwarden feedback --upload
 ```
 
 | Option | Effect |
 |---|---|
-| (none) | write `threatscan-feedback-DATE.zip` in the current folder: the journal for the last 14 days, the tail of the guard log, the latest report, the configuration and a status summary |
+| (none) | write `pushwarden-feedback-DATE.zip` in the current folder: the journal for the last 14 days, the tail of the guard log, the latest report, the configuration and a status summary |
 | `--days N` | how many days of activity to include |
 | `--out FILE` | where to write the bundle |
 | `--no-redact` | keep paths, user and host names. Token-shaped strings are masked regardless |
@@ -378,7 +378,7 @@ threatscan feedback --upload
 
 **Nothing is uploaded unless you opted in.** Without options this command writes a file and tells
 you what is in it, so you can look before you send it. The digest and the central event upload
-below are both off until their URL is set, and `threatscan status` shows whether the upload is on.
+below are both off until their URL is set, and `pushwarden status` shows whether the upload is on.
 
 **Redaction, on by default.** The home folder is written as `~`, the user name and host name are
 removed, and anything shaped like a secret is masked: GitHub, AWS, Slack and API tokens, private
@@ -386,16 +386,16 @@ keys, Supabase keys and other JSON Web Tokens, credentials inside URLs, and the 
 `password`, `api_key`, `webhook_url`, `upload_key` and similar keys.
 
 **The optional daily digest.** Off unless `feedback_url` is set, for example by the team lead at
-install time with `THREATSCAN_FEEDBACK_URL`. Once a day the guard then posts a summary to that
+install time with `PUSHWARDEN_FEEDBACK_URL`. Once a day the guard then posts a summary to that
 URL (a Slack or Discord webhook works). It contains a random machine id, the version, the OS and
 counts: findings per severity and category, actions taken and failed, dialog answers, sweep
 durations, errors, and the notes written with false-positive reports. It never contains file
 contents, command lines or paths; a false-positive report carries the file's base name only. The
-host name is included only with `feedback_identify=true`. `threatscan feedback --digest` shows
+host name is included only with `feedback_identify=true`. `pushwarden feedback --digest` shows
 exactly what would be sent.
 
 **The optional central event upload.** Off unless `upload_url` is set. It gives whoever maintains
-ThreatScan for a team the full record from every machine in one database table, so a false
+PushWarden for a team the full record from every machine in one database table, so a false
 positive or a failed action on a colleague's machine can be diagnosed without asking for a
 bundle. Every 10 minutes the guard sends the journal events it has not sent yet: findings,
 actions, dialog answers, sweeps, guard starts, updates, errors and false-positive reports.
@@ -403,18 +403,18 @@ No URL is built into the program: nothing is uploaded until `upload_url` is set 
 
 What is sent: each event with its severity, category, threat name, title, path, command line,
 matched text, evidence, the reason and response texts, the action and whether it worked, plus the
-ThreatScan version, the OS and the random machine id. What is removed first, always: the home
+PushWarden version, the OS and the random machine id. What is removed first, always: the home
 folder becomes `~`, the user name and host name are taken out, and secrets are masked as
 described under redaction above. This path has no switch to turn redaction off. File contents
 are never sent, apart from the matched text and evidence lines of a finding.
-`threatscan feedback --preview` prints the rows before anything leaves the machine.
+`pushwarden feedback --preview` prints the rows before anything leaves the machine.
 
 Delivery: batches of 200 over HTTPS. A plain `http://` URL is refused unless it points at this
 machine, and redirects are not followed.
 
 **Every event is either `uploaded` or `waiting`.** An event counts as uploaded only after the
-server accepted the batch it was in. `threatscan status` shows the totals and the time of the
-last upload, `threatscan history --all` shows the state of each event in an `upload` column,
+server accepted the batch it was in. `pushwarden status` shows the totals and the time of the
+last upload, `pushwarden history --all` shows the state of each event in an `upload` column,
 `history --not-uploaded` lists what is still waiting, and `history --json` carries
 `"uploaded": true|false`. The state belongs to the URL that is set: after `upload_url` changes,
 every event is waiting again and the new destination receives the full record. The state is
@@ -434,35 +434,35 @@ long before events are dropped unsent; if that happens `guard.log` says how many
 Setting it up with [Supabase](https://supabase.com) (hosted Postgres, no server to run):
 
 1. Create a project. Open the SQL editor, paste
-   [`docs/supabase.sql`](https://github.com/FaheemRafiq/threatscan/blob/main/docs/supabase.sql)
-   and run it. It creates the table `threatscan_events`, four views and the access rules.
+   [`docs/supabase.sql`](https://github.com/FaheemRafiq/pushwarden/blob/main/docs/supabase.sql)
+   and run it. It creates the table `pushwarden_events`, four views and the access rules.
 2. In the project's API settings copy the project URL and the public key, named `anon` or
    `publishable`. Never use the `service_role` or `secret` key on a machine.
 3. On each machine, at install time:
 
    ```
-   curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/installers/install.sh | \
-     THREATSCAN_UPLOAD_URL=https://PROJECT.supabase.co/rest/v1/threatscan_events THREATSCAN_UPLOAD_KEY=KEY sh
+   curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/installers/install.sh | \
+     PUSHWARDEN_UPLOAD_URL=https://PROJECT.supabase.co/rest/v1/pushwarden_events PUSHWARDEN_UPLOAD_KEY=KEY sh
    ```
 
-   or on a machine that already runs ThreatScan:
+   or on a machine that already runs PushWarden:
 
    ```
-   threatscan config --set upload_url=https://PROJECT.supabase.co/rest/v1/threatscan_events upload_key=KEY
-   threatscan feedback --preview
-   threatscan feedback --upload
+   pushwarden config --set upload_url=https://PROJECT.supabase.co/rest/v1/pushwarden_events upload_key=KEY
+   pushwarden feedback --preview
+   pushwarden feedback --upload
    ```
 
    The guard reads its settings when it starts, so restart it after `config --set`
-   (`systemctl --user restart threatscan-guard.service` on Linux, or sign out and in).
+   (`systemctl --user restart pushwarden-guard.service` on Linux, or sign out and in).
 4. Read the data in the Supabase dashboard:
 
 | View | Shows |
 |---|---|
-| `threatscan_false_positive_signals` | what users said was wrong: dialog answers "keep" and `--false-positive` reports, with their notes |
-| `threatscan_findings_summary` | each distinct finding with sightings and how many machines see it. One machine only is a hint of a false positive |
-| `threatscan_tool_errors` | failed actions, recovered panics, refused updates |
-| `threatscan_machines` | per machine: last event, last upload, version, OS, indicator version, average sweep time |
+| `pushwarden_false_positive_signals` | what users said was wrong: dialog answers "keep" and `--false-positive` reports, with their notes |
+| `pushwarden_findings_summary` | each distinct finding with sightings and how many machines see it. One machine only is a hint of a false positive |
+| `pushwarden_tool_errors` | failed actions, recovered panics, refused updates |
+| `pushwarden_machines` | per machine: last event, last upload, version, OS, indicator version, average sweep time |
 
 The key on the machines can only add rows. The SQL turns row level security on with a single
 insert policy for that key, so it cannot read, change or delete anything, and the views are closed
@@ -472,16 +472,16 @@ other server works too if it accepts a JSON array by POST with the key in the `a
 
 ### cleanup
 
-Show what ThreatScan occupies on disk and remove what is past its limits.
+Show what PushWarden occupies on disk and remove what is past its limits.
 
 ```
-threatscan cleanup [--dry-run]
+pushwarden cleanup [--dry-run]
 ```
 
-ThreatScan is meant to run for months without attention, so nothing it stores may grow without
+PushWarden is meant to run for months without attention, so nothing it stores may grow without
 bound. Every store in the data directory has a limit. The guard enforces them once a day;
 this command does the same on demand and prints the sizes. `--dry-run` shows what would be
-removed and removes nothing. `threatscan status` shows the total in its `Disk use` line.
+removed and removes nothing. `pushwarden status` shows the total in its `Disk use` line.
 
 | Store | Limit | Setting |
 |---|---|---|
@@ -493,10 +493,10 @@ removed and removes nothing. `threatscan status` shows the total in its `Disk us
 | alerts log | rotates at 5 MB, 3 archives kept | |
 | reports | newest 60 | `report_keep` |
 | allow decisions | removed when they expire after 30 days | |
-| editor settings backups (`settings.json.threatscan-*.bak`) | newest 2 per file | |
+| editor settings backups (`settings.json.pushwarden-*.bak`) | newest 2 per file | |
 | leftovers in the system temp folder from an interrupted `github-clean` | removed after a day | |
 
-Set a limit to `0` to turn it off, for example `threatscan config --set quarantine_keep_days=0`
+Set a limit to `0` to turn it off, for example `pushwarden config --set quarantine_keep_days=0`
 to keep quarantined files until you remove them yourself.
 
 When the central upload is on, a journal archive whose events are not all uploaded yet is kept
@@ -510,7 +510,7 @@ Run the background protection loop in this terminal. `install` registers this as
 service; run it by hand to debug or on a machine without a service manager.
 
 ```
-threatscan guard [--once] [--dry-run] [--verbose]
+pushwarden guard [--once] [--dry-run] [--verbose]
 ```
 
 | Option | Effect |
@@ -530,20 +530,20 @@ The loop runs four layers, each timed by a configuration key:
 
 Findings go through the `action` policy (see [Configuration keys](#configuration-keys)), then
 through desktop notification and webhook. Configuration is read at start: restart the guard after
-`threatscan config --set`.
+`pushwarden config --set`.
 
 ### install
 
 Install the background guard so it starts at sign-in, harden editors, run a first scan.
 
 ```
-threatscan install [options]
+pushwarden install [options]
 ```
 
 Everything is per user: the binary is copied to a per-user install directory and linked from
 `~/.local/bin`. When that folder is not on your PATH (the macOS default), one line is appended to
 your shell start-up file (`~/.zshrc` on macOS, `~/.bashrc` or `~/.profile` on Linux), marked
-`# added by threatscan install`; open a new terminal afterwards. The guard is registered as a
+`# added by pushwarden install`; open a new terminal afterwards. The guard is registered as a
 systemd `--user` service, a LaunchAgent or a Scheduled Task,
 and every VS Code-family editor found gets `task.allowAutomaticTasks = off` and workspace trust
 turned on.
@@ -567,15 +567,15 @@ turned on.
 | `--dry-run` | show what would be done and change nothing |
 
 The one-line installer from the README calls this for you; its environment variables
-`THREATSCAN_ROOTS`, `THREATSCAN_WEBHOOK`, `THREATSCAN_FEEDBACK_URL`, `THREATSCAN_UPLOAD_URL`,
-`THREATSCAN_UPLOAD_KEY`, `THREATSCAN_VERSION` and `THREATSCAN_NO_INSTALL` map onto these options.
+`PUSHWARDEN_ROOTS`, `PUSHWARDEN_WEBHOOK`, `PUSHWARDEN_FEEDBACK_URL`, `PUSHWARDEN_UPLOAD_URL`,
+`PUSHWARDEN_UPLOAD_KEY`, `PUSHWARDEN_VERSION` and `PUSHWARDEN_NO_INSTALL` map onto these options.
 
 ### uninstall
 
 Remove the background guard.
 
 ```
-threatscan uninstall [--unblock] [--purge]
+pushwarden uninstall [--unblock] [--purge]
 ```
 
 | Option | Effect |
@@ -587,10 +587,10 @@ Editor hardening is left in place because it is a safe default.
 
 ### update
 
-Update ThreatScan to the latest release.
+Update PushWarden to the latest release.
 
 ```
-threatscan update [--check]
+pushwarden update [--check]
 ```
 
 `--check` only reports whether a newer release exists. Releases are verified before they replace
@@ -604,7 +604,7 @@ back. The guard does this on its own every `update_interval` seconds when `auto_
 Download the latest indicator file.
 
 ```
-threatscan update-iocs [--url URL]
+pushwarden update-iocs [--url URL]
 ```
 
 The default source is the file on the project's `main` branch. The download is parsed and
@@ -617,7 +617,7 @@ file up at its next definitions check; restart the service to use it immediately
 Apply preventive settings without installing the guard.
 
 ```
-threatscan harden [options]
+pushwarden harden [options]
 ```
 
 | Option | Effect |
@@ -625,7 +625,7 @@ threatscan harden [options]
 | (none) | harden every VS Code-family editor found: `task.allowAutomaticTasks = off`, workspace trust on |
 | `--npm-ignore-scripts` | set `ignore-scripts=true` in `~/.npmrc`, so installs never run lifecycle scripts |
 | `--undo-npm` | remove that setting again |
-| `--pre-commit REPO` | install a pre-commit hook in `REPO` that runs `threatscan check-staged`. Repeatable. An existing hook is kept as `pre-commit.pre-threatscan` |
+| `--pre-commit REPO` | install a pre-commit hook in `REPO` that runs `pushwarden check-staged`. Repeatable. An existing hook is kept as `pre-commit.pre-pushwarden` |
 | `--dry-run` | show what would change |
 
 ### protect
@@ -633,10 +633,10 @@ threatscan harden [options]
 Block the PolinRider command-and-control (C2) servers system-wide and keep them blocked.
 
 ```
-threatscan protect [--install | --refresh | --uninstall | --status | --block-c2 | --unblock] [--dry-run]
+pushwarden protect [--install | --refresh | --uninstall | --status | --block-c2 | --unblock] [--dry-run]
 ```
 
-`threatscan install` does this for you: it asks once for administrator rights (native password
+`pushwarden install` does this for you: it asks once for administrator rights (native password
 dialog on macOS, polkit or sudo on Linux, UAC on Windows) and registers a small privileged job
 that re-applies the block at every boot and refreshes the address list once a day. You only need
 `protect` directly to check on it, to add it later, or to remove it.
@@ -652,19 +652,19 @@ that re-applies the block at every boot and refreshes the address list once a da
 | `--dry-run` | show what `--install` would do |
 
 **What gets installed.** Outgoing traffic to every IP on the C2 list is dropped: an `iptables`
-chain or `nftables` table named `threatscan` on Linux, a `pf` anchor on macOS, a Windows Firewall
-rule named "ThreatScan C2 block". The C2 hostnames are sinkholed in the hosts file between
-`# BEGIN THREATSCAN C2 SINKHOLE` and `# END` markers. The job that keeps this current is a systemd
-timer (`threatscan-netblock.timer`, at boot and daily), a LaunchDaemon (`com.threatscan.netblock`)
-or a Scheduled Task ("ThreatScan NetBlock", runs as SYSTEM at boot and daily).
+chain or `nftables` table named `pushwarden` on Linux, a `pf` anchor on macOS, a Windows Firewall
+rule named "PushWarden C2 block". The C2 hostnames are sinkholed in the hosts file between
+`# BEGIN PUSHWARDEN C2 SINKHOLE` and `# END` markers. The job that keeps this current is a systemd
+timer (`pushwarden-netblock.timer`, at boot and daily), a LaunchDaemon (`com.pushwarden.netblock`)
+or a Scheduled Task ("PushWarden NetBlock", runs as SYSTEM at boot and daily).
 
 **Why it uses its own copy of the indicators.** The job runs as root, and the `iocs.json` under
 your home folder is writable by anything running as you. A privileged job must not let a
 user-writable file decide what goes into the hosts file, so it keeps a root-owned copy under
-`/etc/threatscan`, `/Library/Application Support/ThreatScan` or `%ProgramData%\ThreatScan`,
+`/etc/pushwarden`, `/Library/Application Support/PushWarden` or `%ProgramData%\PushWarden`,
 refreshed from the project repository only, and runs a root-owned copy of the program.
 
-**Status values** shown by `threatscan status` and `protect --status`:
+**Status values** shown by `pushwarden status` and `protect --status`:
 
 | Firewall | Meaning |
 |---|---|
@@ -673,8 +673,8 @@ refreshed from the project repository only, and runs a root-owned copy of the pr
 | `not active (rules from a previous boot were lost)` | same, after a reboot |
 | `not active` | never installed, or removed |
 
-Opt out with `threatscan install --no-block-c2` or `threatscan config --set block_c2=false`; the
-guard then stops reminding you. Setting `THREATSCAN_NO_BLOCK=1` skips the administrator prompt for
+Opt out with `pushwarden install --no-block-c2` or `pushwarden config --set block_c2=false`; the
+guard then stops reminding you. Setting `PUSHWARDEN_NO_BLOCK=1` skips the administrator prompt for
 one run, which the package installers use because they already did the work as root.
 
 ### config
@@ -682,20 +682,20 @@ one run, which the package installers use because they already did the work as r
 Show or change settings.
 
 ```
-threatscan config
-threatscan config --set key=value [--set key=value ...]
+pushwarden config
+pushwarden config --set key=value [--set key=value ...]
 ```
 
 Without options it prints the current configuration. Keys are the JSON names listed under
 [Configuration keys](#configuration-keys). Booleans take `true`/`false`, lists are
 comma-separated. The guard reads the file when it starts, so restart the service after a change
-(`systemctl --user restart threatscan-guard.service` on Linux).
+(`systemctl --user restart pushwarden-guard.service` on Linux).
 
 ```sh
-threatscan config --set action=ask
-threatscan config --set scan_roots=~/code,~/work
-threatscan config --set webhook_url=https://hooks.slack.com/services/...
-threatscan config --set auto_update=false
+pushwarden config --set action=ask
+pushwarden config --set scan_roots=~/code,~/work
+pushwarden config --set webhook_url=https://hooks.slack.com/services/...
+pushwarden config --set auto_update=false
 ```
 
 ### check-staged
@@ -704,22 +704,22 @@ Pre-commit hook helper: scan the files staged for commit and refuse the commit i
 PolinRider indicator at HIGH or above.
 
 ```
-threatscan check-staged
+pushwarden check-staged
 ```
 
 Run it from inside the repository. Exit `1` blocks the commit, `0` allows it. Install it with
-`threatscan harden --pre-commit .`, or add this to `.git/hooks/pre-commit` yourself:
+`pushwarden harden --pre-commit .`, or add this to `.git/hooks/pre-commit` yourself:
 
 ```sh
 #!/bin/sh
-threatscan check-staged || exit 1
+pushwarden check-staged || exit 1
 ```
 
 ### version
 
 ```
-threatscan version
-threatscan --version
+pushwarden version
+pushwarden --version
 ```
 
 Prints the version. Release builds print the release number; development builds end in `-dev`.
@@ -729,21 +729,21 @@ Prints the version. Release builds print the release number; development builds 
 Show this documentation in the terminal.
 
 ```
-threatscan help                  # command list
-threatscan help <command>        # one command, for example: threatscan help install
-threatscan help <topic>          # config-keys, files, environment, severities, recipes, troubleshooting
-threatscan help all              # the whole reference
+pushwarden help                  # command list
+pushwarden help <command>        # one command, for example: pushwarden help install
+pushwarden help <topic>          # config-keys, files, environment, severities, recipes, troubleshooting
+pushwarden help all              # the whole reference
 ```
 
 The text is embedded in the binary, so it always matches the installed version and works
-offline. Long pages go through `$PAGER` (default `less`); set `THREATSCAN_NO_PAGER=1` to print
+offline. Long pages go through `$PAGER` (default `less`); set `PUSHWARDEN_NO_PAGER=1` to print
 straight to the terminal.
 
 ---
 
 ## Configuration keys
 
-Stored in `config.json` in the data directory. Change them with `threatscan config --set`.
+Stored in `config.json` in the data directory. Change them with `pushwarden config --set`.
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -797,7 +797,7 @@ Stored in `config.json` in the data directory. Change them with `threatscan conf
 
 ## Files and directories
 
-The data directory is `~/.threatscan` (override with `THREATSCAN_HOME`).
+The data directory is `~/.pushwarden` (override with `PUSHWARDEN_HOME`).
 
 | Path | Content |
 |---|---|
@@ -813,35 +813,35 @@ The data directory is `~/.threatscan` (override with `THREATSCAN_HOME`).
 | `reports/` | timestamped JSON reports plus `latest.json` |
 | `quarantine/` | copies of every stripped or deleted file, and `index.jsonl`, the protection history. Copies are deleted after 90 days or past 500 MB |
 | `decisions.json` | files you chose to allow, with their content hash; entries are removed when they expire after 30 days |
-| `ThreatScan Notifier.app` | macOS only, in the install directory: the helper that posts notifications so a click opens `threatscan alerts --gui` |
+| `PushWarden Notifier.app` | macOS only, in the install directory: the helper that posts notifications so a click opens `pushwarden alerts --gui` |
 | `guard/` | heartbeat and state of the running guard |
 
 The privileged C2 block keeps its own root-owned files: `netblock-state.json` and a copy of
-`iocs.json` under `/etc/threatscan` (Linux), `/Library/Application Support/ThreatScan` (macOS) or
-`%ProgramData%\ThreatScan` (Windows), plus a copy of the program under `/usr/local/lib/threatscan`,
-`/usr/local/libexec/threatscan` or `%ProgramFiles%\ThreatScan`.
+`iocs.json` under `/etc/pushwarden` (Linux), `/Library/Application Support/PushWarden` (macOS) or
+`%ProgramData%\PushWarden` (Windows), plus a copy of the program under `/usr/local/lib/pushwarden`,
+`/usr/local/libexec/pushwarden` or `%ProgramFiles%\PushWarden`.
 
-The binary itself lives in a per-user install directory, on Linux `~/.local/share/threatscan`
-with a link in `~/.local/bin` (override with `THREATSCAN_INSTALL_DIR`).
+The binary itself lives in a per-user install directory, on Linux `~/.local/share/pushwarden`
+with a link in `~/.local/bin` (override with `PUSHWARDEN_INSTALL_DIR`).
 
 ## Environment variables
 
 | Variable | Read by | Effect |
 |---|---|---|
-| `THREATSCAN_HOME` | every command | data directory instead of `~/.threatscan` |
-| `THREATSCAN_INSTALL_DIR` | `install`, `update` | where the binary is installed |
+| `PUSHWARDEN_HOME` | every command | data directory instead of `~/.pushwarden` |
+| `PUSHWARDEN_INSTALL_DIR` | `install`, `update` | where the binary is installed |
 | `GITHUB_TOKEN`, `GH_TOKEN` | `github-clean` | token when `--token` is not given |
 | `NO_COLOR` | every command | disable coloured output |
-| `PAGER`, `THREATSCAN_NO_PAGER` | `help` | pager for long pages; set the second to disable paging |
-| `THREATSCAN_NO_BLOCK` | `install`, `protect`, `uninstall` | never ask for administrator rights (package installers, CI) |
-| `THREATSCAN_ROOTS` | install script | space-separated project directories to watch |
-| `THREATSCAN_WEBHOOK` | install script | webhook URL |
-| `THREATSCAN_FEEDBACK_URL` | install script | opt in to the daily digest, see [feedback](#feedback) |
-| `THREATSCAN_UPLOAD_URL` | install script | opt in to the central event upload, see [feedback](#feedback) |
-| `THREATSCAN_UPLOAD_KEY` | install script | the insert-only key for `THREATSCAN_UPLOAD_URL` |
-| `THREATSCAN_VERSION` | install script | install this release instead of the latest |
-| `THREATSCAN_NO_INSTALL` | install script | download the binary only, do not register the guard |
-| `THREATSCAN_BASE_URL` | install script | download from a mirror |
+| `PAGER`, `PUSHWARDEN_NO_PAGER` | `help` | pager for long pages; set the second to disable paging |
+| `PUSHWARDEN_NO_BLOCK` | `install`, `protect`, `uninstall` | never ask for administrator rights (package installers, CI) |
+| `PUSHWARDEN_ROOTS` | install script | space-separated project directories to watch |
+| `PUSHWARDEN_WEBHOOK` | install script | webhook URL |
+| `PUSHWARDEN_FEEDBACK_URL` | install script | opt in to the daily digest, see [feedback](#feedback) |
+| `PUSHWARDEN_UPLOAD_URL` | install script | opt in to the central event upload, see [feedback](#feedback) |
+| `PUSHWARDEN_UPLOAD_KEY` | install script | the insert-only key for `PUSHWARDEN_UPLOAD_URL` |
+| `PUSHWARDEN_VERSION` | install script | install this release instead of the latest |
+| `PUSHWARDEN_NO_INSTALL` | install script | download the binary only, do not register the guard |
+| `PUSHWARDEN_BASE_URL` | install script | download from a mirror |
 
 ## Severities, actions and threat names
 
@@ -854,7 +854,7 @@ with a link in `~/.local/bin` (override with `THREATSCAN_INSTALL_DIR`).
 
 **Why-lines.** Every finding has a one-sentence reason for its severity, and every response
 (kill, strip, quarantine, or nothing) has a one-sentence reason too. They appear in scan output,
-in the dialogs, in `threatscan alerts`, in `threatscan history`, in desktop notifications, in the
+in the dialogs, in `pushwarden alerts`, in `pushwarden history`, in desktop notifications, in the
 webhook JSON (`reasons` array) and in `guard.log`. A process is killed only when its command line
 holds a strict PolinRider marker that legitimate tools never use; a broad indicator alone is
 reported but not killed, and the reason says so.
@@ -868,20 +868,20 @@ injected loader and `Backdoor:Script/PolinRider.Persist` for a persistence entry
 **CI gate.** Fail the pipeline when a PolinRider indicator lands in the repository:
 
 ```yaml
-- run: curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/installers/install.sh | THREATSCAN_NO_INSTALL=1 sh
-- run: ~/.local/bin/threatscan scan --ci --no-system --json threatscan.json .
+- run: curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/installers/install.sh | PUSHWARDEN_NO_INSTALL=1 sh
+- run: ~/.local/bin/pushwarden scan --ci --no-system --json pushwarden.json .
 ```
 
 **Pre-commit hook for every repository you work on:**
 
 ```sh
-for r in ~/code/*/; do threatscan harden --pre-commit "$r"; done
+for r in ~/code/*/; do pushwarden harden --pre-commit "$r"; done
 ```
 
 **Slack, Discord or Teams alerts** from every machine:
 
 ```sh
-threatscan config --set webhook_url=https://hooks.slack.com/services/T000/B000/XXXX
+pushwarden config --set webhook_url=https://hooks.slack.com/services/T000/B000/XXXX
 ```
 
 The POST body contains `text` (Slack), `content` (Discord), `host`, `platform`, `context` and
@@ -891,40 +891,40 @@ the `findings` array, so one URL works for all three and for your own endpoint.
 has Contents write on the organisation's repositories:
 
 ```sh
-threatscan github-clean --owner my-org --list
-threatscan github-clean --owner my-org --json dryrun.json     # review dryrun.json
-threatscan github-clean --owner my-org --apply --json applied.json
+pushwarden github-clean --owner my-org --list
+pushwarden github-clean --owner my-org --json dryrun.json     # review dryrun.json
+pushwarden github-clean --owner my-org --apply --json applied.json
 ```
 
 **Machine audit without touching anything:**
 
 ```sh
-threatscan scan --home --no-prompt --verbose --json audit.json
+pushwarden scan --home --no-prompt --verbose --json audit.json
 ```
 
 ## Troubleshooting
 
 **Clicking a macOS notification opens Script Editor.** Builds before 0.3 posted notifications
-through osascript. Run `threatscan install` again: it builds the notification helper app, and
-macOS will ask once whether ThreatScan may send notifications. Allow it.
+through osascript. Run `pushwarden install` again: it builds the notification helper app, and
+macOS will ask once whether PushWarden may send notifications. Allow it.
 
-**A legitimate file was quarantined.** `threatscan history` shows it; `threatscan history --allow
+**A legitimate file was quarantined.** `pushwarden history` shows it; `pushwarden history --allow
 PATH` restores it and stops flagging that exact content. Please also open an issue with the file so
 the indicator can be tightened.
 
 **A process is flagged repeatedly.** The alert in `alerts.log` shows the indicator and the command
 line. Update indicators first, since false positives are fixed there without a new release:
-`threatscan update-iocs` and then restart the service (`systemctl --user restart
-threatscan-guard.service` on Linux). If it persists, open an issue with the alert line.
+`pushwarden update-iocs` and then restart the service (`systemctl --user restart
+pushwarden-guard.service` on Linux). If it persists, open an issue with the alert line.
 
 **Firewall says `not active` or `until reboot`.** The one-time administrator prompt was declined
-or could not be shown (for example a headless server without polkit). Run `sudo threatscan protect
---install` on Linux and macOS, or `threatscan protect --install` from an elevated terminal on
-Windows. `threatscan protect --status` confirms it afterwards.
+or could not be shown (for example a headless server without polkit). Run `sudo pushwarden protect
+--install` on Linux and macOS, or `pushwarden protect --install` from an elevated terminal on
+Windows. `pushwarden protect --status` confirms it afterwards.
 
 **`status` says the guard is not alive.** Check the service: `systemctl --user status
-threatscan-guard.service` on Linux, `launchctl list | grep threatscan` on macOS, Task Scheduler
-on Windows. Run `threatscan guard --verbose --once` in a terminal to see errors directly.
+pushwarden-guard.service` on Linux, `launchctl list | grep pushwarden` on macOS, Task Scheduler
+on Windows. Run `pushwarden guard --verbose --once` in a terminal to see errors directly.
 
 **Real-time shows `off` or `polling`.** On Linux the inotify watch limit may be exhausted with many
 large repositories; raise `fs.inotify.max_user_watches`. The guard falls back to polling and to the
@@ -938,5 +938,5 @@ non-fast-forward error means someone pushed between clone and push; simply run a
 **`github-clean` cannot find a token.** Pass `--token`, export `GITHUB_TOKEN`, or run `gh auth
 login`. A fine-grained token must list the repositories and grant *Contents: Read and write*.
 
-**Uninstall completely:** `threatscan uninstall --unblock --purge`, then delete the install
-directory shown by `threatscan status`.
+**Uninstall completely:** `pushwarden uninstall --unblock --purge`, then delete the install
+directory shown by `pushwarden status`.

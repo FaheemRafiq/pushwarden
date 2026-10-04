@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/config"
-	"github.com/FaheemRafiq/threatscan/internal/findings"
-	h "github.com/FaheemRafiq/threatscan/internal/helpers"
-	"github.com/FaheemRafiq/threatscan/internal/journal"
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/prompt"
+	"github.com/FaheemRafiq/pushwarden/internal/config"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
+	h "github.com/FaheemRafiq/pushwarden/internal/helpers"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/prompt"
 	"github.com/ncruces/zenity"
 )
 
@@ -88,7 +88,7 @@ func reason(f *findings.Finding) string {
 // with several it lists up to five.
 func BuildAlert(fs []*findings.Finding) (title, body string) {
 	top := findings.Worst(fs)
-	title = "ThreatScan: " + top.String() + " - review recommended"
+	title = "PushWarden: " + top.String() + " - review recommended"
 	allActed := true
 	for _, f := range fs {
 		if f.Severity >= findings.Critical && (f.Action == "" || strings.HasPrefix(f.Action, "kept")) {
@@ -108,7 +108,7 @@ func BuildAlert(fs []*findings.Finding) (title, body string) {
 	var lines []string
 	for i, f := range fs {
 		if i == 5 {
-			lines = append(lines, fmt.Sprintf("... and %d more (threatscan alerts)", len(fs)-5))
+			lines = append(lines, fmt.Sprintf("... and %d more (pushwarden alerts)", len(fs)-5))
 			break
 		}
 		lines = append(lines, line(f))
@@ -165,7 +165,7 @@ func ReadAlerts(path string, n int) ([]Alert, error) {
 }
 
 // Desktop uses the OS notification centre. On macOS the helper app created by
-// `threatscan install` posts it, so a click opens the alert details; without
+// `pushwarden install` posts it, so a click opens the alert details; without
 // the app (or on failure) zenity's osascript path is used.
 func (n *Notifier) Desktop(title, body string) {
 	if n.P != nil && n.P.IsMac() {
@@ -218,7 +218,7 @@ func (n *Notifier) Webhook(title, body string, fs []*findings.Finding, context s
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "threatscan")
+	req.Header.Set("User-Agent", "pushwarden")
 	cl := &http.Client{Timeout: 15 * time.Second}
 	if resp, err := cl.Do(req); err == nil {
 		resp.Body.Close()

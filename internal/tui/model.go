@@ -12,9 +12,9 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/FaheemRafiq/threatscan/internal/ghclean"
-	"github.com/FaheemRafiq/threatscan/internal/github"
-	"github.com/FaheemRafiq/threatscan/internal/remediate"
+	"github.com/FaheemRafiq/pushwarden/internal/ghclean"
+	"github.com/FaheemRafiq/pushwarden/internal/github"
+	"github.com/FaheemRafiq/pushwarden/internal/remediate"
 )
 
 // Run shows the UI until the user leaves it. sess carries everything but the
@@ -25,7 +25,7 @@ func Run(sess *ghclean.Session) (int, error) {
 	_, err := tea.NewProgram(m, tea.WithAltScreen()).Run()
 	m.cancel()
 	if m.interrupted {
-		fmt.Println("Stopped. Progress is saved: open ThreatScan again to continue where it stopped.")
+		fmt.Println("Stopped. Progress is saved: open PushWarden again to continue where it stopped.")
 	}
 	return m.code, err
 }

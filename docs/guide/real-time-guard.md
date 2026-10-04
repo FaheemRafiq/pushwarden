@@ -4,7 +4,7 @@ description: "The background guard: real-time file protection, process and netwo
 ---
 # Real-time guard
 
-The guard is the background process that protects the machine continuously. `threatscan install` registers it as a user service that starts at sign-in.
+The guard is the background process that protects the machine continuously. `pushwarden install` registers it as a user service that starts at sign-in.
 
 ## What it does
 
@@ -22,7 +22,7 @@ The real-time watcher uses the operating system's own mechanism: inotify on Linu
 By default the guard discovers the usual project folders under your home directory. To set them explicitly:
 
 ```sh
-threatscan config --set scan_roots=~/code,~/work
+pushwarden config --set scan_roots=~/code,~/work
 ```
 
 `~/Downloads` and `~/Desktop` are always watched, because that is where a cloned or unpacked interview project usually lands.
@@ -36,7 +36,7 @@ threatscan config --set scan_roots=~/code,~/work
 5. The alert is written to `alerts.log` and sent to the webhook if one is configured.
 6. Everything is recorded in the journal.
 
-Clicking a notification opens the recent alerts (`threatscan alerts --gui`).
+Clicking a notification opens the recent alerts (`pushwarden alerts --gui`).
 
 Other responses do not wait for a dialog:
 
@@ -64,7 +64,7 @@ The same alert about the same finding is not repeated for 6 hours.
 ## Checking that it runs
 
 ```sh
-threatscan status
+pushwarden status
 ```
 
 `status` shows:
@@ -83,7 +83,7 @@ The guard writes a heartbeat file every few seconds; `status` reads it, so the a
 ## Running the guard by hand
 
 ```sh
-threatscan guard [--once] [--dry-run] [--verbose]
+pushwarden guard [--once] [--dry-run] [--verbose]
 ```
 
 | Option | Effect |
@@ -98,11 +98,11 @@ Use this to debug, or on a machine without a service manager.
 
 | System | Commands |
 |---|---|
-| Linux | `systemctl --user status threatscan-guard.service`, `systemctl --user restart threatscan-guard.service` |
-| macOS | `launchctl list com.threatscan.guard` |
-| Windows | Task Scheduler, task "ThreatScan Guard" |
+| Linux | `systemctl --user status pushwarden-guard.service`, `systemctl --user restart pushwarden-guard.service` |
+| macOS | `launchctl list com.pushwarden.guard` |
+| Windows | Task Scheduler, task "PushWarden Guard" |
 
-The guard reads its configuration when it starts. Restart it after `threatscan config --set`.
+The guard reads its configuration when it starts. Restart it after `pushwarden config --set`.
 
 ## Tuning
 

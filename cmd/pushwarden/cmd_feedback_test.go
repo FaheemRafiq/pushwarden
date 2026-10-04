@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/config"
-	"github.com/FaheemRafiq/threatscan/internal/guard"
-	"github.com/FaheemRafiq/threatscan/internal/journal"
-	"github.com/FaheemRafiq/threatscan/internal/testfixtures"
+	"github.com/FaheemRafiq/pushwarden/internal/config"
+	"github.com/FaheemRafiq/pushwarden/internal/guard"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/testfixtures"
 )
 
 func TestFeedbackBundleAndFalsePositive(t *testing.T) {
@@ -44,7 +44,7 @@ func TestFeedbackBundleAndFalsePositive(t *testing.T) {
 			t.Errorf("bundle lacks %s (has %d files)", want, len(names))
 		}
 	}
-	if !strings.Contains(names["journal.jsonl"], `"kind":"finding"`) || !strings.Contains(names["summary.txt"], "ThreatScan") {
+	if !strings.Contains(names["journal.jsonl"], `"kind":"finding"`) || !strings.Contains(names["summary.txt"], "PushWarden") {
 		t.Fatal("bundle content")
 	}
 	if rc := run([]string{"feedback", "--false-positive", filepath.Join(inf, "postcss.config.mjs"), "--note", "ours"}); rc != 0 {
@@ -175,7 +175,7 @@ func TestEventUploadIsOptInPreviewableAndRedacted(t *testing.T) {
 	if rc := run([]string{"feedback", "--upload"}); rc != 2 {
 		t.Fatalf("--upload without upload_url: rc=%d", rc)
 	}
-	if rc := run([]string{"config", "--set", "upload_url=" + srv.URL + "/rest/v1/threatscan_events", "upload_key=the-anon-key"}); rc != 0 {
+	if rc := run([]string{"config", "--set", "upload_url=" + srv.URL + "/rest/v1/pushwarden_events", "upload_key=the-anon-key"}); rc != 0 {
 		t.Fatal(rc)
 	}
 	if cfg := config.Load(home); task.Interval(cfg) != time.Minute {
@@ -312,7 +312,7 @@ func TestCleanupCommandStatusLineAndDailyTask(t *testing.T) {
 	os.WriteFile(filepath.Join(home, "journal-20240101-100000000.jsonl.gz"), []byte("not even gzip"), 0o600)
 
 	c := mustCtx()
-	if sum := diskSummary(c); !strings.Contains(sum, "quarantine 3") || !strings.Contains(sum, "threatscan cleanup") {
+	if sum := diskSummary(c); !strings.Contains(sum, "quarantine 3") || !strings.Contains(sum, "pushwarden cleanup") {
 		t.Fatalf("status disk line: %s", sum)
 	}
 	if out := stdout(t, func() { run([]string{"status"}) }); !strings.Contains(out, "Disk use:") {

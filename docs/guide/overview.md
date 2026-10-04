@@ -1,10 +1,10 @@
 ---
 title: Overview
-description: "What ThreatScan is, the threat it protects against, every feature it has and the platforms it supports."
+description: "What PushWarden is, the threat it protects against, every feature it has and the platforms it supports."
 ---
-# ThreatScan overview
+# PushWarden overview
 
-ThreatScan is a free, open-source security tool that protects developer machines and GitHub repositories from the PolinRider / Contagious Interview supply-chain malware. It runs on Linux, macOS and Windows as a single program with no dependencies.
+PushWarden is a free, open-source security tool that protects developer machines and GitHub repositories from the PolinRider / Contagious Interview supply-chain malware. It runs on Linux, macOS and Windows as a single program with no dependencies.
 
 It works like an antivirus that knows one malware family very well. It catches a malicious file the moment it is written, moves it to quarantine before it can run, names the threat, and lets you decide in a native dialog whether to remove it for good or restore it.
 
@@ -20,7 +20,7 @@ The malware:
 4. **Spreads through git.** With a stolen token it rewrites repositories and force-pushes the backdoor to every branch it can reach, so colleagues who pull become infected too.
 5. **Stays on the machine.** It installs remote access tools and persistence entries (systemd units, LaunchAgents, scheduled tasks, cron lines).
 
-## What ThreatScan does about it
+## What PushWarden does about it
 
 | Capability | What it means | Guide |
 |---|---|---|
@@ -42,7 +42,7 @@ The malware:
 ## Design principles
 
 - **Per user, no administrator rights.** Installation, the background guard and every command run as your user. Only the optional firewall block needs elevated rights, and it asks once.
-- **Every destructive step is reversible.** A file is copied to quarantine before it is stripped or deleted. `threatscan history` puts it back.
+- **Every destructive step is reversible.** A file is copied to quarantine before it is stripped or deleted. `pushwarden history` puts it back.
 - **Evidence first.** A file is acted on only with strong evidence: a literal campaign signature, a known key or hash, or a file whose content does not match its type. Heuristic findings are reported and never acted on automatically.
 - **Explained decisions.** Every finding carries a one-sentence reason for its severity, and every response carries a reason for what was done.
 - **Indicators are data.** All signatures live in one file, `iocs.json`, which is updated daily without a new release.
@@ -60,7 +60,7 @@ Where a native watcher is unavailable the guard falls back to polling.
 
 ## Project status
 
-ThreatScan is in early development (version 0.x). Releases are frequent while detection is extended for new variants. It is a single Go program; the earlier Python versions (v4, v5) are archived on the `archive/python-v5` branch.
+PushWarden is in early development (version 0.x). Releases are frequent while detection is extended for new variants. It is a single Go program; the earlier Python versions (v4, v5) are archived on the `archive/python-v5` branch.
 
 ## Where to go next
 

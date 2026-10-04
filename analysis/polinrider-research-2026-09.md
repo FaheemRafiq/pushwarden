@@ -1,12 +1,12 @@
-<!-- threatscan:allow-signatures -->
+<!-- pushwarden:allow-signatures -->
 # PolinRider / Contagious Interview: indicator research, September 2026
 
-Research date: 2026-09-28. Baseline: ThreatScan indicator file `threatscan/iocs.json` version `2026.09.28`
+Research date: 2026-09-28. Baseline: PushWarden indicator file `pushwarden/iocs.json` version `2026.09.28`
 and program version 0.1.1.
 
 > **Applied 2026-09-28** in indicator file `2026.09.28.1` and program 0.2.0: everything in the
 > [proposal](#proposed-iocsjson-additions) except the generic `/api/ipcheck` and `/api/ip-check/` paths
-> (ThreatScan pairs any C2 path with any `http` string, so they would flag ordinary IP-lookup code; the
+> (PushWarden pairs any C2 path with any `http` string, so they would flag ordinary IP-lookup code; the
 > exact `*.vercel.app` hosts cover that infrastructure instead). `visanduma/nova-two-factor` uses the new
 > version-aware key `compromised_packagist_versions` (CRITICAL on the four `dev-*` branches, HIGH on other
 > versions). `@common-stack/generate-plugin` uses the version prefix `9.0.2-alpha.` because package versions
@@ -18,7 +18,7 @@ and program version 0.1.1.
 
 - **NEW**: not in `iocs.json` 2026.09.28 (checked by string search of the file, not by assumption).
 - **KNOWN**: already in `iocs.json`.
-- **GAP**: listed in `iocs.json` or covered by a pattern, but a test shows ThreatScan does not detect it.
+- **GAP**: listed in `iocs.json` or covered by a pattern, but a test shows PushWarden does not detect it.
 
 Every indicator below was confirmed by at least three independent verification passes against its source
 (see [Method](#method)). Claims that failed verification are listed separately in
@@ -41,7 +41,7 @@ Every indicator below was confirmed by at least three independent verification p
    `@dforge-core/dforge-mcp@0.2.21`, published with **valid npm provenance** during an account takeover; and
    the NullReceiver Ethereum dead drop resolving to `193.247.144.38` (already KNOWN) with the marker
    `helloipbot!!` (NEW).
-3. **Older but missing from ThreatScan:** 9 Packagist packages (July 2026), `@common-stack/generate-plugin`
+3. **Older but missing from PushWarden:** 9 Packagist packages (July 2026), `@common-stack/generate-plugin`
    (May-June 2026), 16 typosquatted npm names, 8 C2 IPs and 7 staging URLs from the wider Contagious
    Interview npm waves (October 2025 onward).
 4. **Not usable yet:** more than 80 Go modules show compromise traces (about 61 confirmed malicious
@@ -53,7 +53,7 @@ Every indicator below was confirmed by at least three independent verification p
 
 ## Detection gaps found by testing
 
-Tested with ThreatScan 0.1.1 (`threatscan scan --ci --no-system`) on a throw-away git repository whose
+Tested with PushWarden 0.1.1 (`pushwarden scan --ci --no-system`) on a throw-away git repository whose
 `postcss.config.mjs` was `export default { plugins: {} };` + 300 spaces + the marker + a dummy IIFE.
 
 | Marker in `postcss.config.mjs` | Result | Status |
@@ -64,7 +64,7 @@ Tested with ThreatScan 0.1.1 (`threatscan scan --ci --no-system`) on a throw-awa
 | `global['!']='9-10094';` | CRITICAL (generic marker regex) | KNOWN |
 | `global['_V']='8-1144';` | CRITICAL (generic marker regex) | KNOWN |
 
-Real payloads usually also contain decoder or XOR-key signatures that ThreatScan does catch, so the gap
+Real payloads usually also contain decoder or XOR-key signatures that PushWarden does catch, so the gap
 matters most for new variants whose body differs. Two further observations from the same test:
 
 - The whitespace-padding heuristic did not fire on these short files: padding plus code after the closing
@@ -98,12 +98,12 @@ matters most for new variants whose body differs. Two further observations from 
 | `fa-solid-400.woff2` | (5,533 characters) | | 2026-04-25; `public/fonts/fa-solid-400.woff2` in 141 repos | KNOWN | [1], [2] |
 
 The loaders are placed under `public/`, `public/fonts/`, `static/` or `assets/`. Detection rule already in
-ThreatScan and still correct: any font file whose bytes are JavaScript rather than a font header. SHA-256s of
+PushWarden and still correct: any font file whose bytes are JavaScript rather than a font header. SHA-256s of
 the September 2026 fonts were not published.
 
 ## Injected config and entry files
 
-Counts of infected files (OpenSourceMalware tracker). All file names below are already in ThreatScan's
+Counts of infected files (OpenSourceMalware tracker). All file names below are already in PushWarden's
 `config_files` / `entry_files` lists (**KNOWN**).
 
 | File | Repos (Apr 2026) | Repos (Jul 2026) |
@@ -126,7 +126,7 @@ through PHP `shell_exec` [5]. Suggested rule: flag `.php` files that contain `sh
 
 ## Propagation and history tampering
 
-Already detected by ThreatScan (**KNOWN**); confirmed unchanged:
+Already detected by PushWarden (**KNOWN**); confirmed unchanged:
 
 - `temp_auto_push.bat` (101 repos): runs `git log -1`, sets the Windows clock to the original commit time,
   `git commit --amend --no-verify`, restores the clock, then `git push -uf origin <branch> --no-verify` [1].
@@ -172,7 +172,7 @@ The Visanduma intrusion came through the compromised GitHub account `lahirulhr` 
 ### Go modules
 
 More than 80 Go modules show compromise traces, about 61 of them confirmed distinct malicious module
-versions [7]. ThreatScan lists 16. No source publishes the module paths, so these cannot be added by name.
+versions [7]. PushWarden lists 16. No source publishes the module paths, so these cannot be added by name.
 Recommendation: keep detection content-based and extend the repository scan to the Go module cache
 (`$GOPATH/pkg/mod`) and `vendor/` directories when `--deep` is used.
 
@@ -243,7 +243,7 @@ All **NEW** (SHA-256).
 | `a85c6955ad689aa89eaae8c8b30723935274f069aed044489cfd922b46bcf2f7` | `package.json` of `@dforge-core/dforge-mcp@0.2.21` | [6] |
 | `e9045b27557e5019fe44a1d5ae4b77714faa65fef883127ca7db85b7970afab4` | npm tarball of `@dforge-core/dforge-mcp@0.2.21` | [6] |
 
-ThreatScan's `fake_font_sha256` list only matches font files. These hashes are config files, a loader and a
+PushWarden's `fake_font_sha256` list only matches font files. These hashes are config files, a loader and a
 tarball, so they need a general "known malicious file hash" list (see the proposal).
 
 ---
@@ -343,7 +343,7 @@ re-confirm them against the cited pages; they were not removed, and nothing here
 ## Open questions
 
 - Which Go module paths and versions make up the ~61 confirmed malicious modules, and which overlap the 16
-  in ThreatScan?
+  in PushWarden?
 - The 11 unpublished `@common-stack/generate-plugin` versions, and the malicious commits or tags of the July
   2026 Packagist packages.
 - SHA-256s of the September 2026 `fa-solid-500.woff2` and `fa-solid-900.woff2` loaders, and whether the `A8`
@@ -361,7 +361,7 @@ Deep-research workflow run on 2026-09-28: 5 search angles (primary tracker, vend
 news and threat intel, technical artefacts, blockchain and C2 infrastructure), 17 sources fetched,
 83 claims extracted, 25 verified by three independent adversarial checks (two refutations remove a claim),
 19 confirmed, 6 rejected, merged into 11 findings. "NEW" and "KNOWN" were then re-checked by searching
-`threatscan/iocs.json` directly, and the two marker gaps by scanning test repositories with ThreatScan 0.1.1.
+`pushwarden/iocs.json` directly, and the two marker gaps by scanning test repositories with PushWarden 0.1.1.
 
 Source concentration: much of the PolinRider-specific detail comes from one tracker (OpenSourceMalware),
 which also named the campaign. Items from a single source are marked medium confidence in the workflow

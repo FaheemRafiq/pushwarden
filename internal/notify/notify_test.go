@@ -1,4 +1,4 @@
-// threatscan:allow-signatures
+// pushwarden:allow-signatures
 package notify
 
 import (
@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FaheemRafiq/threatscan/internal/config"
-	"github.com/FaheemRafiq/threatscan/internal/findings"
-	"github.com/FaheemRafiq/threatscan/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/config"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
 )
 
 func killed() *findings.Finding {
@@ -90,8 +90,8 @@ func TestWebhookCarriesReasons(t *testing.T) {
 }
 
 func TestMacNotifierPieces(t *testing.T) {
-	s := NotifierScript("/Users/x/Library/Application Support/ThreatScan/threatscan")
-	for _, want := range []string{"on run argv", "on reopen", "display notification", "alerts --gui", "'/Users/x/Library/Application Support/ThreatScan/threatscan'"} {
+	s := NotifierScript("/Users/x/Library/Application Support/PushWarden/pushwarden")
+	for _, want := range []string{"on run argv", "on reopen", "display notification", "alerts --gui", "'/Users/x/Library/Application Support/PushWarden/pushwarden'"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("script lacks %q", want)
 		}
@@ -103,7 +103,7 @@ func TestMacNotifierPieces(t *testing.T) {
 		t.Fatal(sub, text)
 	}
 	dir := t.TempDir()
-	if msg, err := InstallMacNotifier(platform.New(), dir, "/bin/threatscan", true); err != nil || !strings.Contains(msg, "would build") {
+	if msg, err := InstallMacNotifier(platform.New(), dir, "/bin/pushwarden", true); err != nil || !strings.Contains(msg, "would build") {
 		t.Fatal(msg, err)
 	}
 	if ents, _ := os.ReadDir(dir); len(ents) != 0 {
@@ -116,14 +116,14 @@ func TestMacNotifierPieces(t *testing.T) {
 }
 
 func TestMacLauncherPieces(t *testing.T) {
-	s := LauncherScript("/Users/x/Library/Application Support/ThreatScan/threatscan")
-	for _, want := range []string{`tell application "Terminal"`, "'/Users/x/Library/Application Support/ThreatScan/threatscan' ui --pause"} {
+	s := LauncherScript("/Users/x/Library/Application Support/PushWarden/pushwarden")
+	for _, want := range []string{`tell application "Terminal"`, "'/Users/x/Library/Application Support/PushWarden/pushwarden' ui --pause"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("script lacks %q", want)
 		}
 	}
 	home := t.TempDir()
-	if msg, err := InstallMacLauncher(platform.New(), home, "/bin/threatscan", true); err != nil || !strings.Contains(msg, "would build") {
+	if msg, err := InstallMacLauncher(platform.New(), home, "/bin/pushwarden", true); err != nil || !strings.Contains(msg, "would build") {
 		t.Fatal(msg, err)
 	}
 	if ents, _ := os.ReadDir(home); len(ents) != 0 {

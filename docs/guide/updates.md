@@ -1,6 +1,6 @@
 ---
 title: Updates
-description: "How ThreatScan keeps its indicators and itself up to date: daily indicator refresh, signed program updates, rollback, channels and how to turn updates off."
+description: "How PushWarden keeps its indicators and itself up to date: daily indicator refresh, signed program updates, rollback, channels and how to turn updates off."
 ---
 # Updates
 
@@ -16,8 +16,8 @@ Most new malware variants are covered by adding an indicator, without a new rele
 - If the download fails, the previous copy stays in use. The program always has an embedded copy as a fallback.
 
 ```sh
-threatscan update-iocs              # download now
-threatscan update-iocs --url URL    # from a mirror or a fork
+pushwarden update-iocs              # download now
+pushwarden update-iocs --url URL    # from a mirror or a fork
 ```
 
 A running guard picks a new file up at its next definitions check. Restart the service to use it immediately.
@@ -33,8 +33,8 @@ A running guard picks a new file up at its next definitions check. Restart the s
 Every 6 hours (`update_interval`) the guard checks GitHub for a newer release.
 
 ```sh
-threatscan update --check     # is a newer release available?
-threatscan update             # update now
+pushwarden update --check     # is a newer release available?
+pushwarden update             # update now
 ```
 
 ### Verification
@@ -70,7 +70,7 @@ The previous binary is kept beside the new one. After an update the guard restar
 To turn automatic updates off:
 
 ```sh
-threatscan config --set auto_update=false
+pushwarden config --set auto_update=false
 ```
 
 ## The firewall block updates separately
@@ -82,16 +82,16 @@ The privileged job that keeps the [C2 block](network-block.md) refreshes its own
 Every indicator and program update, and every refused or rolled-back update, is written to the journal with kind `update` or `error`.
 
 ```sh
-threatscan history --all --kind update
+pushwarden history --all --kind update
 ```
 
 ## Versions
 
 ```sh
-threatscan version
+pushwarden version
 ```
 
-Release builds print the release number; development builds end in `-dev`. `threatscan status` shows the program version and the indicator version.
+Release builds print the release number; development builds end in `-dev`. `pushwarden status` shows the program version and the indicator version.
 
 ## How releases are made
 

@@ -10,18 +10,18 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/config"
-	"github.com/FaheemRafiq/threatscan/internal/iocs"
+	"github.com/FaheemRafiq/pushwarden/internal/config"
+	"github.com/FaheemRafiq/pushwarden/internal/iocs"
 )
 
-const DefaultIOCURL = "https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/threatscan/iocs.json"
+const DefaultIOCURL = "https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/pushwarden/iocs.json"
 
 // Version is the running program version, sent as the User-Agent. Set by main.
 var Version = "dev"
 
 const maxIOCBytes = 2 * 1024 * 1024
 
-func userAgent() string { return "threatscan/" + Version }
+func userAgent() string { return "pushwarden/" + Version }
 
 type httpError struct {
 	url  string

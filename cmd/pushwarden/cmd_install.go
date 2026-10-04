@@ -7,13 +7,13 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/FaheemRafiq/threatscan/internal/feedback"
-	"github.com/FaheemRafiq/threatscan/internal/helpers"
-	"github.com/FaheemRafiq/threatscan/internal/notify"
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/protect"
-	"github.com/FaheemRafiq/threatscan/internal/service"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/internal/feedback"
+	"github.com/FaheemRafiq/pushwarden/internal/helpers"
+	"github.com/FaheemRafiq/pushwarden/internal/notify"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/protect"
+	"github.com/FaheemRafiq/pushwarden/internal/service"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 func init() {
@@ -119,7 +119,7 @@ func cmdInstall(args []string) int {
 		if err := feedback.CheckURL(c.Cfg.UploadURL); err != nil {
 			u.Warn("Event upload will not work: " + err.Error())
 		} else {
-			u.Info("Event upload: on. Redacted events go to your team's table; see them first with: threatscan feedback --preview")
+			u.Info("Event upload: on. Redacted events go to your team's table; see them first with: pushwarden feedback --preview")
 		}
 	}
 	rs := c.Cfg.Roots(c.P.CommonProjectDirs)
@@ -164,24 +164,24 @@ func cmdInstall(args []string) int {
 			}
 		}
 		if !ok {
-			u.Warn("You can still run the guard in a terminal:  threatscan guard")
+			u.Warn("You can still run the guard in a terminal:  pushwarden guard")
 		}
 		if msg := m.LinkCLI(false); msg != "" {
 			u.Info(msg)
 		}
 	}
 	if c.P.IsMac() {
-		// notifications posted by this applet open `threatscan alerts --gui` when clicked
+		// notifications posted by this applet open `pushwarden alerts --gui` when clicked
 		if msg, err := notify.InstallMacNotifier(c.P, c.P.InstallDir(), m.Exe(), *dry); err != nil {
 			u.Warn("Notification helper not built (" + err.Error() + "); clicking a notification will not show details")
 		} else {
 			u.OK("Notification helper: " + msg)
 		}
-		// what people who do not use a terminal click to open `threatscan ui`
+		// what people who do not use a terminal click to open `pushwarden ui`
 		if msg, err := notify.InstallMacLauncher(c.P, c.P.Home, m.Exe(), *dry); err != nil {
-			u.Warn("ThreatScan app not built (" + err.Error() + "); run `threatscan ui` in Terminal instead")
+			u.Warn("PushWarden app not built (" + err.Error() + "); run `pushwarden ui` in Terminal instead")
 		} else {
-			u.OK("ThreatScan app: " + msg)
+			u.OK("PushWarden app: " + msg)
 		}
 	}
 
@@ -197,8 +197,8 @@ func cmdInstall(args []string) int {
 		// the guard's start-up sweep is the first scan; a second process would
 		// race it and double every quarantine and alert
 		u.Section("FIRST SCAN")
-		u.Info("The guard is running the first full scan now; results: threatscan status")
-		notify.New(c.P, c.Cfg, c.DataDir).Desktop("ThreatScan", "ThreatScan is protecting this computer")
+		u.Info("The guard is running the first full scan now; results: pushwarden status")
+		notify.New(c.P, c.Cfg, c.DataDir).Desktop("PushWarden", "PushWarden is protecting this computer")
 	case *unattended && !*dry:
 		u.Section("FIRST SCAN")
 		exe := m.Exe()
@@ -210,7 +210,7 @@ func cmdInstall(args []string) int {
 		if err := cmd.Start(); err != nil {
 			u.Warn("Could not start the first scan: " + err.Error())
 		} else {
-			u.Info(fmt.Sprintf("First scan running in the background (pid %d); results: threatscan status", cmd.Process.Pid))
+			u.Info(fmt.Sprintf("First scan running in the background (pid %d); results: pushwarden status", cmd.Process.Pid))
 			_ = cmd.Process.Release()
 		}
 	case *dry:
@@ -218,7 +218,7 @@ func cmdInstall(args []string) int {
 		u.Info("[dry-run] report-only scan; nothing is written")
 		runScan(c, scanOpts{home: true, deep: c.Cfg.Deep, gui: !isTTY(), noPrompt: true, noReport: true})
 	}
-	u.Info("Status any time:  threatscan status      Logs: " + m.Log)
+	u.Info("Status any time:  pushwarden status      Logs: " + m.Log)
 	if ok {
 		return 0
 	}
@@ -253,7 +253,7 @@ func installBlock(u *ui.UI, c *ctx, exe string, dry, unattended bool) {
 		var ans string
 		fmt.Scanln(&ans)
 		if a := strings.ToLower(strings.TrimSpace(ans)); a == "n" || a == "no" {
-			u.Info("Skipped. Later:  threatscan protect --install     Opt out for good:  threatscan config --set block_c2=false")
+			u.Info("Skipped. Later:  pushwarden protect --install     Opt out for good:  pushwarden config --set block_c2=false")
 			return
 		}
 	}
@@ -264,16 +264,16 @@ func installBlock(u *ui.UI, c *ctx, exe string, dry, unattended bool) {
 	}
 	u.Warn("C2 blocking not enabled (" + how + ")")
 	if c.P.IsWindows() {
-		u.Info("Later, from an elevated terminal:  threatscan protect --install")
+		u.Info("Later, from an elevated terminal:  pushwarden protect --install")
 	} else {
-		u.Info("Later:  sudo threatscan protect --install")
+		u.Info("Later:  sudo pushwarden protect --install")
 	}
 }
 
 func cmdUninstall(args []string) int {
 	fs := newFlags("uninstall", "[--unblock] [--purge]")
 	unblock := fs.Bool("unblock", false, "also remove firewall/hosts blocks")
-	purge := fs.Bool("purge", false, "also delete ~/.threatscan (config, reports, quarantine)")
+	purge := fs.Bool("purge", false, "also delete ~/.pushwarden (config, reports, quarantine)")
 	if _, err := parseInterspersed(fs, args); err != nil {
 		return 2
 	}
@@ -296,7 +296,7 @@ func cmdUninstall(args []string) int {
 			nb := &protect.NetBlocker{P: c.P, I: c.I, UI: u}
 			nb.UninstallPersistent()
 		} else if rc, how := protect.Elevate(c.P, platform.Exe(), []string{"protect", "--uninstall"}, !isTTY()); rc != 0 {
-			u.Warn("Could not remove the C2 block (" + how + "). Run:  sudo threatscan protect --uninstall")
+			u.Warn("Could not remove the C2 block (" + how + "). Run:  sudo pushwarden protect --uninstall")
 		} else {
 			u.OK("C2 block removed")
 		}

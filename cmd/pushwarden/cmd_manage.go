@@ -9,15 +9,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/findings"
-	"github.com/FaheemRafiq/threatscan/internal/harden"
-	"github.com/FaheemRafiq/threatscan/internal/iocs"
-	"github.com/FaheemRafiq/threatscan/internal/journal"
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/prompt"
-	"github.com/FaheemRafiq/threatscan/internal/protect"
-	"github.com/FaheemRafiq/threatscan/internal/report"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
+	"github.com/FaheemRafiq/pushwarden/internal/harden"
+	"github.com/FaheemRafiq/pushwarden/internal/iocs"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/prompt"
+	"github.com/FaheemRafiq/pushwarden/internal/protect"
+	"github.com/FaheemRafiq/pushwarden/internal/report"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 func init() {
@@ -101,7 +101,7 @@ func cmdHistory(args []string) int {
 		}
 		if *notUp {
 			if c.Cfg.UploadURL == "" {
-				u.Err("upload_url is not set, so nothing is uploaded from this machine. See: threatscan help feedback")
+				u.Err("upload_url is not set, so nothing is uploaded from this machine. See: pushwarden help feedback")
 				return 2
 			}
 			kept := evs[:0]
@@ -198,7 +198,7 @@ func formatHistory(es []protect.Entry, details bool) string {
 			}
 		}
 	}
-	b.WriteString("\n  threatscan history --details | --restore <path> | --allow <path> | --remove <path>\n")
+	b.WriteString("\n  pushwarden history --details | --restore <path> | --allow <path> | --remove <path>\n")
 	return b.String()
 }
 
@@ -376,9 +376,9 @@ func elevateOrHint(u *ui.UI, p *platform.Info, args []string) int {
 	u.Warn(how)
 	switch {
 	case p.IsWindows():
-		u.Info("Run in an elevated terminal:  threatscan " + strings.Join(args, " "))
+		u.Info("Run in an elevated terminal:  pushwarden " + strings.Join(args, " "))
 	default:
-		u.Info("Run:  sudo threatscan " + strings.Join(args, " "))
+		u.Info("Run:  sudo pushwarden " + strings.Join(args, " "))
 	}
 	return 2
 }

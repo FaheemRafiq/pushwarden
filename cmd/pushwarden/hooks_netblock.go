@@ -4,9 +4,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/config"
-	"github.com/FaheemRafiq/threatscan/internal/guard"
-	"github.com/FaheemRafiq/threatscan/internal/protect"
+	"github.com/FaheemRafiq/pushwarden/internal/config"
+	"github.com/FaheemRafiq/pushwarden/internal/guard"
+	"github.com/FaheemRafiq/pushwarden/internal/protect"
 )
 
 func init() {

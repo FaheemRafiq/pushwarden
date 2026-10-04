@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FaheemRafiq/threatscan/internal/remediate"
-	"github.com/FaheemRafiq/threatscan/internal/testfixtures"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/internal/remediate"
+	"github.com/FaheemRafiq/pushwarden/internal/testfixtures"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 func TestParseSelection(t *testing.T) {
@@ -55,13 +55,13 @@ func TestGitUsesBinaryAsAskpass(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git missing")
 	}
-	bin := filepath.Join(t.TempDir(), "threatscan")
+	bin := filepath.Join(t.TempDir(), "pushwarden")
 	if out, err := exec.Command("go", "build", "-buildvcs=false", "-o", bin, ".").CombinedOutput(); err != nil {
 		t.Skipf("cannot build binary: %v\n%s", err, out)
 	}
 	cmd := exec.Command("git", "-c", "credential.helper=", "credential", "fill")
 	cmd.Env = append(os.Environ(), "GIT_ASKPASS="+bin, "GIT_TERMINAL_PROMPT=0", remediate.TokenEnv+"=sekret",
-		"THREATSCAN_HOME="+t.TempDir())
+		"PUSHWARDEN_HOME="+t.TempDir())
 	cmd.Stdin = strings.NewReader("protocol=https\nhost=github.com\n\n")
 	out, err := cmd.CombinedOutput()
 	if err != nil {

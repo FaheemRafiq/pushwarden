@@ -1,4 +1,4 @@
-// threatscan:allow-signatures
+// pushwarden:allow-signatures
 package helpers
 
 import (
@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FaheemRafiq/threatscan/internal/iocs"
+	"github.com/FaheemRafiq/pushwarden/internal/iocs"
 )
 
 const CleanPostcss = "export default {\n  plugins: { '@tailwindcss/postcss': {} },\n};\n"

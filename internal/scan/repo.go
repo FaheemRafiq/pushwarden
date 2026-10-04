@@ -1,4 +1,4 @@
-// threatscan:allow-signatures
+// pushwarden:allow-signatures
 // Package scan contains the repository and host scanners (read-only).
 package scan
 
@@ -19,10 +19,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/findings"
-	h "github.com/FaheemRafiq/threatscan/internal/helpers"
-	"github.com/FaheemRafiq/threatscan/internal/iocs"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
+	h "github.com/FaheemRafiq/pushwarden/internal/helpers"
+	"github.com/FaheemRafiq/pushwarden/internal/iocs"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 type F = findings.Finding
@@ -414,7 +414,7 @@ func (r *Repo) CheckVSCodeTasks(repo string) []*F {
 		}
 		details := "runOptions.runOn=folderOpen executes the moment the folder opens in VS Code/Cursor/GitHub Desktop.\n"
 		f := &F{Severity: crit, Category: "vscode_autorun", Title: "VS Code folderOpen autorun task", Path: tasks,
-			Remediation: "Delete " + tasks + " unless you wrote it.\n  Run: threatscan harden   (sets task.allowAutomaticTasks=off)."}
+			Remediation: "Delete " + tasks + " unless you wrote it.\n  Run: pushwarden harden   (sets task.allowAutomaticTasks=off)."}
 		if loader != "" || len(c2) > 0 || len(kws) > 0 {
 			f.Details = details + "Task body references a loader/font/shell/C2 host: this is the PolinRider stage-1 entry point."
 			ev := []string{`"runOn": "folderOpen" (runs when the folder is opened)`}

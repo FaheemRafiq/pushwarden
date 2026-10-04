@@ -1,10 +1,10 @@
 ---
 title: What it detects
-description: "Every category of finding ThreatScan reports, in repositories and on the host, with severities, threat names and how indicators are managed."
+description: "Every category of finding PushWarden reports, in repositories and on the host, with severities, threat names and how indicators are managed."
 ---
 # What it detects
 
-ThreatScan looks for the artefacts and behaviour of the PolinRider / Contagious Interview campaign in two places: your repositories and the computer itself. Every finding has a severity, a category, a threat name, the evidence and a one-sentence reason.
+PushWarden looks for the artefacts and behaviour of the PolinRider / Contagious Interview campaign in two places: your repositories and the computer itself. Every finding has a severity, a category, a threat name, the evidence and a one-sentence reason.
 
 ## Severities
 
@@ -83,7 +83,7 @@ Windows Defender itself names the family `Trojan:JS/PolinRider.DB!MTB`.
 
 Every finding has a `why` line: one sentence that says what the evidence means and why it has that severity. Every response has a `response` line: what was done and why (killed, stripped, quarantined, or left for you to decide).
 
-These lines appear in scan output, dialogs, `threatscan alerts`, `threatscan history`, desktop notifications, the webhook JSON (`reasons` array) and `guard.log`.
+These lines appear in scan output, dialogs, `pushwarden alerts`, `pushwarden history`, desktop notifications, the webhook JSON (`reasons` array) and `guard.log`.
 
 ## Indicators are data
 
@@ -91,10 +91,10 @@ All indicators live in one file, `iocs.json`: signature strings and regular expr
 
 - The program carries an embedded copy, so it works offline from the first run.
 - The guard downloads a newer copy from the project repository every 24 hours. The download is parsed and validated before it replaces the previous copy: every regular expression must compile, every IP and hash must be well formed, and the version must be newer.
-- `threatscan update-iocs` forces a download. `--url` and the `ioc_update_url` setting point it at a mirror or a fork.
+- `pushwarden update-iocs` forces a download. `--url` and the `ioc_update_url` setting point it at a mirror or a fork.
 - New variants are usually covered by adding an indicator, with no new release.
 
-The current list is in [`threatscan/iocs.json`](https://github.com/FaheemRafiq/threatscan/blob/main/threatscan/iocs.json) in the repository.
+The current list is in [`pushwarden/iocs.json`](https://github.com/FaheemRafiq/pushwarden/blob/main/pushwarden/iocs.json) in the repository.
 
 ## Kill list versus report list
 
@@ -102,7 +102,7 @@ A process is killed only when its command line holds a strict marker that legiti
 
 ## Files that legitimately contain signatures
 
-Rule sets, tests and indicator databases contain the same strings the scanner looks for. Such a file opts out by carrying the token `threatscan:allow-signatures` in its first 512 bytes.
+Rule sets, tests and indicator databases contain the same strings the scanner looks for. Such a file opts out by carrying the token `pushwarden:allow-signatures` in its first 512 bytes.
 
 The token is never honoured for config files, entry files, asset files or JavaScript and TypeScript files, so malware cannot use it to hide.
 
@@ -111,7 +111,7 @@ The token is never honoured for config files, entry files, asset files or JavaSc
 If a legitimate file is flagged:
 
 ```sh
-threatscan history --allow PATH --note "what the file really is"
+pushwarden history --allow PATH --note "what the file really is"
 ```
 
 This restores the file, stops flagging that exact content for 30 days, and records the note as feedback. Use `exclude` in the [configuration](configuration.md) to skip a directory entirely. See [Response and recovery](response-and-recovery.md).

@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/FaheemRafiq/threatscan/internal/findings"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
 )
 
 type UI struct {
@@ -75,7 +75,7 @@ func (u *UI) Live() bool { return u.barLive }
 func (u *UI) Banner(version, iocVersion string) {
 	line := strings.Repeat("=", 70)
 	u.P("\n%s", u.C("BOLD_CYAN", line))
-	u.P("%s", u.C("BOLD_CYAN", "  ThreatScan v"+version+" - PolinRider / Contagious Interview protection"))
+	u.P("%s", u.C("BOLD_CYAN", "  PushWarden v"+version+" - PolinRider / Contagious Interview protection"))
 	u.P("%s", u.C("BOLD_CYAN", "  Cross-platform | Indicators "+iocVersion))
 	u.P("%s\n", u.C("BOLD_CYAN", line))
 }
@@ -173,7 +173,7 @@ func (u *UI) Remediation(fs []*findings.Finding) {
 		"1. Rotate: GitHub PATs, SSH keys, npm tokens, cloud/deploy tokens (Vercel/Netlify/AWS).",
 		"2. Revoke OAuth apps & GitHub App installs you don't recognise.",
 		"3. Enable hardware-backed 2FA on GitHub and npm.",
-		"4. Run: threatscan harden   (turns off VS Code automatic tasks).",
+		"4. Run: pushwarden harden   (turns off VS Code automatic tasks).",
 		"5. Report: https://opensourcemalware.com",
 	} {
 		u.P("    %s", l)

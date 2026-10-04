@@ -1,4 +1,4 @@
-// Package iocs loads and validates the indicator database (threatscan/iocs.json).
+// Package iocs loads and validates the indicator database (pushwarden/iocs.json).
 package iocs
 
 import (
@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 
-	iocsdata "github.com/FaheemRafiq/threatscan/threatscan"
+	iocsdata "github.com/FaheemRafiq/pushwarden/pushwarden"
 )
 
 // Raw mirrors iocs.json.  Unknown keys are ignored so newer files load in older binaries.

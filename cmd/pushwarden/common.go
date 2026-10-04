@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/FaheemRafiq/threatscan/internal/config"
-	"github.com/FaheemRafiq/threatscan/internal/findings"
-	"github.com/FaheemRafiq/threatscan/internal/iocs"
-	"github.com/FaheemRafiq/threatscan/internal/journal"
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/protect"
+	"github.com/FaheemRafiq/pushwarden/internal/config"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
+	"github.com/FaheemRafiq/pushwarden/internal/iocs"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/protect"
 )
 
 type ctx struct {
@@ -48,7 +48,7 @@ func openJournal(c *ctx) *journal.Journal {
 func mustCtx() *ctx {
 	c, err := newCtx()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "threatscan:", err)
+		fmt.Fprintln(os.Stderr, "pushwarden:", err)
 		os.Exit(2)
 	}
 	return c
@@ -59,9 +59,9 @@ func mustCtx() *ctx {
 func newFlags(name, usage string) *flag.FlagSet {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), "Usage: threatscan %s %s\n\nOptions:\n", name, usage)
+		fmt.Fprintf(fs.Output(), "Usage: pushwarden %s %s\n\nOptions:\n", name, usage)
 		fs.PrintDefaults()
-		fmt.Fprintf(fs.Output(), "\nFull documentation: threatscan help %s\n", name)
+		fmt.Fprintf(fs.Output(), "\nFull documentation: pushwarden help %s\n", name)
 	}
 	return fs
 }

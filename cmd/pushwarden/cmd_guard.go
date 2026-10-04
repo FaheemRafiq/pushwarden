@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/guard"
+	"github.com/FaheemRafiq/pushwarden/internal/guard"
 )
 
 func init() {
@@ -54,7 +54,7 @@ func cmdGuard(args []string) int {
 	c := mustCtx()
 	g, err := guard.New(c.P, c.DataDir, version, *once, *dry, *verbose)
 	if err != nil {
-		fmt.Println("threatscan:", err)
+		fmt.Println("pushwarden:", err)
 		return 2
 	}
 	g.Hooks = guardHooks

@@ -9,5 +9,5 @@ tail -n0 -F "$QUEUE" | while IFS= read -r line; do
   [[ -z "$line" ]] && continue
   title=$(jq -r '.title // empty' <<<"$line" 2>/dev/null); msg=$(jq -r '.message // empty' <<<"$line" 2>/dev/null)
   [[ -z "$title" ]] && continue
-  notify-send --urgency=critical --expire-time=20000 --app-name=ThreatScan "$title" "$msg"
+  notify-send --urgency=critical --expire-time=20000 --app-name=PushWarden "$title" "$msg"
 done

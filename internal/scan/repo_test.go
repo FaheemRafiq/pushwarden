@@ -1,4 +1,4 @@
-// threatscan:allow-signatures
+// pushwarden:allow-signatures
 package scan
 
 import (
@@ -11,11 +11,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FaheemRafiq/threatscan/internal/findings"
-	"github.com/FaheemRafiq/threatscan/internal/helpers"
-	"github.com/FaheemRafiq/threatscan/internal/iocs"
-	"github.com/FaheemRafiq/threatscan/internal/testfixtures"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
+	"github.com/FaheemRafiq/pushwarden/internal/helpers"
+	"github.com/FaheemRafiq/pushwarden/internal/iocs"
+	"github.com/FaheemRafiq/pushwarden/internal/testfixtures"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 func testIOCs(t *testing.T) *iocs.IOCs {
@@ -393,7 +393,7 @@ func TestPayloadCompanionsSkipAllowlistedRepos(t *testing.T) {
 	dir := t.TempDir()
 	gitT(t, dir, "init", "-q")
 	// a rule set that carries the indicators on purpose, plus a sibling
-	write(t, filepath.Join(dir, "rules_test.go"), "// threatscan:allow-signatures\npackage x\nvar s = \""+string(testfixtures.FakeWoff2[421:])+"\"\n")
+	write(t, filepath.Join(dir, "rules_test.go"), "// pushwarden:allow-signatures\npackage x\nvar s = \""+string(testfixtures.FakeWoff2[421:])+"\"\n")
 	write(t, filepath.Join(dir, "README.md"), "# rules\n")
 	gitT(t, dir, "add", "-A")
 	gitT(t, dir, "commit", "-q", "-m", "rules")

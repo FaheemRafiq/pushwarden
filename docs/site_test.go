@@ -15,8 +15,8 @@ import (
 //	UPDATE_SITE=1 go test ./docs -run TestSite
 
 const (
-	siteURL = "https://faheemrafiq.github.io/threatscan"
-	rawURL  = "https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/docs"
+	siteURL = "https://faheemrafiq.github.io/pushwarden"
+	rawURL  = "https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/docs"
 )
 
 type sitePage struct {
@@ -127,17 +127,17 @@ func TestSitePagesAreConsistent(t *testing.T) {
 // llms builds llms.txt (the index) and llms-full.txt (everything in one file).
 func llms(pages []sitePage) (index, full string) {
 	var a, b strings.Builder
-	a.WriteString("# ThreatScan\n\n" +
-		"> ThreatScan is a free, open-source tool that protects developer machines and GitHub repositories from the " +
+	a.WriteString("# PushWarden\n\n" +
+		"> PushWarden is a free, open-source tool that protects developer machines and GitHub repositories from the " +
 		"PolinRider / Contagious Interview supply-chain malware. It is a single program for Linux, macOS and Windows: " +
 		"a background guard with real-time file protection, an on-demand scanner, a C2 firewall block, editor hardening, " +
 		"and a command that cleans every branch of every GitHub repository you can push to.\n\n" +
-		"Every feature is a subcommand of `threatscan`. It installs per user without administrator rights, every destructive " +
+		"Every feature is a subcommand of `pushwarden`. It installs per user without administrator rights, every destructive " +
 		"action is reversible through a quarantine, and nothing leaves the machine unless the user opts in. " +
 		"The links below are Markdown sources. The same pages are rendered at " + siteURL + "/guide/overview.html, " +
 		"and the whole documentation is one file at " + siteURL + "/llms-full.txt.\n")
-	b.WriteString("<!-- threatscan:allow-signatures -->\n# ThreatScan documentation\n\n" +
-		"This file is the complete ThreatScan documentation in one plain-text Markdown file, generated from the pages at " +
+	b.WriteString("<!-- pushwarden:allow-signatures -->\n# PushWarden documentation\n\n" +
+		"This file is the complete PushWarden documentation in one plain-text Markdown file, generated from the pages at " +
 		siteURL + "/. Each page starts with a level-1 heading and a `Source:` line.\n")
 	section := ""
 	for _, p := range pages {
@@ -147,7 +147,7 @@ func llms(pages []sitePage) (index, full string) {
 		}
 		src, body := p.file, p.body
 		if p.file == "reference.md" {
-			src, body = "CLI.md", strings.TrimPrefix(strings.ReplaceAll(CLI, "\r\n", "\n"), "<!-- threatscan:allow-signatures -->\n")
+			src, body = "CLI.md", strings.TrimPrefix(strings.ReplaceAll(CLI, "\r\n", "\n"), "<!-- pushwarden:allow-signatures -->\n")
 		}
 		a.WriteString("- [" + p.title + "](" + rawURL + "/" + src + "): " + p.desc + "\n")
 		head, rest, _ := strings.Cut(strings.TrimSpace(body), "\n")
@@ -155,9 +155,9 @@ func llms(pages []sitePage) (index, full string) {
 	}
 	a.WriteString("\n## Optional\n\n" +
 		"- [Whole documentation in one file](" + siteURL + "/llms-full.txt): every page above, concatenated\n" +
-		"- [Indicator file](https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/threatscan/iocs.json): every signature, key, hash and C2 address the scanner uses\n" +
+		"- [Indicator file](https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/pushwarden/iocs.json): every signature, key, hash and C2 address the scanner uses\n" +
 		"- [Supabase table definition](" + rawURL + "/supabase.sql): the SQL for the optional central event upload\n" +
-		"- [Source code](https://github.com/FaheemRafiq/threatscan): the repository\n")
+		"- [Source code](https://github.com/FaheemRafiq/pushwarden): the repository\n")
 	return a.String(), b.String()
 }
 

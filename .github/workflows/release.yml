@@ -52,17 +52,17 @@ jobs:
         with:
           name: dist
           path: dist
-      - name: Build ThreatScan-Setup.exe
+      - name: Build PushWarden-Setup.exe
         shell: pwsh
         run: |
           choco install innosetup -y --no-progress
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=${{ needs.build.outputs.version }}" "/DDist=$PWD\dist" installers\windows\threatscan.iss
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=${{ needs.build.outputs.version }}" "/DDist=$PWD\dist" installers\windows\pushwarden.iss
           if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Smoke-test the installer
         shell: pwsh
         run: |
-          Start-Process -Wait -FilePath dist\ThreatScan-Setup.exe -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/LOG=setup.log'
-          $exe = "$env:LOCALAPPDATA\Programs\ThreatScan\threatscan.exe"
+          Start-Process -Wait -FilePath dist\PushWarden-Setup.exe -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/LOG=setup.log'
+          $exe = "$env:LOCALAPPDATA\Programs\PushWarden\pushwarden.exe"
           $s = ''
           for ($i = 0; $i -lt 40; $i++) {
             $s = & $exe status | Out-String
@@ -72,15 +72,15 @@ jobs:
           $s
           if ($s -notmatch 'Guard:\s+alive') { Get-Content setup.log -Tail 60; exit 1 }
           # the uninstaller relaunches itself from %TEMP%, so -Wait returns early
-          Start-Process -Wait -FilePath "$env:LOCALAPPDATA\Programs\ThreatScan\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES'
+          Start-Process -Wait -FilePath "$env:LOCALAPPDATA\Programs\PushWarden\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES'
           for ($i = 0; $i -lt 30 -and (Test-Path $exe); $i++) { Start-Sleep 2 }
           if (Test-Path $exe) { Write-Error "uninstall left $exe"; exit 1 }
-          if (schtasks /Query /TN "ThreatScan Guard" 2>$null) { Write-Error "uninstall left the scheduled task"; exit 1 }
+          if (schtasks /Query /TN "PushWarden Guard" 2>$null) { Write-Error "uninstall left the scheduled task"; exit 1 }
           exit 0   # schtasks /Query above exits 1 when the task is gone, as it should be
       - uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: dist/ThreatScan-Setup.exe
+          path: dist/PushWarden-Setup.exe
 
   macos:
     needs: build
@@ -91,14 +91,14 @@ jobs:
         with:
           name: dist
           path: dist
-      - run: chmod +x dist/threatscan-*
+      - run: chmod +x dist/pushwarden-*
       - run: installers/macos/build-pkg.sh "${{ needs.build.outputs.version }}" dist
       - name: Smoke-test the package
         env:
-          THREATSCAN_NO_BLOCK: "1"
+          PUSHWARDEN_NO_BLOCK: "1"
         run: |
-          installer -pkg dist/ThreatScan.pkg -target CurrentUserHomeDirectory
-          exe="$HOME/Library/Application Support/ThreatScan/threatscan"
+          installer -pkg dist/PushWarden.pkg -target CurrentUserHomeDirectory
+          exe="$HOME/Library/Application Support/PushWarden/pushwarden"
           for i in $(seq 1 40); do "$exe" status > status.txt 2>&1 || true; grep -Eq 'Guard:\s+alive' status.txt && break; sleep 3; done
           cat status.txt
           grep -Eq 'Guard:\s+alive' status.txt
@@ -106,7 +106,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: macos
-          path: dist/ThreatScan.pkg
+          path: dist/PushWarden.pkg
 
   linux:
     needs: build
@@ -124,16 +124,16 @@ jobs:
           for i in $(seq 1 30); do [ -S "/run/user/$(id -u)/bus" ] && break; sleep 1; done
       - name: Smoke-test install.sh
         run: |
-          THREATSCAN_NO_BLOCK=1 THREATSCAN_BASE_URL="file://$PWD/dist" sh installers/install.sh
-          ts="$HOME/.local/bin/threatscan"
+          PUSHWARDEN_NO_BLOCK=1 PUSHWARDEN_BASE_URL="file://$PWD/dist" sh installers/install.sh
+          ts="$HOME/.local/bin/pushwarden"
           for i in $(seq 1 40); do "$ts" status > status.txt 2>&1 || true; grep -Eq 'Guard:\s+alive' status.txt && break; sleep 3; done
           cat status.txt
           grep -Eq 'Guard:\s+alive' status.txt
           "$ts" uninstall --purge
       - name: Smoke-test the .deb (postinstall registers the guard for $SUDO_USER)
         run: |
-          sudo dpkg -i dist/threatscan-linux-amd64.deb
-          ts="$HOME/.local/bin/threatscan"
+          sudo dpkg -i dist/pushwarden-linux-amd64.deb
+          ts="$HOME/.local/bin/pushwarden"
           for i in $(seq 1 40); do "$ts" status > status.txt 2>&1 || true; grep -Eq 'Guard:\s+alive' status.txt && break; sleep 3; done
           cat status.txt
           grep -Eq 'Guard:\s+alive' status.txt
@@ -152,11 +152,11 @@ jobs:
           path: dist
       - name: install.sh and the .rpm (no systemd in a container, so no guard)
         run: |
-          THREATSCAN_NO_INSTALL=1 THREATSCAN_BASE_URL="file://$PWD/dist" sh installers/install.sh
-          ~/.local/bin/threatscan version
-          dnf install -y -q ./dist/threatscan-linux-amd64.rpm
-          /usr/lib/threatscan/threatscan version
-          ~/.local/bin/threatscan scan --ci --no-system --no-report --no-prompt .
+          PUSHWARDEN_NO_INSTALL=1 PUSHWARDEN_BASE_URL="file://$PWD/dist" sh installers/install.sh
+          ~/.local/bin/pushwarden version
+          dnf install -y -q ./dist/pushwarden-linux-amd64.rpm
+          /usr/lib/pushwarden/pushwarden version
+          ~/.local/bin/pushwarden scan --ci --no-system --no-report --no-prompt .
 
   publish:
     needs: [build, windows, macos, linux, fedora]
@@ -175,9 +175,9 @@ jobs:
           merge-multiple: true
       - name: Checksums over every asset, signed
         env:
-          THREATSCAN_SIGNING_KEY: ${{ secrets.THREATSCAN_SIGNING_KEY }}
+          PUSHWARDEN_SIGNING_KEY: ${{ secrets.PUSHWARDEN_SIGNING_KEY }}
         run: |
-          [ -n "$THREATSCAN_SIGNING_KEY" ] || { echo "::error::THREATSCAN_SIGNING_KEY secret is not set"; exit 1; }
+          [ -n "$PUSHWARDEN_SIGNING_KEY" ] || { echo "::error::PUSHWARDEN_SIGNING_KEY secret is not set"; exit 1; }
           scripts/release.sh checksums out
           ls -l out
       - uses: softprops/action-gh-release@v2

@@ -33,9 +33,9 @@ func TestTopicsAndLookup(t *testing.T) {
 func TestRender(t *testing.T) {
 	md := "# Title\n\nSome **bold** and `code` and a [link](#x) plus [ext](https://e.x).\n\n" +
 		"| Option | Effect |\n|---|---|\n| `--a` | first thing that is quite long and needs to wrap around the width limit |\n| `--b` | second |\n\n" +
-		"```\nthreatscan scan\n```\n\n- item one\n1. step one\n"
+		"```\npushwarden scan\n```\n\n- item one\n1. step one\n"
 	out := Render(md, 60, nil)
-	for _, want := range []string{"Title", "Some bold and code and a link plus ext (https://e.x).", "--a", "--b", "second", "    threatscan scan", "  - item one", "  1. step one"} {
+	for _, want := range []string{"Title", "Some bold and code and a link plus ext (https://e.x).", "--a", "--b", "second", "    pushwarden scan", "  - item one", "  1. step one"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in:\n%s", want, out)
 		}

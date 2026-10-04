@@ -49,7 +49,7 @@ For EACH infected repository:
 ```bash
 # Check if infected
 cd <repo>
-python3 ~/Coding/threatscan/threat_scanner.py .
+python3 ~/Coding/pushwarden/threat_scanner.py .
 
 # If infected, identify the infection commit
 git log --oneline --all | head -20
@@ -109,17 +109,17 @@ ps -ef | grep -E "detached|node -e"
 
 ### 9. Verify All Repos Are Clean
 ```bash
-# Run ThreatScan on every repo
+# Run PushWarden on every repo
 for repo in ~/Coding/*/*/; do
     if [ -d "$repo/.git" ]; then
         echo "Scanning: $repo"
-        python3 ~/Coding/threatscan/threat_scanner.py "$repo"
+        python3 ~/Coding/pushwarden/threat_scanner.py "$repo"
     fi
 done
 ```
 
 ### 10. Monitor for Re-infection
-- [ ] Enable ThreatScan CI on all repos (already done for A-Bot-backend and mentor-ai-landing)
+- [ ] Enable PushWarden CI on all repos (already done for A-Bot-backend and mentor-ai-landing)
 - [ ] Watch for unexpected git pushes for 7 days
 - [ ] Monitor GitHub notification emails for repo activity
 - [ ] Check `git reflog` daily in active repos
@@ -145,7 +145,7 @@ git log --all --oneline --grep="chore: update"
 ## Prevention Going Forward
 
 ### 13. Security Hardening
-- [ ] Install pre-commit hook: `cp ~/Coding/threatscan/analysis/defensive-rules/pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit`
+- [ ] Install pre-commit hook: `cp ~/Coding/pushwarden/analysis/defensive-rules/pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit`
 - [ ] Enable 2FA on all accounts (GitHub, npm, cloud providers)
 - [ ] Use hardware security keys where possible
 - [ ] Never run `npm install` on untrusted packages without reviewing

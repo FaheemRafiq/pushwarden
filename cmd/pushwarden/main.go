@@ -1,4 +1,4 @@
-// Command threatscan detects, removes and blocks the PolinRider / Contagious
+// Command pushwarden detects, removes and blocks the PolinRider / Contagious
 // Interview supply-chain malware on developer machines.
 package main
 
@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/FaheemRafiq/threatscan/internal/protect"
+	"github.com/FaheemRafiq/pushwarden/internal/protect"
 )
 
 // version is set at build time: -ldflags "-X main.version=0.1.0"
@@ -26,8 +26,8 @@ func register(name, help string, run func([]string) int) {
 }
 
 func usage() {
-	fmt.Println("ThreatScan " + version + " - PolinRider / Contagious Interview protection\n")
-	fmt.Println("Usage: threatscan <command> [options]\n\nCommands:")
+	fmt.Println("PushWarden " + version + " - PolinRider / Contagious Interview protection\n")
+	fmt.Println("Usage: pushwarden <command> [options]\n\nCommands:")
 	order := map[string]int{"scan": 0, "status": 1, "history": 2, "alerts": 3, "guard": 4, "install": 5, "uninstall": 6, "update": 7, "update-iocs": 8}
 	sorted := append([]command{}, commands...)
 	sort.SliceStable(sorted, func(i, j int) bool {
@@ -44,8 +44,8 @@ func usage() {
 	for _, c := range sorted {
 		fmt.Printf("  %-13s %s\n", c.name, c.help)
 	}
-	fmt.Println("\nRun `threatscan <command> -h` for options, `threatscan help <command>` for the full documentation.")
-	fmt.Println("`threatscan [dirs]` is short for `threatscan scan [dirs]`.")
+	fmt.Println("\nRun `pushwarden <command> -h` for options, `pushwarden help <command>` for the full documentation.")
+	fmt.Println("`pushwarden [dirs]` is short for `pushwarden scan [dirs]`.")
 }
 
 func main() { os.Exit(run(os.Args[1:])) }
@@ -71,7 +71,7 @@ func run(args []string) int {
 			}
 		}
 	}
-	// Backwards compatible: `threatscan [opts] [dirs]` means `threatscan scan ...`
+	// Backwards compatible: `pushwarden [opts] [dirs]` means `pushwarden scan ...`
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
 		if st, err := os.Stat(args[0]); err != nil || !st.IsDir() {
 			fmt.Fprintf(os.Stderr, "unknown command %q\n\n", args[0])

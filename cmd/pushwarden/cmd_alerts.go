@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/FaheemRafiq/threatscan/internal/findings"
-	"github.com/FaheemRafiq/threatscan/internal/notify"
-	"github.com/FaheemRafiq/threatscan/internal/prompt"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
+	"github.com/FaheemRafiq/pushwarden/internal/notify"
+	"github.com/FaheemRafiq/pushwarden/internal/prompt"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 func init() {
@@ -38,7 +38,7 @@ func cmdAlerts(args []string) int {
 	}
 	text := formatAlerts(as, false)
 	if *gui {
-		if err := prompt.ShowInfo("ThreatScan alerts", text); err == nil {
+		if err := prompt.ShowInfo("PushWarden alerts", text); err == nil {
 			return 0
 		}
 	}
@@ -74,6 +74,6 @@ func formatAlerts(as []notify.Alert, color bool) string {
 		}
 		b.WriteString("\n")
 	}
-	b.WriteString("threatscan history   # restore / allow / remove quarantined files\n")
+	b.WriteString("pushwarden history   # restore / allow / remove quarantined files\n")
 	return b.String()
 }

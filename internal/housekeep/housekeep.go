@@ -1,6 +1,6 @@
-// Package housekeep keeps ThreatScan's footprint on disk bounded: every
+// Package housekeep keeps PushWarden's footprint on disk bounded: every
 // store in the data directory has a size or age limit, and one pass enforces
-// them all. The guard runs it daily; `threatscan cleanup` runs it on demand.
+// them all. The guard runs it daily; `pushwarden cleanup` runs it on demand.
 //
 // It only ever deletes files it recognises by name inside the data directory
 // (and its own leftovers in the temp folder). No path read from stored data
@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/config"
-	"github.com/FaheemRafiq/threatscan/internal/journal"
-	"github.com/FaheemRafiq/threatscan/internal/protect"
-	"github.com/FaheemRafiq/threatscan/internal/remediate"
+	"github.com/FaheemRafiq/pushwarden/internal/config"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/protect"
+	"github.com/FaheemRafiq/pushwarden/internal/remediate"
 )
 
 const (
@@ -126,11 +126,11 @@ func Run(o Options) Report {
 		tmp = os.TempDir()
 	}
 	n, b = stale(tmp, o.Dry, o.Now, func(name string, dir bool) bool {
-		if !dir || !strings.HasPrefix(name, "threatscan-") {
+		if !dir || !strings.HasPrefix(name, "pushwarden-") {
 			return false
 		}
 		// ours for certain: the hooks folder of older versions, or a clone of an interrupted github-clean
-		return strings.HasPrefix(name, "threatscan-nohooks-") || dirExists(filepath.Join(tmp, name, "repo.git"))
+		return strings.HasPrefix(name, "pushwarden-nohooks-") || dirExists(filepath.Join(tmp, name, "repo.git"))
 	})
 	add("leftover folders in the temp folder", n, b, "")
 	return r
@@ -187,7 +187,7 @@ func limit(n int, unit string) string {
 	return fmt.Sprintf("%d %s", n, unit)
 }
 
-// Usage measures what ThreatScan occupies in its data directory.
+// Usage measures what PushWarden occupies in its data directory.
 func Usage(dataDir string, c *config.Config) []Item {
 	if c == nil {
 		c = config.Default()

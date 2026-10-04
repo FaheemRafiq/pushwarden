@@ -61,7 +61,7 @@ func TestWhyAction(t *testing.T) {
 	if w := WhyAction(&Finding{Category: "malicious_process", Meta: Meta{Kill: true}, Action: "kill PID 5 failed (permission?)"}); !strings.Contains(w, "failed") {
 		t.Fatal(w)
 	}
-	if w := WhyAction(&Finding{Category: "c2_connection", Meta: Meta{PID: 0}}); !strings.Contains(w, "threatscan protect") {
+	if w := WhyAction(&Finding{Category: "c2_connection", Meta: Meta{PID: 0}}); !strings.Contains(w, "pushwarden protect") {
 		t.Fatal(w)
 	}
 	cases := map[string]*Finding{

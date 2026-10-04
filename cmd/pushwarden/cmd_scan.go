@@ -7,20 +7,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/findings"
-	"github.com/FaheemRafiq/threatscan/internal/journal"
-	"github.com/FaheemRafiq/threatscan/internal/notify"
-	"github.com/FaheemRafiq/threatscan/internal/prompt"
-	"github.com/FaheemRafiq/threatscan/internal/protect"
-	"github.com/FaheemRafiq/threatscan/internal/report"
-	"github.com/FaheemRafiq/threatscan/internal/scan"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/notify"
+	"github.com/FaheemRafiq/pushwarden/internal/prompt"
+	"github.com/FaheemRafiq/pushwarden/internal/protect"
+	"github.com/FaheemRafiq/pushwarden/internal/report"
+	"github.com/FaheemRafiq/pushwarden/internal/scan"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 func init() {
 	register("scan", "one-off scan of repos and this computer", cmdScan)
 	register("check-staged", "pre-commit hook helper: scan staged files", cmdCheckStaged)
-	register("version", "print the version", func([]string) int { fmt.Println("ThreatScan " + version); return 0 })
+	register("version", "print the version", func([]string) int { fmt.Println("PushWarden " + version); return 0 })
 }
 
 type scanOpts struct {
@@ -47,7 +47,7 @@ func cmdScan(args []string) int {
 	fs.BoolVar(&o.gui, "gui", false, "ask about each malicious file with a native dialog")
 	fs.BoolVar(&o.noPrompt, "no-prompt", false, "report only; never ask, never change files")
 	fs.BoolVar(&o.notify, "notify", false, "send a desktop/webhook alert on HIGH+")
-	fs.BoolVar(&o.noReport, "no-report", false, "do not save a report under ~/.threatscan/reports")
+	fs.BoolVar(&o.noReport, "no-report", false, "do not save a report under ~/.pushwarden/reports")
 	fs.StringVar(&o.json, "json", "", "write a JSON report to `FILE`")
 	pos, err := parseInterspersed(fs, args)
 	if err != nil {
@@ -166,7 +166,7 @@ func runScan(c *ctx, o scanOpts) int {
 		if len(acted) == 0 {
 			u.Info("Nothing was changed.")
 		} else {
-			u.Info("Protection history: threatscan history   (undo: threatscan history --restore <path>)")
+			u.Info("Protection history: pushwarden history   (undo: pushwarden history --restore <path>)")
 		}
 	}
 

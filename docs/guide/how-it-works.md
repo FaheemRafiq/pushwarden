@@ -1,10 +1,10 @@
 ---
 title: How it works
-description: "The architecture of ThreatScan: the four protection layers, the path from detection to response, and where data is stored."
+description: "The architecture of PushWarden: the four protection layers, the path from detection to response, and where data is stored."
 ---
 # How it works
 
-ThreatScan is one program. Every feature is a subcommand, and the background protection is the same program running the `guard` command as a user service.
+PushWarden is one program. Every feature is a subcommand, and the background protection is the same program running the `guard` command as a user service.
 
 ## From file write to decision
 
@@ -15,7 +15,7 @@ file written --> real-time watcher --> scan for evidence --> quarantine --> noti
                                                native dialog: [Remove] [Restore and allow]
                                                                  |
                                                                  v
-                                                  threatscan history (restore, allow, remove)
+                                                  pushwarden history (restore, allow, remove)
 ```
 
 1. A file is written inside a watched folder.
@@ -81,7 +81,7 @@ Processes are different: a running payload cannot wait for a dialog. A process w
 
 ## Where everything is stored
 
-All state lives in one data directory, `~/.threatscan` (override with `THREATSCAN_HOME`): settings, indicators, the journal, logs, reports, quarantine and small state files. Every store has a size or age limit. See [Disk use and cleanup](disk-and-cleanup.md) and the file table in [Configuration](configuration.md).
+All state lives in one data directory, `~/.pushwarden` (override with `PUSHWARDEN_HOME`): settings, indicators, the journal, logs, reports, quarantine and small state files. Every store has a size or age limit. See [Disk use and cleanup](disk-and-cleanup.md) and the file table in [Configuration](configuration.md).
 
 The firewall block is the one exception. It runs as root, so it keeps its own root-owned copy of the program and of the indicators in a system location, and never trusts files under your home folder. See [Blocking C2 servers](network-block.md).
 

@@ -5,18 +5,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/config"
-	"github.com/FaheemRafiq/threatscan/internal/guard"
-	"github.com/FaheemRafiq/threatscan/internal/journal"
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/service"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
-	"github.com/FaheemRafiq/threatscan/internal/update"
+	"github.com/FaheemRafiq/pushwarden/internal/config"
+	"github.com/FaheemRafiq/pushwarden/internal/guard"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/service"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/internal/update"
 )
 
 func init() {
 	update.Version = version
-	register("update", "update ThreatScan to the latest release", cmdUpdate)
+	register("update", "update PushWarden to the latest release", cmdUpdate)
 	register("update-iocs", "download the latest indicator file", cmdUpdateIOCs)
 
 	guardHooks.UpdateIOCs = update.UpdateIOCs
@@ -71,7 +71,7 @@ func confirmUpdate(g *guard.Guard) {
 	if v := guardUpdater(g).Confirm(hbVersion); v != "" {
 		g.Log("update: running " + v)
 		g.J.Write(journal.Event{Ctx: "update", Kind: journal.KindUpdate, Title: "program update confirmed: running " + v})
-		g.Notifier.Desktop("ThreatScan", "ThreatScan updated to v"+v)
+		g.Notifier.Desktop("PushWarden", "PushWarden updated to v"+v)
 	}
 }
 
@@ -120,19 +120,19 @@ func cmdUpdate(args []string) int {
 		return 1
 	}
 	if rel == nil {
-		u.OK("ThreatScan " + version + " is up to date")
+		u.OK("PushWarden " + version + " is up to date")
 		return 0
 	}
 	if *check {
-		u.Info(fmt.Sprintf("ThreatScan %s is available (you have %s). Install:  threatscan update", rel.Version(), version))
+		u.Info(fmt.Sprintf("PushWarden %s is available (you have %s). Install:  pushwarden update", rel.Version(), version))
 		return 0
 	}
-	u.Info("Downloading and verifying ThreatScan " + rel.Version() + "...")
+	u.Info("Downloading and verifying PushWarden " + rel.Version() + "...")
 	if err := up.Apply(rel); err != nil {
 		u.Err("Update refused: " + err.Error())
 		return 1
 	}
-	u.OK("Installed ThreatScan " + rel.Version() + " at " + up.Exe)
+	u.OK("Installed PushWarden " + rel.Version() + " at " + up.Exe)
 	m := service.New(c.P, c.DataDir)
 	if up.Exe == m.Exe() {
 		if ok, msg := m.Restart(); ok {

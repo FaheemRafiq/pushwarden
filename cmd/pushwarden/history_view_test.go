@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/journal"
-	"github.com/FaheemRafiq/threatscan/internal/testfixtures"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/testfixtures"
 )
 
 func TestParseSince(t *testing.T) {

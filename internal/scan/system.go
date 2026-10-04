@@ -1,4 +1,4 @@
-// threatscan:allow-signatures
+// pushwarden:allow-signatures
 package scan
 
 import (
@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/findings"
-	h "github.com/FaheemRafiq/threatscan/internal/helpers"
-	"github.com/FaheemRafiq/threatscan/internal/iocs"
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
+	h "github.com/FaheemRafiq/pushwarden/internal/helpers"
+	"github.com/FaheemRafiq/pushwarden/internal/iocs"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 type System struct {
@@ -43,14 +43,14 @@ func (s *System) CheckProcesses() []*F {
 	return out
 }
 
-// ownProcessTree returns this process, every other threatscan process, and
+// ownProcessTree returns this process, every other pushwarden process, and
 // all their descendants. The scanner's own `git log -G <indicator regex>`
 // children carry the indicators on their command line; killing them would
 // abort the history checks and raise false alerts.
 func ownProcessTree(procs []platform.Proc, me int) map[int]bool {
 	own := map[int]bool{me: true}
 	for _, p := range procs {
-		if strings.Contains(strings.ToLower(p.Cmd), "threatscan") {
+		if strings.Contains(strings.ToLower(p.Cmd), "pushwarden") {
 			own[p.PID] = true
 		}
 	}
@@ -153,7 +153,7 @@ func stripSandboxMounts(name, cmd string) string {
 // tools are skipped: the dialogs and notifications quote indicators in their
 // arguments.
 func (s *System) matchProcess(name, cmd string) (re, kill *regexp.Regexp) {
-	if strings.Contains(strings.ToLower(cmd), "threatscan") || ownTools[strings.ToLower(strings.TrimSuffix(name, ".exe"))] {
+	if strings.Contains(strings.ToLower(cmd), "pushwarden") || ownTools[strings.ToLower(strings.TrimSuffix(name, ".exe"))] {
 		return nil, nil
 	}
 	cmd = stripGitPatterns(name, stripSandboxMounts(name, cmd))
@@ -218,7 +218,7 @@ func c2Finding(c platform.Conn, ownerCmd, iocVersion, goos string) *F {
 	}
 	return &F{Severity: crit, Category: "c2_connection", Title: "Live connection to PolinRider C2 " + key,
 		Details:     fmt.Sprintf("PID: %d", c.PID),
-		Remediation: block + fmt.Sprintf("\n  Then kill PID %d.  Or: sudo threatscan protect --install", c.PID),
+		Remediation: block + fmt.Sprintf("\n  Then kill PID %d.  Or: sudo pushwarden protect --install", c.PID),
 		Meta:        findings.Meta{PID: c.PID, Kill: c.PID > 0, IP: c.IP, Cmd: h.Trunc(ownerCmd, 500), Evidence: ev, Matched: key}}
 }
 
@@ -273,7 +273,7 @@ func (s *System) CheckSystemdUser() []*F {
 	var out []*F
 	dir := filepath.Join(s.P.Home, ".config", "systemd", "user")
 	_ = filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".service") || strings.HasPrefix(d.Name(), "threatscan") {
+		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".service") || strings.HasPrefix(d.Name(), "pushwarden") {
 			return nil
 		}
 		if _, err := os.Stat(p); err != nil { // dangling symlink
@@ -324,7 +324,7 @@ func (s *System) CheckLaunchd() []*F {
 	for _, d := range []string{filepath.Join(s.P.Home, "Library", "LaunchAgents"), "/Library/LaunchAgents", "/Library/LaunchDaemons"} {
 		ents, _ := os.ReadDir(d)
 		for _, e := range ents {
-			if !strings.HasSuffix(e.Name(), ".plist") || strings.Contains(e.Name(), "threatscan") {
+			if !strings.HasSuffix(e.Name(), ".plist") || strings.Contains(e.Name(), "pushwarden") {
 				continue
 			}
 			p := filepath.Join(d, e.Name())
@@ -349,7 +349,7 @@ func (s *System) CheckWindowsTasks() []*F {
 	bad := []string{"runtimedev", "vscodeupdater", "microsoftclroptimization", "svchostupdate", "wscript.exe //b", "node -e", "python -c"}
 	for _, line := range strings.Split(s.P.Run(40*time.Second, "schtasks", "/query", "/fo", "CSV", "/v"), "\n") {
 		low := strings.ToLower(line)
-		if strings.Contains(low, "threatscan") || !containsAny(low, bad...) {
+		if strings.Contains(low, "pushwarden") || !containsAny(low, bad...) {
 			continue
 		}
 		task := ""
@@ -363,7 +363,7 @@ func (s *System) CheckWindowsTasks() []*F {
 	ents, _ := os.ReadDir(startup)
 	for _, e := range ents {
 		n := strings.ToLower(e.Name())
-		if !e.IsDir() && !strings.Contains(n, "threatscan") && containsAny(n, "runtimedev", "vscode", "updater", "svchost", "clroptim") {
+		if !e.IsDir() && !strings.Contains(n, "pushwarden") && containsAny(n, "runtimedev", "vscode", "updater", "svchost", "clroptim") {
 			p := filepath.Join(startup, e.Name())
 			out = append(out, &F{Severity: high, Category: "persistence_startup", Title: "Suspicious Startup item: " + e.Name(), Path: p,
 				Remediation: `del "` + p + `"`})

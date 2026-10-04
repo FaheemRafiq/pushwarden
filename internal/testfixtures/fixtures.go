@@ -1,4 +1,4 @@
-// threatscan:allow-signatures
+// pushwarden:allow-signatures
 // Package testfixtures builds inert repositories that mimic the *shape* of
 // PolinRider artefacts (marker strings, padding, fake magic bytes).  Nothing
 // here is executable malware; no fixture connects anywhere.

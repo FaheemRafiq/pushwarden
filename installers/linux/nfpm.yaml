@@ -2,7 +2,7 @@
 # @VERSION@ and @BINARY@.
 # The package only ships the binary; postinstall registers the per-user guard
 # for the user who ran sudo, which copies the binary into their home.
-name: threatscan
+name: pushwarden
 arch: @ARCH@
 platform: linux
 version: @VERSION@
@@ -12,15 +12,15 @@ version_schema: semver
 epoch: "1"
 section: utils
 priority: optional
-maintainer: ThreatScan <noreply@github.com>
+maintainer: PushWarden <noreply@github.com>
 description: |
   Detects, removes and blocks the PolinRider / Contagious Interview
   supply-chain malware on developer machines.
-homepage: https://github.com/FaheemRafiq/threatscan
+homepage: https://github.com/FaheemRafiq/pushwarden
 license: MIT
 contents:
   - src: @BINARY@
-    dst: /usr/lib/threatscan/threatscan
+    dst: /usr/lib/pushwarden/pushwarden
     file_info:
       mode: 0755
 scripts:

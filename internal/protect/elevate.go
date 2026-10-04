@@ -7,14 +7,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
 )
 
 // NoBlockEnv disables every attempt to obtain administrator rights (installers
 // that already did it, CI, people who opted out).
-const NoBlockEnv = "THREATSCAN_NO_BLOCK"
+const NoBlockEnv = "PUSHWARDEN_NO_BLOCK"
 
-const elevatePrompt = "ThreatScan needs administrator rights to block the PolinRider command servers at the firewall."
+const elevatePrompt = "PushWarden needs administrator rights to block the PolinRider command servers at the firewall."
 
 // shQuote quotes for /bin/sh.
 func shQuote(s string) string {
@@ -57,7 +57,7 @@ func ElevateCommand(p *platform.Info, exe string, args []string, gui bool,
 		if _, err := lookPath("sudo"); err == nil {
 			out = append(out, append([]string{"sudo", "-n"}, full...))
 			if haveTTY {
-				out = append(out, append([]string{"sudo", "-p", "[threatscan] password for %u (to block the C2 servers): "}, full...))
+				out = append(out, append([]string{"sudo", "-p", "[pushwarden] password for %u (to block the C2 servers): "}, full...))
 			}
 		}
 		if !gui && display {

@@ -4,8 +4,8 @@
 if [ "${1:-}" = "upgrade" ] || [ "${1:-}" = "1" ]; then
   exit 0
 fi
-BIN=/usr/lib/threatscan/threatscan
+BIN=/usr/lib/pushwarden/pushwarden
 [ -x "$BIN" ] && "$BIN" protect --uninstall >/dev/null 2>&1
-rm -f /etc/systemd/system/threatscan-netblock.service /etc/systemd/system/threatscan-netblock.timer
+rm -f /etc/systemd/system/pushwarden-netblock.service /etc/systemd/system/pushwarden-netblock.timer
 systemctl daemon-reload >/dev/null 2>&1 || true
 exit 0

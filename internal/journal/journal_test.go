@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/findings"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
 )
 
 func TestWriteReadFilter(t *testing.T) {

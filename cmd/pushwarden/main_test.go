@@ -1,4 +1,4 @@
-// threatscan:allow-signatures
+// pushwarden:allow-signatures
 package main
 
 import (
@@ -7,15 +7,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/testfixtures"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/testfixtures"
 )
 
 func isolate(t *testing.T) string {
 	home := filepath.Join(t.TempDir(), "tshome")
-	t.Setenv("THREATSCAN_HOME", home)
-	t.Setenv("THREATSCAN_NO_BLOCK", "1") // never ask for admin rights in tests
-	t.Setenv("THREATSCAN_SYSTEM_DIR", filepath.Join(t.TempDir(), "sys"))
+	t.Setenv("PUSHWARDEN_HOME", home)
+	t.Setenv("PUSHWARDEN_NO_BLOCK", "1") // never ask for admin rights in tests
+	t.Setenv("PUSHWARDEN_SYSTEM_DIR", filepath.Join(t.TempDir(), "sys"))
 	return home
 }
 
@@ -120,7 +120,7 @@ func TestInstallDryRunWritesNothing(t *testing.T) {
 	}
 	t.Setenv("APPDATA", filepath.Join(fake, "AppData", "Roaming"))
 	t.Setenv("LOCALAPPDATA", filepath.Join(fake, "AppData", "Local"))
-	t.Setenv("THREATSCAN_INSTALL_DIR", filepath.Join(t.TempDir(), "inst"))
+	t.Setenv("PUSHWARDEN_INSTALL_DIR", filepath.Join(t.TempDir(), "inst"))
 	for _, base := range []string{".config/Code", "Library/Application Support/Code", "AppData/Roaming/Code"} {
 		os.MkdirAll(filepath.Join(fake, filepath.FromSlash(base)), 0o755)
 	}
@@ -139,10 +139,10 @@ func TestInstallDryRunWritesNothing(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(home, "config.json")); err == nil {
 		t.Error("dry run saved config.json")
 	}
-	if _, err := os.Stat(os.Getenv("THREATSCAN_INSTALL_DIR")); err == nil {
+	if _, err := os.Stat(os.Getenv("PUSHWARDEN_INSTALL_DIR")); err == nil {
 		t.Error("dry run copied the binary")
 	}
-	for _, p := range []string{".config/systemd/user/threatscan-guard.service", "Library/LaunchAgents/com.threatscan.guard.plist", ".local/bin/threatscan"} {
+	for _, p := range []string{".config/systemd/user/pushwarden-guard.service", "Library/LaunchAgents/com.pushwarden.guard.plist", ".local/bin/pushwarden"} {
 		if _, err := os.Lstat(filepath.Join(fake, filepath.FromSlash(p))); err == nil {
 			t.Errorf("dry run wrote %s", p)
 		}

@@ -5,14 +5,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/config"
-	"github.com/FaheemRafiq/threatscan/internal/guard"
-	"github.com/FaheemRafiq/threatscan/internal/housekeep"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/internal/config"
+	"github.com/FaheemRafiq/pushwarden/internal/guard"
+	"github.com/FaheemRafiq/pushwarden/internal/housekeep"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 func init() {
-	register("cleanup", "show what ThreatScan occupies on disk and remove what is past its limits", cmdCleanup)
+	register("cleanup", "show what PushWarden occupies on disk and remove what is past its limits", cmdCleanup)
 	guardHooks.Periodic = append(guardHooks.Periodic, guard.PeriodicTask{
 		Name:     "housekeeping",
 		Interval: func(*config.Config) time.Duration { return 24 * time.Hour },
@@ -43,7 +43,7 @@ func diskSummary(c *ctx) string {
 	if len(parts) > 0 {
 		out += " (" + strings.Join(parts, ", ") + ")"
 	}
-	return out + ". Limits and cleanup: threatscan cleanup"
+	return out + ". Limits and cleanup: pushwarden cleanup"
 }
 
 func cmdCleanup(args []string) int {
@@ -81,7 +81,7 @@ func cmdCleanup(args []string) int {
 		u.Info(line)
 	}
 	if *dry {
-		u.Info(fmt.Sprintf("Dry run: nothing was removed. `threatscan cleanup` frees %s.", housekeep.MB(r.Bytes())))
+		u.Info(fmt.Sprintf("Dry run: nothing was removed. `pushwarden cleanup` frees %s.", housekeep.MB(r.Bytes())))
 	} else {
 		u.OK(housekeep.MB(r.Bytes()) + " freed.")
 	}

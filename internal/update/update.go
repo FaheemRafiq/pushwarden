@@ -20,12 +20,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/config"
+	"github.com/FaheemRafiq/pushwarden/internal/config"
 )
 
 const (
-	DefaultAPIURL  = "https://api.github.com/repos/FaheemRafiq/threatscan/releases/latest"
-	defaultListURL = "https://api.github.com/repos/FaheemRafiq/threatscan/releases"
+	DefaultAPIURL  = "https://api.github.com/repos/FaheemRafiq/pushwarden/releases/latest"
+	defaultListURL = "https://api.github.com/repos/FaheemRafiq/pushwarden/releases"
 	maxBinaryBytes = 200 << 20
 	// RollbackWindow: a restart this soon after an update, without a heartbeat
 	// from the new version, means the new version crashed.
@@ -128,7 +128,7 @@ func (u *Updater) saveState(s *State) error {
 
 // AssetName is the release asset for this OS/arch.
 func (u *Updater) AssetName() string {
-	n := "threatscan-" + u.GOOS + "-" + u.GOARCH
+	n := "pushwarden-" + u.GOOS + "-" + u.GOARCH
 	if u.GOOS == "windows" {
 		n += ".exe"
 	}

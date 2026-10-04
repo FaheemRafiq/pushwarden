@@ -1,10 +1,10 @@
 ---
 title: Security and privacy
-description: "The trust model of ThreatScan: what runs with which privileges, how tokens and updates are protected, and exactly what data can leave the machine."
+description: "The trust model of PushWarden: what runs with which privileges, how tokens and updates are protected, and exactly what data can leave the machine."
 ---
 # Security and privacy
 
-A security tool runs on machines that may already be compromised and handles sensitive material. This page states what ThreatScan does and does not do, so you can decide whether to trust it.
+A security tool runs on machines that may already be compromised and handles sensitive material. This page states what PushWarden does and does not do, so you can decide whether to trust it.
 
 ## Privileges
 
@@ -33,8 +33,8 @@ There is no built-in telemetry endpoint. No URL for the digest or the upload is 
 Before turning the digest or the upload on you can see exactly what would be sent:
 
 ```sh
-threatscan feedback --digest
-threatscan feedback --preview
+pushwarden feedback --digest
+pushwarden feedback --preview
 ```
 
 See [Team reporting](team-reporting.md) for the contents and the redaction rules.
@@ -78,7 +78,7 @@ The key that every machine holds for the central upload is an insert-only key. T
 
 The data directory and the files in it are created with user-only permissions (`0700` for directories, `0600` for files). `config.json` can contain a webhook URL and an upload key; treat it like any other credentials file.
 
-## What ThreatScan does not do
+## What PushWarden does not do
 
 - It does not collect analytics or usage statistics.
 - It does not upload file contents. The central upload carries only the matched text and evidence lines of a finding, redacted.
@@ -88,8 +88,8 @@ The data directory and the files in it are created with user-only permissions (`
 
 ## Reporting a vulnerability
 
-Open an issue at <https://github.com/FaheemRafiq/threatscan/issues>. For anything that should not be public, contact the maintainer through the GitHub profile first.
+Open an issue at <https://github.com/FaheemRafiq/pushwarden/issues>. For anything that should not be public, contact the maintainer through the GitHub profile first.
 
 ## License
 
-ThreatScan is released under the MIT license. The source is at <https://github.com/FaheemRafiq/threatscan>.
+PushWarden is released under the MIT license. The source is at <https://github.com/FaheemRafiq/pushwarden>.

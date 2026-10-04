@@ -85,9 +85,9 @@ func Editor(path string, dry bool) (bool, []string, error) {
 	if !dry {
 		_ = os.MkdirAll(filepath.Dir(path), 0o755)
 		if len(raw) > 2 {
-			_ = os.WriteFile(fmt.Sprintf("%s.threatscan-%d.bak", path, time.Now().Unix()), raw, 0o600)
+			_ = os.WriteFile(fmt.Sprintf("%s.pushwarden-%d.bak", path, time.Now().Unix()), raw, 0o600)
 			// keep the two newest backups of this file; older ones only pile up
-			if baks, _ := filepath.Glob(path + ".threatscan-*.bak"); len(baks) > 2 {
+			if baks, _ := filepath.Glob(path + ".pushwarden-*.bak"); len(baks) > 2 {
 				sort.Slice(baks, func(a, b int) bool { return bakTime(baks[a]) < bakTime(baks[b]) })
 				for _, old := range baks[:len(baks)-2] {
 					_ = os.Remove(old)
@@ -187,9 +187,9 @@ func UndoNPM(home string) bool {
 }
 
 const preCommit = `#!/bin/sh
-# ThreatScan pre-commit hook: refuse to commit files with PolinRider indicators.
-if command -v threatscan >/dev/null 2>&1; then
-  threatscan check-staged || exit 1
+# PushWarden pre-commit hook: refuse to commit files with PolinRider indicators.
+if command -v pushwarden >/dev/null 2>&1; then
+  pushwarden check-staged || exit 1
 fi
 `
 
@@ -201,13 +201,13 @@ func PreCommit(repo string, dry bool) (bool, string) {
 	hook := filepath.Join(hooks, "pre-commit")
 	body := preCommit + "exit 0\n"
 	if b, err := os.ReadFile(hook); err == nil {
-		if strings.Contains(string(b), "threatscan") {
+		if strings.Contains(string(b), "pushwarden") {
 			return false, "already installed"
 		}
 		if !dry {
-			_ = os.Rename(hook, filepath.Join(hooks, "pre-commit.pre-threatscan"))
+			_ = os.Rename(hook, filepath.Join(hooks, "pre-commit.pre-pushwarden"))
 		}
-		body = preCommit + `exec "$(dirname "$0")/pre-commit.pre-threatscan" "$@"` + "\n"
+		body = preCommit + `exec "$(dirname "$0")/pre-commit.pre-pushwarden" "$@"` + "\n"
 	}
 	if !dry {
 		if err := os.WriteFile(hook, []byte(body), 0o755); err != nil {
@@ -217,7 +217,7 @@ func PreCommit(repo string, dry bool) (bool, string) {
 	return true, "installed " + hook
 }
 
-// bakTime reads the timestamp out of "<file>.threatscan-<unix>.bak".
+// bakTime reads the timestamp out of "<file>.pushwarden-<unix>.bak".
 func bakTime(p string) int64 {
 	p = strings.TrimSuffix(p, ".bak")
 	n, _ := strconv.ParseInt(p[strings.LastIndex(p, "-")+1:], 10, 64)

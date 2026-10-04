@@ -72,7 +72,7 @@ func addUserPath(dir string, dry bool) string {
 	if err := writeUserPath(k, strings.Join(append(splitPath(v), dir), ";"), typ); err != nil {
 		return "could not update the user PATH: " + err.Error()
 	}
-	return "added " + dir + " to your user PATH (open a new terminal to use 'threatscan')"
+	return "added " + dir + " to your user PATH (open a new terminal to use 'pushwarden')"
 }
 
 func removeUserPath(dir string) {

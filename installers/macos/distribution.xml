@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <installer-gui-script minSpecVersion="2">
-    <title>ThreatScan</title>
+    <title>PushWarden</title>
     <options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64"/>
     <!-- per user: no administrator password -->
     <domains enable_anywhere="false" enable_currentUserHome="true" enable_localSystem="false"/>
@@ -9,12 +9,12 @@
     </allowed-os-versions>
     <choices-outline>
         <line choice="default">
-            <line choice="com.threatscan.pkg"/>
+            <line choice="com.pushwarden.pkg"/>
         </line>
     </choices-outline>
     <choice id="default"/>
-    <choice id="com.threatscan.pkg" visible="false">
-        <pkg-ref id="com.threatscan.pkg"/>
+    <choice id="com.pushwarden.pkg" visible="false">
+        <pkg-ref id="com.pushwarden.pkg"/>
     </choice>
-    <pkg-ref id="com.threatscan.pkg" version="@VERSION@" onConclusion="none">threatscan-component.pkg</pkg-ref>
+    <pkg-ref id="com.pushwarden.pkg" version="@VERSION@" onConclusion="none">pushwarden-component.pkg</pkg-ref>
 </installer-gui-script>

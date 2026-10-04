@@ -1,12 +1,12 @@
-// threatscan:allow-signatures
+// pushwarden:allow-signatures
 package scan
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 // The exact command line GNOME's sandboxed image loader ran on Fedora 44; the
@@ -27,7 +27,7 @@ func TestMatchProcess(t *testing.T) {
 		"chrome":     "chrome --user-data-dir=/home/x/.cache/fontconfig-cache",
 		"flatpak":    "flatpak run --filesystem=/home/x/.cache/font/ org.example.App",
 		"zenity":     "zenity --info --text global['_V']='8-st17' /home/x/.cache/font/a.js",
-		"threatscan": "threatscan scan /home/x/.cache/font/",
+		"pushwarden": "pushwarden scan /home/x/.cache/font/",
 	}
 	for name, cmd := range clean {
 		if re, _ := s.matchProcess(name, cmd); re != nil {
@@ -123,7 +123,7 @@ func TestOwnGitChildrenAndSearchPatternsAreNotFlagged(t *testing.T) {
 	}
 	procs := []platform.Proc{
 		{PID: 1, PPID: 0, Name: "systemd", Cmd: "/sbin/init"},
-		{PID: 100, PPID: 1, Name: "threatscan", Cmd: "/home/x/.local/share/threatscan/threatscan guard"},
+		{PID: 100, PPID: 1, Name: "pushwarden", Cmd: "/home/x/.local/share/pushwarden/pushwarden guard"},
 		{PID: 200, PPID: 100, Name: "git", Cmd: ownGitLog},
 		{PID: 201, PPID: 200, Name: "git", Cmd: "git pack-objects"},
 		{PID: 300, PPID: 1, Name: "node", Cmd: "node -e \"global['_V']='8-st17'\""},

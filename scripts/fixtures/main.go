@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/FaheemRafiq/threatscan/internal/testfixtures"
+	"github.com/FaheemRafiq/pushwarden/internal/testfixtures"
 )
 
 func main() {

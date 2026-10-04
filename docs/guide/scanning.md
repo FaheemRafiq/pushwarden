@@ -1,16 +1,16 @@
 ---
 title: Scanning
-description: "How to run an on-demand scan of repositories and the host with threatscan scan: options, behaviour when something is found, reports and exit codes."
+description: "How to run an on-demand scan of repositories and the host with pushwarden scan: options, behaviour when something is found, reports and exit codes."
 ---
 # Scanning
 
-`threatscan scan` is a one-off scan of repositories and of the computer. The background guard does the same work on a schedule; this command runs it now and shows the result.
+`pushwarden scan` is a one-off scan of repositories and of the computer. The background guard does the same work on a schedule; this command runs it now and shows the result.
 
 ```sh
-threatscan scan [options] [directories]
+pushwarden scan [options] [directories]
 ```
 
-`threatscan [directories]` without a command means the same.
+`pushwarden [directories]` without a command means the same.
 
 ## What is scanned
 
@@ -60,7 +60,7 @@ What `--fix` does:
 
 Every changed or removed file is copied to quarantine first. See [Response and recovery](response-and-recovery.md).
 
-Findings that ThreatScan cannot fix on its own, such as a compromised package version in a lockfile, are printed with a remediation hint.
+Findings that PushWarden cannot fix on its own, such as a compromised package version in a lockfile, are printed with a remediation hint.
 
 ## Exit codes
 
@@ -76,33 +76,33 @@ Each scan saves a JSON report under `reports/` in the data directory, plus `late
 
 The report contains the version, the indicator version, statistics (repositories scanned and infected, files checked, counts per severity, duration) and every finding with its severity, category, title, path, details, remediation hint, action taken and evidence.
 
-`threatscan status` shows a summary of the latest report.
+`pushwarden status` shows a summary of the latest report.
 
 ## Examples
 
 ```sh
-threatscan scan                          # this directory
-threatscan scan ~/code ~/work            # specific directories
-threatscan scan --home --no-system       # repositories only
-threatscan scan --home --fix             # clean up without questions
-threatscan scan --home --no-prompt --verbose --json audit.json   # audit without touching anything
-threatscan scan --ci --json report.json  # in a pipeline; exit 1 fails the job
-threatscan --deep ~/proj                 # same as: threatscan scan --deep ~/proj
+pushwarden scan                          # this directory
+pushwarden scan ~/code ~/work            # specific directories
+pushwarden scan --home --no-system       # repositories only
+pushwarden scan --home --fix             # clean up without questions
+pushwarden scan --home --no-prompt --verbose --json audit.json   # audit without touching anything
+pushwarden scan --ci --json report.json  # in a pipeline; exit 1 fails the job
+pushwarden --deep ~/proj                 # same as: pushwarden scan --deep ~/proj
 ```
 
 ## Scanning staged files before a commit
 
-`threatscan check-staged` scans only the files staged for commit and exits `1` if any carries an indicator at HIGH or above, which blocks the commit.
+`pushwarden check-staged` scans only the files staged for commit and exits `1` if any carries an indicator at HIGH or above, which blocks the commit.
 
 ```sh
-threatscan harden --pre-commit .    # install it as a pre-commit hook in this repository
+pushwarden harden --pre-commit .    # install it as a pre-commit hook in this repository
 ```
 
 Or add it to `.git/hooks/pre-commit` yourself:
 
 ```sh
 #!/bin/sh
-threatscan check-staged || exit 1
+pushwarden check-staged || exit 1
 ```
 
 See [CI and automation](ci-and-automation.md).
@@ -112,7 +112,7 @@ See [CI and automation](ci-and-automation.md).
 Set `exclude` to a comma-separated list of directories that must never be scanned:
 
 ```sh
-threatscan config --set exclude=~/code/malware-samples,~/archive
+pushwarden config --set exclude=~/code/malware-samples,~/archive
 ```
 
 ## Every scan is recorded

@@ -1,23 +1,23 @@
 ---
 title: Quick start
-description: "The ThreatScan commands used most often, with one line on what each does."
+description: "The PushWarden commands used most often, with one line on what each does."
 ---
 # Quick start
 
 Five commands cover most needs.
 
 ```sh
-threatscan install              # background guard + editor hardening + first scan
-threatscan status               # is everything running?
-threatscan scan --home          # audit every project under your home folder now
-threatscan github-clean         # dry run: which of my GitHub repositories and branches are infected?
-threatscan github-clean --apply # fix and push them
+pushwarden install              # background guard + editor hardening + first scan
+pushwarden status               # is everything running?
+pushwarden scan --home          # audit every project under your home folder now
+pushwarden github-clean         # dry run: which of my GitHub repositories and branches are infected?
+pushwarden github-clean --apply # fix and push them
 ```
 
 ## Check the protection
 
 ```sh
-threatscan status
+pushwarden status
 ```
 
 Look for `Guard: alive`, a real-time backend other than `off`, and `Firewall: active (persistent ...)`.
@@ -25,21 +25,21 @@ Look for `Guard: alive`, a real-time backend other than `off`, and `Firewall: ac
 ## Scan now
 
 ```sh
-threatscan scan                        # the current directory
-threatscan scan ~/code ~/work          # specific directories
-threatscan scan --home                 # every project under your home folder, plus the host
-threatscan scan --home --no-prompt     # report only, change nothing
-threatscan scan --home --fix           # clean up without asking (reversible)
+pushwarden scan                        # the current directory
+pushwarden scan ~/code ~/work          # specific directories
+pushwarden scan --home                 # every project under your home folder, plus the host
+pushwarden scan --home --no-prompt     # report only, change nothing
+pushwarden scan --home --fix           # clean up without asking (reversible)
 ```
 
-`threatscan [dirs]` without a command is short for `threatscan scan [dirs]`. See [Scanning](scanning.md).
+`pushwarden [dirs]` without a command is short for `pushwarden scan [dirs]`. See [Scanning](scanning.md).
 
 ## See what happened
 
 ```sh
-threatscan alerts                       # recent alerts and why each one fired
-threatscan history                      # each distinct finding once, then what was done
-threatscan history --all --since 7d     # everything this week, nothing collapsed
+pushwarden alerts                       # recent alerts and why each one fired
+pushwarden history                      # each distinct finding once, then what was done
+pushwarden history --all --since 7d     # everything this week, nothing collapsed
 ```
 
 See [Activity history](activity-history.md).
@@ -47,9 +47,9 @@ See [Activity history](activity-history.md).
 ## Undo an action
 
 ```sh
-threatscan history --restore PATH       # put the original back (it is still malicious)
-threatscan history --allow PATH         # restore and stop flagging this exact content for 30 days
-threatscan history --remove PATH        # delete the quarantined copies for good
+pushwarden history --restore PATH       # put the original back (it is still malicious)
+pushwarden history --allow PATH         # restore and stop flagging this exact content for 30 days
+pushwarden history --remove PATH        # delete the quarantined copies for good
 ```
 
 See [Response and recovery](response-and-recovery.md).
@@ -57,9 +57,9 @@ See [Response and recovery](response-and-recovery.md).
 ## Clean GitHub
 
 ```sh
-threatscan github-clean --list              # which repositories can my token push to?
-threatscan github-clean                     # dry run over all of them
-threatscan github-clean --select --apply    # pick from a list, then fix and push
+pushwarden github-clean --list              # which repositories can my token push to?
+pushwarden github-clean                     # dry run over all of them
+pushwarden github-clean --select --apply    # pick from a list, then fix and push
 ```
 
 See [Cleaning GitHub repositories](github-clean.md).
@@ -67,9 +67,9 @@ See [Cleaning GitHub repositories](github-clean.md).
 ## Change a setting
 
 ```sh
-threatscan config                          # show all settings
-threatscan config --set action=ask         # ask before touching any file
-threatscan config --set webhook_url=URL    # send alerts to Slack, Discord or Teams
+pushwarden config                          # show all settings
+pushwarden config --set action=ask         # ask before touching any file
+pushwarden config --set webhook_url=URL    # send alerts to Slack, Discord or Teams
 ```
 
 Restart the guard after a change. See [Configuration](configuration.md).
@@ -77,9 +77,9 @@ Restart the guard after a change. See [Configuration](configuration.md).
 ## Get help offline
 
 ```sh
-threatscan help                  # list of commands
-threatscan help scan             # documentation for one command
-threatscan help all              # the whole reference
+pushwarden help                  # list of commands
+pushwarden help scan             # documentation for one command
+pushwarden help all              # the whole reference
 ```
 
 The help text is embedded in the program, so it always matches the installed version.

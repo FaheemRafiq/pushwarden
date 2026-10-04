@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FaheemRafiq/threatscan/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
 )
 
 func testManager(t *testing.T) *Manager {
 	t.Helper()
-	t.Setenv("THREATSCAN_INSTALL_DIR", filepath.Join(t.TempDir(), "install dir"))
-	t.Setenv("THREATSCAN_HOME", t.TempDir())
+	t.Setenv("PUSHWARDEN_INSTALL_DIR", filepath.Join(t.TempDir(), "install dir"))
+	t.Setenv("PUSHWARDEN_HOME", t.TempDir())
 	p := platform.New()
 	p.Home = t.TempDir()
 	return New(p, p.DataDir())
@@ -32,10 +32,10 @@ func TestPreview(t *testing.T) {
 }
 
 func TestSystemdUnit(t *testing.T) {
-	u := SystemdUnit([]string{"/home/a b/.local/share/threatscan/threatscan", "guard"}, "/home/a/.threatscan/guard.log", "/tmp/th")
+	u := SystemdUnit([]string{"/home/a b/.local/share/pushwarden/pushwarden", "guard"}, "/home/a/.pushwarden/guard.log", "/tmp/th")
 	for _, want := range []string{"Restart=always", "Nice=10", "IOSchedulingClass=idle", "WantedBy=default.target",
-		"ExecStart='/home/a b/.local/share/threatscan/threatscan' guard", "Environment=THREATSCAN_HOME=/tmp/th",
-		"StandardOutput=append:/home/a/.threatscan/guard.log"} {
+		"ExecStart='/home/a b/.local/share/pushwarden/pushwarden' guard", "Environment=PUSHWARDEN_HOME=/tmp/th",
+		"StandardOutput=append:/home/a/.pushwarden/guard.log"} {
 		if !strings.Contains(u, want) {
 			t.Errorf("unit lacks %q", want)
 		}
@@ -43,14 +43,14 @@ func TestSystemdUnit(t *testing.T) {
 	if strings.Contains(u, "After=default.target") {
 		t.Error("unit has After=default.target (ordering cycle)")
 	}
-	if strings.Contains(SystemdUnit([]string{"/x", "guard"}, "/l", ""), "THREATSCAN_HOME") {
-		t.Error("THREATSCAN_HOME set although empty")
+	if strings.Contains(SystemdUnit([]string{"/x", "guard"}, "/l", ""), "PUSHWARDEN_HOME") {
+		t.Error("PUSHWARDEN_HOME set although empty")
 	}
 }
 
 func TestLaunchdPlist(t *testing.T) {
-	pl := LaunchdPlist([]string{"/Users/a/Library/Application Support/ThreatScan/threatscan", "guard"}, "/Users/a/.threatscan/guard.log", "", launchdPath())
-	for _, want := range []string{"<string>com.threatscan.guard</string>", "<key>RunAtLoad</key>\n\t<true/>",
+	pl := LaunchdPlist([]string{"/Users/a/Library/Application Support/PushWarden/pushwarden", "guard"}, "/Users/a/.pushwarden/guard.log", "", launchdPath())
+	for _, want := range []string{"<string>com.pushwarden.guard</string>", "<key>RunAtLoad</key>\n\t<true/>",
 		"<key>KeepAlive</key>\n\t<true/>", "<integer>10</integer>", "<string>Background</string>",
 		"/opt/homebrew/bin", "<string>guard</string>"} {
 		if !strings.Contains(pl, want) {
@@ -60,8 +60,8 @@ func TestLaunchdPlist(t *testing.T) {
 }
 
 func TestVBSLauncher(t *testing.T) {
-	v := vbsLauncher([]string{`C:\Users\a b\AppData\Local\Programs\ThreatScan\threatscan.exe`, "guard"})
-	if !strings.Contains(v, `s.Run """C:\Users\a b\AppData\Local\Programs\ThreatScan\threatscan.exe"" guard", 0, False`) {
+	v := vbsLauncher([]string{`C:\Users\a b\AppData\Local\Programs\PushWarden\pushwarden.exe`, "guard"})
+	if !strings.Contains(v, `s.Run """C:\Users\a b\AppData\Local\Programs\PushWarden\pushwarden.exe"" guard", 0, False`) {
 		t.Fatal(v)
 	}
 }
@@ -103,7 +103,7 @@ func TestLinkCLI(t *testing.T) {
 		t.Skip("PATH is edited in the registry on Windows")
 	}
 	m := testManager(t)
-	link := filepath.Join(m.P.Home, ".local", "bin", "threatscan")
+	link := filepath.Join(m.P.Home, ".local", "bin", "pushwarden")
 	if msg := m.LinkCLI(true); !strings.Contains(msg, "would link") {
 		t.Fatal(msg)
 	}
@@ -116,7 +116,7 @@ func TestLinkCLI(t *testing.T) {
 	}
 	// an old symlink (v5 venv) is replaced
 	os.Remove(link)
-	os.Symlink("/old/venv/bin/threatscan", link)
+	os.Symlink("/old/venv/bin/pushwarden", link)
 	m.LinkCLI(false)
 	if cur, _ := os.Readlink(link); cur != m.Exe() {
 		t.Fatalf("old symlink not replaced: %q", cur)
@@ -145,7 +145,7 @@ func TestPlaceBinaryKeepsNewerInstalled(t *testing.T) {
 	}
 	m := testManager(t)
 	os.MkdirAll(m.P.InstallDir(), 0o755)
-	newer := "#!/bin/sh\necho 'ThreatScan 99.0.0'\n"
+	newer := "#!/bin/sh\necho 'PushWarden 99.0.0'\n"
 	os.WriteFile(m.Exe(), []byte(newer), 0o755)
 	if v := InstalledVersion(m.Exe()); v != "99.0.0" {
 		t.Fatalf("InstalledVersion = %q", v)
@@ -160,13 +160,13 @@ func TestPlaceBinaryKeepsNewerInstalled(t *testing.T) {
 		t.Fatal("newer binary was overwritten")
 	}
 	// an older installed binary is replaced
-	os.WriteFile(m.Exe(), []byte("#!/bin/sh\necho 'ThreatScan 0.0.9'\n"), 0o755)
+	os.WriteFile(m.Exe(), []byte("#!/bin/sh\necho 'PushWarden 0.0.9'\n"), 0o755)
 	if copied, err := m.PlaceBinary(); !copied || err != nil {
 		t.Fatalf("older binary not replaced: %v %v", copied, err)
 	}
 	// so is the withdrawn 6.0.0 line, although its number is higher
 	for _, v := range []string{"6.0.0", "6.0.0-rc1", "6.0.0-dev"} {
-		os.WriteFile(m.Exe(), []byte("#!/bin/sh\necho 'ThreatScan "+v+"'\n"), 0o755)
+		os.WriteFile(m.Exe(), []byte("#!/bin/sh\necho 'PushWarden "+v+"'\n"), 0o755)
 		if copied, err := m.PlaceBinary(); !copied || err != nil {
 			t.Fatalf("withdrawn %s not replaced: %v %v", v, copied, err)
 		}
@@ -186,7 +186,7 @@ func TestLinkCLIAddsLocalBinToShellPath(t *testing.T) {
 		t.Fatalf("msg: %s", msg)
 	}
 	z, _ := os.ReadFile(filepath.Join(m.P.Home, ".zshrc"))
-	if !strings.HasPrefix(string(z), "alias ll='ls -l'\n") || strings.Count(string(z), ".local/bin") != 1 || !strings.Contains(string(z), "# added by threatscan install") {
+	if !strings.HasPrefix(string(z), "alias ll='ls -l'\n") || strings.Count(string(z), ".local/bin") != 1 || !strings.Contains(string(z), "# added by pushwarden install") {
 		t.Fatalf("zshrc:\n%s", z)
 	}
 	// second install: nothing added again
@@ -212,7 +212,7 @@ func TestLinkCLIAddsPathWhenLinkAlreadyExists(t *testing.T) {
 	t.Setenv("PATH", "/usr/bin:/bin")
 	bin := filepath.Join(m.P.Home, ".local", "bin")
 	os.MkdirAll(bin, 0o755)
-	os.Symlink(m.Exe(), filepath.Join(bin, "threatscan"))
+	os.Symlink(m.Exe(), filepath.Join(bin, "pushwarden"))
 	msg := m.LinkCLI(false)
 	if !strings.Contains(msg, "added ~/.local/bin to PATH") {
 		t.Fatalf("existing link skipped the PATH step: %s", msg)

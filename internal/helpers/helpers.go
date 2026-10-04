@@ -13,7 +13,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/FaheemRafiq/threatscan/internal/iocs"
+	"github.com/FaheemRafiq/pushwarden/internal/iocs"
 )
 
 type magic struct {
@@ -50,7 +50,7 @@ func init() {
 var JSExt = map[string]bool{".js": true, ".mjs": true, ".cjs": true, ".ts": true, ".tsx": true, ".jsx": true,
 	".mts": true, ".cts": true, ".html": true, ".htm": true}
 
-const AllowToken = "threatscan:allow-signatures"
+const AllowToken = "pushwarden:allow-signatures"
 
 var codeMarkers = [][]byte{[]byte("<html"), []byte("<!doc"), []byte("<script"), []byte("require("), []byte("global["),
 	[]byte("global."), []byte("function"), []byte("eval("), []byte("const "), []byte("var "), []byte("let "),
@@ -60,7 +60,7 @@ var skipDirs = map[string]bool{}
 
 func init() {
 	for _, d := range []string{"node_modules", ".git", ".hg", ".svn", "vendor", "__pycache__", ".venv", "venv", "dist", "build",
-		".next", ".nuxt", ".cache", "target", ".gradle", ".idea", ".threatscan",
+		".next", ".nuxt", ".cache", "target", ".gradle", ".idea", ".pushwarden",
 		"google-chrome", "chromium", "BraveSoftware", "microsoft-edge", "Google", "Mozilla", "firefox", "Extensions",
 		"Service Worker", "Cache", "Code Cache", "GPUCache", "IndexedDB", "Local Storage"} {
 		skipDirs[d] = true

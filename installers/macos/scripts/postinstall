@@ -4,14 +4,14 @@ user="$(stat -f %Su /dev/console)"
 if [ "$(id -u)" = 0 ]; then
   [ -n "$user" ] && [ "$user" != root ] || exit 0
   home="$(dscl . -read "/Users/$user" NFSHomeDirectory | awk '{print $2}')"
-  bin="$home/Library/Application Support/ThreatScan/threatscan"
-  [ -x "$bin" ] || bin="$2/threatscan"
+  bin="$home/Library/Application Support/PushWarden/pushwarden"
+  [ -x "$bin" ] || bin="$2/pushwarden"
   # system-wide C2 block (pf anchor + hosts), kept by a LaunchDaemon
   "$bin" protect --install >/dev/null 2>&1 || true
-  launchctl asuser "$(id -u "$user")" sudo -u "$user" -H env THREATSCAN_NO_BLOCK=1 "$bin" install --unattended || true
+  launchctl asuser "$(id -u "$user")" sudo -u "$user" -H env PUSHWARDEN_NO_BLOCK=1 "$bin" install --unattended || true
 else
-  bin="$2/threatscan"
-  [ -x "$bin" ] || bin="$HOME/Library/Application Support/ThreatScan/threatscan"
+  bin="$2/pushwarden"
+  [ -x "$bin" ] || bin="$HOME/Library/Application Support/PushWarden/pushwarden"
   "$bin" install --unattended || true
 fi
 exit 0

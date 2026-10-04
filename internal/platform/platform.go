@@ -47,34 +47,34 @@ func (p *Info) DisplayName() string {
 	return p.OS
 }
 
-// DataDir is ~/.threatscan (override with THREATSCAN_HOME), shared with the Python v5 build.
+// DataDir is ~/.pushwarden (override with PUSHWARDEN_HOME), shared with the Python v5 build.
 func (p *Info) DataDir() string {
-	if d := os.Getenv("THREATSCAN_HOME"); d != "" {
+	if d := os.Getenv("PUSHWARDEN_HOME"); d != "" {
 		return d
 	}
-	return filepath.Join(p.Home, ".threatscan")
+	return filepath.Join(p.Home, ".pushwarden")
 }
 
 // InstallDir is the per-user, user-writable location the binary runs from.
 func (p *Info) InstallDir() string {
-	if d := os.Getenv("THREATSCAN_INSTALL_DIR"); d != "" {
+	if d := os.Getenv("PUSHWARDEN_INSTALL_DIR"); d != "" {
 		return d
 	}
 	switch p.OS {
 	case "windows":
-		return filepath.Join(p.LocalAppData(), "Programs", "ThreatScan")
+		return filepath.Join(p.LocalAppData(), "Programs", "PushWarden")
 	case "darwin":
-		return filepath.Join(p.Home, "Library", "Application Support", "ThreatScan")
+		return filepath.Join(p.Home, "Library", "Application Support", "PushWarden")
 	default:
-		return filepath.Join(p.Home, ".local", "share", "threatscan")
+		return filepath.Join(p.Home, ".local", "share", "pushwarden")
 	}
 }
 
 func (p *Info) ExeName() string {
 	if p.IsWindows() {
-		return "threatscan.exe"
+		return "pushwarden.exe"
 	}
-	return "threatscan"
+	return "pushwarden"
 }
 
 func (p *Info) LocalAppData() string {

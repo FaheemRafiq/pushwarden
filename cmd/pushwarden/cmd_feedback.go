@@ -12,13 +12,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/config"
-	"github.com/FaheemRafiq/threatscan/internal/feedback"
-	"github.com/FaheemRafiq/threatscan/internal/guard"
-	"github.com/FaheemRafiq/threatscan/internal/journal"
-	"github.com/FaheemRafiq/threatscan/internal/protect"
-	"github.com/FaheemRafiq/threatscan/internal/service"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/internal/config"
+	"github.com/FaheemRafiq/pushwarden/internal/feedback"
+	"github.com/FaheemRafiq/pushwarden/internal/guard"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/protect"
+	"github.com/FaheemRafiq/pushwarden/internal/service"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 func init() {
@@ -109,7 +109,7 @@ func uploadSummary(up *feedback.Uploader) string {
 	default:
 		out += " (no upload yet)"
 	}
-	return out + ". See: threatscan feedback --preview"
+	return out + ". See: pushwarden feedback --preview"
 }
 
 func lastDigest(dataDir string) time.Time {
@@ -154,7 +154,7 @@ func postDigest(dataDir string, cfg *config.Config, iocVersion, goos, host strin
 func cmdFeedback(args []string) int {
 	fs := newFlags("feedback", "[--days N] [--out FILE] [--no-redact] | --false-positive PATH [--note TEXT] | --digest | --preview | --upload")
 	days := fs.Int("days", 14, "how many days of activity to include")
-	out := fs.String("out", "", "write the bundle to `FILE` (default: ./threatscan-feedback-DATE.zip)")
+	out := fs.String("out", "", "write the bundle to `FILE` (default: ./pushwarden-feedback-DATE.zip)")
 	noRedact := fs.Bool("no-redact", false, "keep paths, user and host names (secrets are still masked)")
 	fp := fs.String("false-positive", "", "record that the finding on `PATH` was wrong")
 	note := fs.String("note", "", "with --false-positive: what the file really is")
@@ -172,7 +172,7 @@ func cmdFeedback(args []string) int {
 		p, _ := filepath.Abs(*fp)
 		jr.Write(journal.Event{Ctx: "cli", Kind: journal.KindFeedback, Title: "marked as a false positive", Path: p, Note: *note})
 		u.OK("Recorded. It is included in the next feedback bundle" + map[bool]string{true: " and daily digest", false: ""}[c.Cfg.FeedbackURL != ""] + ".")
-		u.Info("To also restore the file and stop flagging it:  threatscan history --allow " + p)
+		u.Info("To also restore the file and stop flagging it:  pushwarden history --allow " + p)
 		return 0
 	case *preview:
 		rows, total := newUploader(c.DataDir, c.Cfg, c.P.Home, c.P.Hostname, c.P.OS).Pending(5)
@@ -190,7 +190,7 @@ func cmdFeedback(args []string) int {
 		return 0
 	case *upload:
 		if c.Cfg.UploadURL == "" {
-			u.Err("upload_url is not set. See: threatscan help feedback")
+			u.Err("upload_url is not set. See: pushwarden help feedback")
 			return 2
 		}
 		up := newUploader(c.DataDir, c.Cfg, c.P.Home, c.P.Hostname, c.P.OS)
@@ -214,7 +214,7 @@ func cmdFeedback(args []string) int {
 	}
 	path := *out
 	if path == "" {
-		path = "threatscan-feedback-" + time.Now().Format("20060102-1504") + ".zip"
+		path = "pushwarden-feedback-" + time.Now().Format("20060102-1504") + ".zip"
 	}
 	red := redactorFor(c.P.Home, c.P.Hostname)
 	if *noRedact {
@@ -234,14 +234,14 @@ func cmdFeedback(args []string) int {
 	} else {
 		u.P("      Redacted: home folder shown as ~, user and host names removed, token-shaped strings masked.")
 	}
-	u.Info("Nothing was uploaded. Look inside with `unzip -l`, then send the file to whoever maintains ThreatScan for you.")
+	u.Info("Nothing was uploaded. Look inside with `unzip -l`, then send the file to whoever maintains PushWarden for you.")
 	return 0
 }
 
 // feedbackSummary is the status text placed in the bundle.
 func feedbackSummary(c *ctx) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "ThreatScan %s on %s/%s (%s)\n", version, runtime.GOOS, runtime.GOARCH, c.P.DisplayName())
+	fmt.Fprintf(&b, "PushWarden %s on %s/%s (%s)\n", version, runtime.GOOS, runtime.GOARCH, c.P.DisplayName())
 	fmt.Fprintf(&b, "indicators: %s (%s)\n", c.I.Version, c.I.Source)
 	hb, age, alive := guard.ReadHeartbeat(c.DataDir)
 	switch {

@@ -18,7 +18,7 @@ file is the plan.
 ## Ground rules
 
 1. **Do not invent behaviour.** Every remaining piece already exists in the
-   Python v5 package under `threatscan/`. Port it; keep names, paths, file
+   Python v5 package under `pushwarden/`. Port it; keep names, paths, file
    formats and timings identical so a machine can move from v5 to v6 with its
    history intact.
 2. **Go 1.24 only.** `go.mod` says `go 1.24.0` on purpose: binaries must run on
@@ -33,14 +33,14 @@ file is the plan.
    the *shape* of the malware (marker strings, padding, fake magic bytes) and
    nothing executable. Never add real samples to the repo.
 6. Files that legitimately contain signature strings (tests, rule sets) start
-   with the comment `threatscan:allow-signatures`. See `internal/helpers.IsAllowlisted`
+   with the comment `pushwarden:allow-signatures`. See `internal/helpers.IsAllowlisted`
    for where it is and is not honoured.
 
 ## What exists (pushed to `main`)
 
 | Package | Ported from | Notes |
 |---|---|---|
-| `internal/iocs` | `threatscan/iocs.py` | embeds `threatscan/iocs.json` via `threatscan/iocsdata.go`; loads a newer user copy from `<data_dir>/iocs.json` |
+| `internal/iocs` | `pushwarden/iocs.py` | embeds `pushwarden/iocs.json` via `pushwarden/iocsdata.go`; loads a newer user copy from `<data_dir>/iocs.json` |
 | `internal/findings` | `findings.py` | `Finding`, `Meta`, `Stats`, `Severity` (JSON as names) |
 | `internal/platform` | `platform_info.py` | paths (`DataDir`, `InstallDir`, `ExeName`), gopsutil processes/sockets, `RunRC`, `Kill`, `Exe()`, `IsAdmin()`, `Detach()` |
 | `internal/helpers` | `helpers.py` | `AssetVerdict`, `Evidence`, `PayloadCut`, `IsAllowlisted`, `IsUnder`, `SHA256` |
@@ -53,31 +53,31 @@ file is the plan.
 | `internal/guard` | `guard.py` | loop, policy, dialog worker, heartbeat; `Hooks` for later phases |
 | `internal/realtime` | `realtime.py` | fsnotify + polling fallback |
 | `internal/service` | `service.py` | P4: `Manager` with `Preview`, `PlaceBinary`, `Install`, `Uninstall`, `Status`, `LinkCLI`/`UnlinkCLI`; Windows PATH edits in `path_windows.go` |
-| `cmd/threatscan` | `cli.py` | scan, guard, status, history, restore, harden, protect, config, check-staged, version, install, uninstall |
+| `cmd/pushwarden` | `cli.py` | scan, guard, status, history, restore, harden, protect, config, check-staged, version, install, uninstall |
 
 Tests: `GOTOOLCHAIN=go1.24.13 go test -race ./...` passes. The Python v5 code and
 its tests now live only on the `archive/python-v5` branch (see P8).
 
 ## Extension points you plug into (do not restructure them)
 
-- `cmd/threatscan/cmd_guard.go`: `var guardHooks guard.Hooks`. Set fields in an
-  `init()` of a new file in `cmd/threatscan/`, exactly as `hooks_realtime.go`
+- `cmd/pushwarden/cmd_guard.go`: `var guardHooks guard.Hooks`. Set fields in an
+  `init()` of a new file in `cmd/pushwarden/`, exactly as `hooks_realtime.go`
   does for `StartRealtime`.
 - `guard.Hooks.UpdateIOCs func(dataDir, current string, cfg *config.Config) (bool, string)`
   is called on the 24 h cadence; the guard reloads indicators when it returns true.
 - `guard.Hooks.Periodic []guard.PeriodicTask{Name, Interval(cfg), Run(g)}` runs
   extra work on its own cadence from the main loop. Program self-update goes here.
-- `cmd/threatscan/cmd_manage.go`: `var statusServiceRows func(c *ctx) [][2]string`.
-  Wrap it (see `cmd_guard.go`) to add rows to `threatscan status`.
+- `cmd/pushwarden/cmd_manage.go`: `var statusServiceRows func(c *ctx) [][2]string`.
+  Wrap it (see `cmd_guard.go`) to add rows to `pushwarden status`.
 - `main.go`: `register(name, help, func([]string) int)` adds a subcommand. Add
   `install`, `uninstall`, `update`, `update-iocs`. Give them a position in the
   `order` map in `usage()`.
 - `platform.Info.InstallDir()` is the per-user, user-writable location the
-  binary must run from: `%LOCALAPPDATA%\Programs\ThreatScan`,
-  `~/Library/Application Support/ThreatScan`, `~/.local/share/threatscan`.
-  `THREATSCAN_INSTALL_DIR` overrides it (use this in tests).
-- `platform.Info.DataDir()` is `~/.threatscan` (`THREATSCAN_HOME` overrides it).
-  Tests must set `THREATSCAN_HOME` to a temp dir.
+  binary must run from: `%LOCALAPPDATA%\Programs\PushWarden`,
+  `~/Library/Application Support/PushWarden`, `~/.local/share/pushwarden`.
+  `PUSHWARDEN_INSTALL_DIR` overrides it (use this in tests).
+- `platform.Info.DataDir()` is `~/.pushwarden` (`PUSHWARDEN_HOME` overrides it).
+  Tests must set `PUSHWARDEN_HOME` to a temp dir.
 
 ## P4. Start the guard at sign-in: `internal/service` (done)
 
@@ -86,7 +86,7 @@ Implemented as specified below. Choices worth knowing:
   the new binary. `Status()` reports "not installed" when the unit file is absent.
 - On Windows a successful task registration deletes a leftover Startup-folder
   launcher so two guards never start. The stop before copying ends the task and
-  kills any `threatscan ... guard` process (gopsutil, not PowerShell).
+  kills any `pushwarden ... guard` process (gopsutil, not PowerShell).
 - `PlaceBinary` is a no-op when the target is the same file or has the same SHA-256.
 - `uninstall` also removes the `~/.local/bin` symlink (only if it points at the
   installed binary) or the Windows PATH entry. It leaves the binary itself; P7's
@@ -94,26 +94,26 @@ Implemented as specified below. Choices worth knowing:
 - Not yet verified: a real `install` on Linux/macOS/Windows (`Guard: alive`).
   That is the CI smoke job in P5/P7.
 
-Port `threatscan/service.py` (class `ServiceManager`, function `_guard_cmd`).
+Port `pushwarden/service.py` (class `ServiceManager`, function `_guard_cmd`).
 Keep these names so v6 replaces a v5 install cleanly:
 
 | OS | Mechanism | Name / file |
 |---|---|---|
-| Linux | systemd user unit | `~/.config/systemd/user/threatscan-guard.service` |
-| macOS | LaunchAgent | `~/Library/LaunchAgents/com.threatscan.guard.plist` |
-| Windows | Scheduled Task at logon, limited rights | task `ThreatScan Guard`; fall back to a Startup-folder launcher if task creation is refused |
+| Linux | systemd user unit | `~/.config/systemd/user/pushwarden-guard.service` |
+| macOS | LaunchAgent | `~/Library/LaunchAgents/com.pushwarden.guard.plist` |
+| Windows | Scheduled Task at logon, limited rights | task `PushWarden Guard`; fall back to a Startup-folder launcher if task creation is refused |
 
 Behaviour to reproduce from `service.py`:
 - The registered command is `<InstallDir>/<ExeName> guard`.
 - `install` first copies the running executable into `InstallDir()` (skip if
   already running from there), then registers and starts the service, then
-  makes `threatscan` callable from a terminal (symlink in `~/.local/bin`, or
+  makes `pushwarden` callable from a terminal (symlink in `~/.local/bin`, or
   the install dir on the user's PATH on Windows). Do not replace a v5 shim that
   is a real file; the v5.2 migration removes it.
 - Linux unit: `Restart=always`, `Nice=10`, `IOSchedulingClass=idle`, log to
   `<data_dir>/guard.log`, `WantedBy=default.target`, and **no `After=default.target`**
   (that created an ordering cycle in v5.0; the v5 review caught it). Pass
-  `THREATSCAN_HOME` through as `Environment=` when set. Enable lingering when
+  `PUSHWARDEN_HOME` through as `Environment=` when set. Enable lingering when
   `loginctl` exists so the guard survives logout.
 - macOS plist: `RunAtLoad`, `KeepAlive`, `ThrottleInterval` 10, `ProcessType`
   Background, log paths, a `PATH` that includes `/opt/homebrew/bin`. Use
@@ -125,31 +125,31 @@ Behaviour to reproduce from `service.py`:
 - Windows-only code goes in `_windows.go` files; use `golang.org/x/sys/windows/registry`
   for PATH edits under `HKCU\Environment`.
 
-CLI (`cmd/threatscan/cmd_install.go`), mirroring `cli.py` `cmd_install`/`cmd_uninstall`:
+CLI (`cmd/pushwarden/cmd_install.go`), mirroring `cli.py` `cmd_install`/`cmd_uninstall`:
 - `install [--roots ...] [--webhook URL] [--no-kill] [--no-prompt] [--deep] [--no-harden] [--npm-ignore-scripts] [--block-c2] [--full-interval N] [--dry-run] [--unattended]`
 - `--dry-run` writes nothing at all (config, editor settings, service).
 - `--unattended` is what the installers call: no terminal prompts, run
   hardening, install the service, start it, and run the first scan **in the
   background** (start `<exe> scan --home --fix --notify` detached with
-  `platform.Detach`), then send one notification "ThreatScan is protecting this computer".
+  `platform.Detach`), then send one notification "PushWarden is protecting this computer".
 - `uninstall [--unblock] [--purge]`.
 - Add `Service` and `Binary` rows to `status` through `statusServiceRows`.
 
-Tests (`internal/service/service_test.go`, use `THREATSCAN_INSTALL_DIR` and
-`THREATSCAN_HOME` temp dirs):
+Tests (`internal/service/service_test.go`, use `PUSHWARDEN_INSTALL_DIR` and
+`PUSHWARDEN_HOME` temp dirs):
 - `Preview()` on the current OS contains the binary path and `guard`.
 - Linux unit text has no `After=default.target` and has `Restart=always`.
 - `PlaceBinary` copies the test binary and is a no-op on a second call.
 - Do **not** call `Install()` in unit tests; CI does that in a smoke job.
 
 Done when `install --dry-run` prints the definition for the current OS, and a
-real `install` on a Linux box shows `Guard: alive` in `threatscan status`.
+real `install` on a Linux box shows `Guard: alive` in `pushwarden status`.
 
 ## P5. Remaining tests, parity, CI (done, CI not yet run on GitHub)
 
 - Tests: `internal/scan/repo_test.go`, `internal/protect/protect_test.go`,
   `internal/prompt/prompt_test.go`, and `TestInstallDryRunWritesNothing` in
-  `cmd/threatscan`. The exclude test uses `third_party`, because `vendor` is
+  `cmd/pushwarden`. The exclude test uses `third_party`, because `vendor` is
   already a default skip dir and would pass without `Exclude`.
 - `testfixtures.Build(dir)` writes the fixtures without a `testing.TB`;
   `go run ./scripts/fixtures DIR` exposes it to scripts.
@@ -190,7 +190,7 @@ Port every case in `tests/test_scanner.py` that has no Go twin yet. Missing:
 
 Parity: `scripts/parity.sh` runs
 `python3 threat_scanner.py scan --ci --no-system --no-report --no-prompt --json py.json DIR`
-and `go run ./cmd/threatscan scan --ci --no-system --no-report --no-prompt --json go.json DIR`
+and `go run ./cmd/pushwarden scan --ci --no-system --no-report --no-prompt --json go.json DIR`
 on `internal/testfixtures` output and on `~/Coding`, then compares the sorted
 sets of `(category, severity, path)`. Any difference must be fixed or written
 down in this file.
@@ -213,10 +213,10 @@ macos-13, windows-latest and the Fedora containers: `go vet ./...`,
 - A 404 from `releases/latest` means "no release yet", not an error.
 - Signature format: `checksums.txt.sig` is base64 of the ed25519 signature
   over the exact bytes of `checksums.txt`. `go run ./scripts/sign FILE` makes
-  it from `$THREATSCAN_SIGNING_KEY` (base64 32-byte seed).
+  it from `$PUSHWARDEN_SIGNING_KEY` (base64 32-byte seed).
 - Signing key generated 2026-09-28 with `go run ./scripts/keygen PATH`; the
   public key is in `pubkeys.go`. **Still to do:** put the seed in the
-  `THREATSCAN_SIGNING_KEY` secret and an offline backup. Rotate by adding a
+  `PUSHWARDEN_SIGNING_KEY` secret and an offline backup. Rotate by adding a
   new key to the slice, releasing with it, then removing the old one.
 - Windows risk to check in the P7 smoke test: after an update the guard starts
   the new exe detached and exits. If Task Scheduler's job object kills child
@@ -227,10 +227,10 @@ macos-13, windows-latest and the Fedora containers: `go vet ./...`,
 
 ### Original P6 specification
 
-**Indicators** (do first, it is a straight port of `threatscan/updater.py`):
+**Indicators** (do first, it is a straight port of `pushwarden/updater.py`):
 `UpdateIOCs(dataDir, current, cfg)`: GET `cfg.IOCUpdateURL` or the default
-`https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/threatscan/iocs.json`
-with User-Agent `threatscan/<version>`, cap at 2 MB, validate with
+`https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/pushwarden/iocs.json`
+with User-Agent `pushwarden/<version>`, cap at 2 MB, validate with
 `iocs.Parse`, install to `iocs.UserPath(dataDir)` via temp file + rename only
 if `version` is newer, always write `<data_dir>/ioc-last-check` (Unix seconds).
 Set `guardHooks.UpdateIOCs` to it and add the `update-iocs [--url]` command.
@@ -238,11 +238,11 @@ Set `guardHooks.UpdateIOCs` to it and add the `update-iocs [--url]` command.
 **Program** (`update.go`, wired as a `guard.PeriodicTask` named "self-update"
 with interval `cfg.UpdateInterval` when `cfg.AutoUpdate`, plus an `update
 [--check]` command):
-1. GET `cfg.UpdateAPIURL` or `https://api.github.com/repos/FaheemRafiq/threatscan/releases/latest`
+1. GET `cfg.UpdateAPIURL` or `https://api.github.com/repos/FaheemRafiq/pushwarden/releases/latest`
    (`.../releases` and pick the newest when `update_channel` is `beta`).
    Skip drafts. Compare tags as semver against the running version; nothing to
    do unless newer. Skip a version recorded as failed (see step 6).
-2. Download `threatscan-<goos>-<goarch>[.exe]`, `checksums.txt`,
+2. Download `pushwarden-<goos>-<goarch>[.exe]`, `checksums.txt`,
    `checksums.txt.sig` to `<InstallDir>/update/`.
 3. Verify `checksums.txt.sig` with ed25519 against the public keys in
    `internal/update/pubkeys.go` (a slice, so keys can rotate), then verify the
@@ -260,7 +260,7 @@ with interval `cfg.UpdateInterval` when `cfg.AutoUpdate`, plus an `update
    less than 2 minutes ago and the previous run never wrote a heartbeat with the
    new version, and a `.old` exists, swap `.old` back, mark that version as
    failed, and restart. `guard.ReadHeartbeat` gives you the last heartbeat.
-7. After a successful start on a new version, notify "ThreatScan updated to vX.Y.Z"
+7. After a successful start on a new version, notify "PushWarden updated to vX.Y.Z"
    and delete `.old`.
 
 Tests: an `httptest.Server` serving a fake releases API and assets; build two
@@ -270,12 +270,12 @@ is refused, and a simulated missing heartbeat rolls back.
 
 One-time setup: generate an ed25519 key pair (`go run ./scripts/keygen`),
 commit only the public key, put the private key in the GitHub secret
-`THREATSCAN_SIGNING_KEY` and an offline backup.
+`PUSHWARDEN_SIGNING_KEY` and an offline backup.
 
 ## P7. Installers, download page, release pipeline (done, not yet run on GitHub)
 
 Files: `scripts/release.sh`, `installers/linux/{nfpm.yaml,postinstall.sh}`,
-`installers/windows/threatscan.iss`, `installers/macos/{build-pkg.sh,distribution.xml,scripts/postinstall}`,
+`installers/windows/pushwarden.iss`, `installers/macos/{build-pkg.sh,distribution.xml,scripts/postinstall}`,
 `installers/install.sh` (v6; the v5 one moved to `installers/v5/install.sh`),
 `docs/index.html`, `.github/workflows/release.yml` (Go, tags `v6+`) and
 `release-v5.yml` (since removed from `main` with the Python code; the old
@@ -292,7 +292,7 @@ assets no binary can verify.
 Choices worth knowing:
 - `install` no longer downgrades: when the installed binary reports a newer
   version (a self-updated copy), a package or installer upgrade keeps it.
-- Windows: the installer ends the task and kills `threatscan.exe` before
+- Windows: the installer ends the task and kills `pushwarden.exe` before
   replacing files; `uninstall` also kills anything running the installed exe
   (the background first scan would otherwise lock it).
 - The release workflow publishes only after the Windows, macOS, Linux (Ubuntu
@@ -302,12 +302,12 @@ Choices worth knowing:
   get past SmartScreen and Gatekeeper.
 
 Before tagging, the repository owner must:
-1. Add the `THREATSCAN_SIGNING_KEY` secret (the seed from `scripts/keygen`).
+1. Add the `PUSHWARDEN_SIGNING_KEY` secret (the seed from `scripts/keygen`).
 2. Enable GitHub Pages from `main` `/docs` (after merging) for the download page.
 3. Run the Release workflow manually once (no publish) to see the smoke jobs pass.
 
 Release order: tag `v6.0.0-rc1` on this branch (pre-release; `releases/latest`
-does not see it, so test with `THREATSCAN_VERSION=v6.0.0-rc1`), then P8's
+does not see it, so test with `PUSHWARDEN_VERSION=v6.0.0-rc1`), then P8's
 v5.2 from `main`, then `v6.0.0`, then merge this branch. Until `v6.0.0` exists
 the README one-liner on `main` must keep pointing at an installer that works,
 which is why the merge comes last.
@@ -317,37 +317,37 @@ which is why the merge comes last.
 - `scripts/release.sh`: `CGO_ENABLED=0 GOTOOLCHAIN=go1.24.13 go build -trimpath -ldflags "-s -w -X main.version=$TAG"`
   for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64,
   windows/arm64; write `checksums.txt`; sign it with the secret; `nfpm` for
-  `.rpm`/`.deb` (payload in `/usr/lib/threatscan`, postinstall runs
+  `.rpm`/`.deb` (payload in `/usr/lib/pushwarden`, postinstall runs
   `install --unattended` as the invoking user).
-- Windows: Inno Setup `installers/windows/threatscan.iss`,
-  `PrivilegesRequired=lowest`, installs to `{localappdata}\Programs\ThreatScan`,
-  `[Run]` `threatscan.exe install --unattended`, `[UninstallRun]`
-  `threatscan.exe uninstall`. Build with `iscc` on the Windows runner.
+- Windows: Inno Setup `installers/windows/pushwarden.iss`,
+  `PrivilegesRequired=lowest`, installs to `{localappdata}\Programs\PushWarden`,
+  `[Run]` `pushwarden.exe install --unattended`, `[UninstallRun]`
+  `pushwarden.exe uninstall`. Build with `iscc` on the Windows runner.
 - macOS: `lipo` the two darwin binaries, `pkgbuild` + `productbuild` into
-  `ThreatScan.pkg` targeting the user home; `postinstall` runs
+  `PushWarden.pkg` targeting the user home; `postinstall` runs
   `install --unattended` as the console user (`stat -f %Su /dev/console`).
 - Linux `installers/install.sh`: detect arch, download binary + checksums +
   sig from `releases/latest/download/`, verify SHA-256 (signature verification
   is optional in shell; the binary re-verifies on its first self-update),
   `chmod +x`, run `install --unattended`.
 - `docs/index.html` on GitHub Pages: detect OS from `navigator.userAgent`,
-  one button linking to `https://github.com/FaheemRafiq/threatscan/releases/latest/download/<asset>`,
+  one button linking to `https://github.com/FaheemRafiq/pushwarden/releases/latest/download/<asset>`,
   and the Linux one-liner.
 - Replace `.github/workflows/release.yml` (currently PyInstaller) with the Go
   pipeline above. Tag `v6.0.0-rc1` as a pre-release first.
 
-Smoke tests in CI: `ThreatScan-Setup.exe /VERYSILENT` on windows-latest,
-`installer -pkg ThreatScan.pkg -target CurrentUserHomeDirectory` on macOS,
-`install.sh` in the Fedora container; each must end with `threatscan status`
+Smoke tests in CI: `PushWarden-Setup.exe /VERYSILENT` on windows-latest,
+`installer -pkg PushWarden.pkg -target CurrentUserHomeDirectory` on macOS,
+`install.sh` in the Fedora container; each must end with `pushwarden status`
 showing `Guard: alive`.
 
 ## P8. v5.2 migration (Python) -- on the `archive/python-v5` branch
 
 Status 2026-09-28: v6.0.0 is released and `main` is the Go code. The Python v5
 package was removed from `main` and lives on `archive/python-v5` (the last
-v5 commit, `b0988c6`). `threatscan/iocs.json` stays on `main` at the same path
+v5 commit, `b0988c6`). `pushwarden/iocs.json` stays on `main` at the same path
 because v5 guards in the field download indicator updates from
-`main/threatscan/iocs.json`; keep that file there as long as v5 installs exist.
+`main/pushwarden/iocs.json`; keep that file there as long as v5 installs exist.
 
 Do P8 on `archive/python-v5` and tag `v5.2.0` from that branch (a tag runs the
 workflow files of the commit it points at, i.e. the old PyInstaller
@@ -364,7 +364,7 @@ workflow files of the commit it points at, i.e. the old PyInstaller
    `releases/latest/download/...` link (download page, install.sh, Setup.exe,
    the reusable scan workflow) points at v5 assets and breaks.
 
-Original plan: in `threatscan/guard.py`, extend `maybe_update_iocs` (daily) to
+Original plan: in `pushwarden/guard.py`, extend `maybe_update_iocs` (daily) to
 also check the releases API for a stable `v6.*`; download the Go binary for this
 OS/arch, verify SHA-256 against `checksums.txt` (and the ed25519 signature: use
 the same public key, `cryptography` is not a dependency, so ship a tiny

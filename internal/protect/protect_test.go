@@ -1,4 +1,4 @@
-// threatscan:allow-signatures
+// pushwarden:allow-signatures
 package protect
 
 import (
@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/iocs"
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/prompt"
-	"github.com/FaheemRafiq/threatscan/internal/scan"
-	"github.com/FaheemRafiq/threatscan/internal/testfixtures"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/internal/iocs"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/prompt"
+	"github.com/FaheemRafiq/pushwarden/internal/scan"
+	"github.com/FaheemRafiq/pushwarden/internal/testfixtures"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 type env struct {

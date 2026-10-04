@@ -9,22 +9,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
 )
 
 // macOS notifications posted through osascript belong to Script Editor, so a
-// click opens Script Editor with nothing in it. `threatscan install` therefore
+// click opens Script Editor with nothing in it. `pushwarden install` therefore
 // compiles a tiny AppleScript applet: called with arguments it posts the
 // notification under its own name; launched with none (that is what a click
 // does) it opens the alert details.
 const (
-	MacAppName  = "ThreatScan Notifier.app"
-	MacBundleID = "com.threatscan.notifier"
+	MacAppName  = "PushWarden Notifier.app"
+	MacBundleID = "com.pushwarden.notifier"
 )
 
 func MacAppPath(installDir string) string { return filepath.Join(installDir, MacAppName) }
 
-// NotifierScript is the applet source; bin is the threatscan binary it calls back.
+// NotifierScript is the applet source; bin is the pushwarden binary it calls back.
 func NotifierScript(bin string) string {
 	q := "'" + strings.ReplaceAll(bin, "'", `'\''`) + "'"
 	return `on run argv
@@ -66,8 +66,8 @@ func InstallMacNotifier(p *platform.Info, installDir, bin string, dry bool) (str
 	}
 	err := buildApplet(p, app, NotifierScript(bin), [][]string{
 		{"CFBundleIdentifier", "-string", MacBundleID},
-		{"CFBundleName", "-string", "ThreatScan"},
-		{"CFBundleDisplayName", "-string", "ThreatScan"},
+		{"CFBundleName", "-string", "PushWarden"},
+		{"CFBundleDisplayName", "-string", "PushWarden"},
 		{"LSUIElement", "-bool", "true"},
 	})
 	if err != nil {
@@ -87,7 +87,7 @@ func buildApplet(p *platform.Info, app, script string, plistKeys [][]string) err
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	src := filepath.Join(dir, ".threatscan-applet.applescript")
+	src := filepath.Join(dir, ".pushwarden-applet.applescript")
 	if err := os.WriteFile(src, []byte(script), 0o644); err != nil {
 		return err
 	}
@@ -111,17 +111,17 @@ func buildApplet(p *platform.Info, app, script string, plistKeys [][]string) err
 func RemoveMacNotifier(installDir string) { _ = os.RemoveAll(MacAppPath(installDir)) }
 
 // The launcher is what people who do not use a terminal click: an app in
-// ~/Applications that opens Terminal on `threatscan ui`.
+// ~/Applications that opens Terminal on `pushwarden ui`.
 const (
-	MacLauncherName     = "ThreatScan.app"
-	MacLauncherBundleID = "com.threatscan.launcher"
+	MacLauncherName     = "PushWarden.app"
+	MacLauncherBundleID = "com.pushwarden.launcher"
 )
 
 func MacLauncherPath(home string) string {
 	return filepath.Join(home, "Applications", MacLauncherName)
 }
 
-// LauncherScript is the launcher's source; bin is the threatscan binary it runs.
+// LauncherScript is the launcher's source; bin is the pushwarden binary it runs.
 func LauncherScript(bin string) string {
 	q := "'" + strings.ReplaceAll(bin, "'", `'\''`) + "'"
 	return `on run
@@ -138,18 +138,18 @@ end run
 func InstallMacLauncher(p *platform.Info, home, bin string, dry bool) (string, error) {
 	app := MacLauncherPath(home)
 	if dry {
-		return "would build " + app + " (opens `threatscan ui` in Terminal)", nil
+		return "would build " + app + " (opens `pushwarden ui` in Terminal)", nil
 	}
 	if !p.IsMac() {
 		return "", errors.New("macOS only")
 	}
 	if exists(app) && !isMacLauncher(app) {
-		return "", errors.New(app + " exists and is not ThreatScan's")
+		return "", errors.New(app + " exists and is not PushWarden's")
 	}
 	err := buildApplet(p, app, LauncherScript(bin), [][]string{
 		{"CFBundleIdentifier", "-string", MacLauncherBundleID},
-		{"CFBundleName", "-string", "ThreatScan"},
-		{"CFBundleDisplayName", "-string", "ThreatScan"},
+		{"CFBundleName", "-string", "PushWarden"},
+		{"CFBundleDisplayName", "-string", "PushWarden"},
 	})
 	if err != nil {
 		return "", err

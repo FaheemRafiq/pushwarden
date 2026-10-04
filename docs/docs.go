@@ -1,4 +1,4 @@
-// Package docs embeds the user documentation so `threatscan help <topic>`
+// Package docs embeds the user documentation so `pushwarden help <topic>`
 // works offline. docs/CLI.md is the single source: edit it, rebuild.
 package docs
 

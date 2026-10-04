@@ -1,4 +1,4 @@
-# threatscan:allow-signatures
+# pushwarden:allow-signatures
 ======================================================================
 LAZARUS C2 IMPLANT - STATIC ANALYSIS REPORT
 Campaign: Contagious Interview

@@ -46,13 +46,13 @@ func TestOnlyTheTwoNewestSettingsBackupsAreKept(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "settings.json")
 	os.WriteFile(p, []byte(`{"editor.fontSize": 14}`), 0o644)
 	for _, ts := range []string{"1700000001", "1700000002", "1700000003"} {
-		os.WriteFile(p+".threatscan-"+ts+".bak", []byte("{}"), 0o600)
+		os.WriteFile(p+".pushwarden-"+ts+".bak", []byte("{}"), 0o600)
 	}
 	os.WriteFile(p+".mine.bak", []byte("{}"), 0o600) // not ours
 	if changed, _, err := Editor(p, false); err != nil || !changed {
 		t.Fatalf("changed=%v err=%v", changed, err)
 	}
-	baks, _ := filepath.Glob(p + ".threatscan-*.bak")
+	baks, _ := filepath.Glob(p + ".pushwarden-*.bak")
 	if len(baks) != 2 {
 		t.Fatalf("backups kept: %v", baks)
 	}

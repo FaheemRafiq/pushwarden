@@ -1,10 +1,10 @@
 ---
 title: Activity history
-description: "The journal that records every finding, action, decision, sweep and error, and how to read and filter it with threatscan history and threatscan alerts."
+description: "The journal that records every finding, action, decision, sweep and error, and how to read and filter it with pushwarden history and pushwarden alerts."
 ---
 # Activity history
 
-ThreatScan keeps a complete record of what it saw and did on the machine. The record is the journal; `threatscan history` reads it.
+PushWarden keeps a complete record of what it saw and did on the machine. The record is the journal; `pushwarden history` reads it.
 
 ## The journal
 
@@ -21,7 +21,7 @@ ThreatScan keeps a complete record of what it saw and did on the machine. The re
 | `error` | failed actions, recovered crashes, refused or rolled-back updates |
 | `feedback` | a finding you marked as a false positive |
 
-Each event carries the time, the ThreatScan and indicator versions, the context that produced it (`guard-full`, `guard-quick`, `realtime`, `scan`, `github-clean`, `cli`), and for findings the severity, category, threat name, title, path, process id and command line, the matched text, the evidence, the reason and the response.
+Each event carries the time, the PushWarden and indicator versions, the context that produced it (`guard-full`, `guard-quick`, `realtime`, `scan`, `github-clean`, `cli`), and for findings the severity, category, threat name, title, path, process id and command line, the matched text, the evidence, the reason and the response.
 
 Settings:
 
@@ -34,10 +34,10 @@ Settings:
 
 At 10 MB the file is rolled into a compressed archive (`journal-DATE.jsonl.gz`) and a new file starts. The oldest archives are deleted once the archives pass the size or age limit. See [Disk use and cleanup](disk-and-cleanup.md).
 
-## Reading it: `threatscan history`
+## Reading it: `pushwarden history`
 
 ```sh
-threatscan history [filters] [--all] [--details] [--json]
+pushwarden history [filters] [--all] [--details] [--json]
 ```
 
 ### The default view
@@ -79,12 +79,12 @@ Each detection shows a `why:` line and a `response:` line.
 ### Examples
 
 ```sh
-threatscan history                                    # the summary
-threatscan history --severity critical --since 7d     # what was serious this week
-threatscan history --all --kind sweep                 # every sweep with duration and counts
-threatscan history --kind error                       # anything ThreatScan itself got wrong
-threatscan history --all --path my-project --details  # everything about one project, with evidence
-threatscan history --all --since 2026-10-01 --json    # machine-readable
+pushwarden history                                    # the summary
+pushwarden history --severity critical --since 7d     # what was serious this week
+pushwarden history --all --kind sweep                 # every sweep with duration and counts
+pushwarden history --kind error                       # anything PushWarden itself got wrong
+pushwarden history --all --path my-project --details  # everything about one project, with evidence
+pushwarden history --all --since 2026-10-01 --json    # machine-readable
 ```
 
 ## Upload state per event
@@ -99,7 +99,7 @@ When the [central event upload](team-reporting.md) is on, each event is either `
 ## Alerts
 
 ```sh
-threatscan alerts [--last N] [--gui] [--json]
+pushwarden alerts [--last N] [--gui] [--json]
 ```
 
 | Option | Effect |
@@ -122,4 +122,4 @@ The difference from history: alerts are what you were notified about; history is
 
 ## Sending the record to someone
 
-`threatscan feedback` packages the journal, the log tail, the latest report, the settings and a status summary into one redacted zip file. See [Team reporting](team-reporting.md).
+`pushwarden feedback` packages the journal, the log tail, the latest report, the settings and a status summary into one redacted zip file. See [Team reporting](team-reporting.md).

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
 )
 
 // Bundle describes what was written, for the summary shown to the user.
@@ -65,7 +65,7 @@ func WriteBundle(out, dataDir, summary, configJSON string, since time.Time, red 
 		jl.Write(line)
 		jl.WriteByte('\n')
 	}
-	readme := fmt.Sprintf("ThreatScan feedback bundle, created %s\n\nPeriod: since %s\nEvents: %d\nRedacted: %v (home folder -> ~, user and host names removed, token-shaped strings masked)\n\n"+
+	readme := fmt.Sprintf("PushWarden feedback bundle, created %s\n\nPeriod: since %s\nEvents: %d\nRedacted: %v (home folder -> ~, user and host names removed, token-shaped strings masked)\n\n"+
 		"journal.jsonl      every finding, action, decision, sweep, update and error in the period\n"+
 		"guard.log          the last 2000 lines of the guard's log\n"+
 		"latest-report.json the most recent full scan report\n"+

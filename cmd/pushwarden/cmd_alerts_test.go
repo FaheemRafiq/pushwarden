@@ -6,12 +6,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FaheemRafiq/threatscan/internal/findings"
-	"github.com/FaheemRafiq/threatscan/internal/journal"
-	"github.com/FaheemRafiq/threatscan/internal/notify"
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/protect"
-	"github.com/FaheemRafiq/threatscan/internal/testfixtures"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/notify"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/protect"
+	"github.com/FaheemRafiq/pushwarden/internal/testfixtures"
 )
 
 func TestFormatAlertsAndHistory(t *testing.T) {
@@ -82,7 +82,7 @@ func TestProtectDryRunAndStatusNeedNoRoot(t *testing.T) {
 	if rc := run([]string{"install", "--dry-run", "--no-harden", "--roots", t.TempDir()}); rc != 0 {
 		t.Fatal("install dry-run", rc)
 	}
-	if ents, _ := os.ReadDir(os.Getenv("THREATSCAN_SYSTEM_DIR")); len(ents) != 0 {
+	if ents, _ := os.ReadDir(os.Getenv("PUSHWARDEN_SYSTEM_DIR")); len(ents) != 0 {
 		t.Fatal("dry runs wrote to the system dir")
 	}
 }

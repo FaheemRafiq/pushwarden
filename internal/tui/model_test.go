@@ -8,9 +8,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/FaheemRafiq/threatscan/internal/ghclean"
-	"github.com/FaheemRafiq/threatscan/internal/github"
-	"github.com/FaheemRafiq/threatscan/internal/remediate"
+	"github.com/FaheemRafiq/pushwarden/internal/ghclean"
+	"github.com/FaheemRafiq/pushwarden/internal/github"
+	"github.com/FaheemRafiq/pushwarden/internal/remediate"
 )
 
 // fake is a backend with two pushable repositories and a fork; a dry pass

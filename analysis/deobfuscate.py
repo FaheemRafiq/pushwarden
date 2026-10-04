@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# threatscan:allow-signatures
+# pushwarden:allow-signatures
 """
 Lazarus C2 Implant Deobfuscator & Static Analyzer
 Campaign: Contagious Interview (Blockchain C2 dead-drop)

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/findings"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
 	"github.com/ncruces/zenity"
 )
 
@@ -69,9 +69,9 @@ func BuildMessage(f *findings.Finding, action string) string {
 	l = append(l, evidenceLines(f)...)
 	l = append(l, "")
 	if action == "Delete the file" {
-		l = append(l, action+"?  This removes it permanently (a record is kept in ~/.threatscan/quarantine/index.jsonl).")
+		l = append(l, action+"?  This removes it permanently (a record is kept in ~/.pushwarden/quarantine/index.jsonl).")
 	} else {
-		l = append(l, action+"?  The original is kept in ~/.threatscan/quarantine and can be restored.")
+		l = append(l, action+"?  The original is kept in ~/.pushwarden/quarantine and can be restored.")
 	}
 	return strings.Join(l, "\n")
 }
@@ -120,11 +120,11 @@ func Dialog(title, msg, ok, cancel string, timeout time.Duration) Verdict {
 }
 
 func Ask(f *findings.Finding, action string, timeout time.Duration) Verdict {
-	return Dialog(fmt.Sprintf("ThreatScan: %s - %s", f.Severity, f.Title), BuildMessage(f, action), action, "Keep", timeout)
+	return Dialog(fmt.Sprintf("PushWarden: %s - %s", f.Severity, f.Title), BuildMessage(f, action), action, "Keep", timeout)
 }
 
 func AskQuarantined(f *findings.Finding, timeout time.Duration) Verdict {
-	return Dialog("ThreatScan: threat quarantined - "+ThreatName(f), QuarantinedMessage(f), "Remove", "Restore & allow", timeout)
+	return Dialog("PushWarden: threat quarantined - "+ThreatName(f), QuarantinedMessage(f), "Remove", "Restore & allow", timeout)
 }
 
 // AskTerminal is the TTY fallback for interactive scans.

@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
 )
 
 // Row is one journal event as stored in the central table. Every text field
@@ -108,7 +108,7 @@ func redactValue(v any, r func(string) string) any {
 // POST) and works with any endpoint that accepts the same.
 type Uploader struct {
 	DataDir   string
-	URL       string // e.g. https://PROJECT.supabase.co/rest/v1/threatscan_events
+	URL       string // e.g. https://PROJECT.supabase.co/rest/v1/pushwarden_events
 	Key       string // an insert-only key; it lives in every install's config
 	MachineID string
 	OS        string
@@ -404,7 +404,7 @@ func (u *Uploader) send(ctx context.Context, rows []Row) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "threatscan")
+	req.Header.Set("User-Agent", "pushwarden")
 	req.Header.Set("Prefer", "return=minimal") // the key may insert, not read back
 	if u.Key != "" {
 		req.Header.Set("apikey", u.Key)

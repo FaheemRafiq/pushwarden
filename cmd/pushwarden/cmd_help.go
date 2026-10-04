@@ -7,12 +7,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/FaheemRafiq/threatscan/docs"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/docs"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 func init() {
-	register("help", "full documentation: threatscan help <command|topic>", cmdHelp)
+	register("help", "full documentation: pushwarden help <command|topic>", cmdHelp)
 }
 
 func cmdHelp(args []string) int {
@@ -22,7 +22,7 @@ func cmdHelp(args []string) int {
 		return 0
 	}
 	if args[0] == "-h" || args[0] == "--help" {
-		fmt.Print("Usage: threatscan help <command|topic>\n\n")
+		fmt.Print("Usage: pushwarden help <command|topic>\n\n")
 		helpTopics(u)
 		return 0
 	}
@@ -43,7 +43,7 @@ func helpTopics(u *ui.UI) {
 	cmds, refs := docs.Names()
 	fmt.Println(u.C("BOLD", "Commands:  ") + strings.Join(cmds, ", "))
 	fmt.Println(u.C("BOLD", "Topics:    ") + strings.Join(refs, ", ") + ", all")
-	fmt.Println("\nExamples: threatscan help install     threatscan help github-clean     threatscan help config-keys")
+	fmt.Println("\nExamples: pushwarden help install     pushwarden help github-clean     pushwarden help config-keys")
 }
 
 func style(u *ui.UI) docs.Style {
@@ -76,7 +76,7 @@ func termWidth() int {
 func page(text string) int {
 	st, err := os.Stdout.Stat()
 	tty := err == nil && st.Mode()&os.ModeCharDevice != 0
-	if tty && strings.Count(text, "\n") > 40 && os.Getenv("THREATSCAN_NO_PAGER") == "" {
+	if tty && strings.Count(text, "\n") > 40 && os.Getenv("PUSHWARDEN_NO_PAGER") == "" {
 		pager := os.Getenv("PAGER")
 		if pager == "" {
 			pager = "less"

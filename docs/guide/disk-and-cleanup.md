@@ -1,18 +1,18 @@
 ---
 title: Disk use and cleanup
-description: "Every store ThreatScan keeps on disk, the size or age limit of each, and how threatscan cleanup and the daily housekeeping enforce them."
+description: "Every store PushWarden keeps on disk, the size or age limit of each, and how pushwarden cleanup and the daily housekeeping enforce them."
 ---
 # Disk use and cleanup
 
-ThreatScan is meant to run for months without attention, so nothing it stores may grow without bound. Every store in the data directory has a limit. The guard enforces the limits once a day, and `threatscan cleanup` does the same on demand.
+PushWarden is meant to run for months without attention, so nothing it stores may grow without bound. Every store in the data directory has a limit. The guard enforces the limits once a day, and `pushwarden cleanup` does the same on demand.
 
 ```sh
-threatscan cleanup [--dry-run]
+pushwarden cleanup [--dry-run]
 ```
 
 The command prints each store with its size and limit, then removes what is past its limit. `--dry-run` shows what would be removed and removes nothing.
 
-`threatscan status` shows the total in its `Disk use` line.
+`pushwarden status` shows the total in its `Disk use` line.
 
 ## Limits
 
@@ -26,14 +26,14 @@ The command prints each store with its size and limit, then removes what is past
 | Alerts log | rotates at 5 MB; newest 3 archives kept | |
 | Reports | newest 60 | `report_keep` |
 | Allow decisions | removed when they expire after 30 days | |
-| Editor settings backups (`settings.json.threatscan-*.bak`) | newest 2 per file | |
+| Editor settings backups (`settings.json.pushwarden-*.bak`) | newest 2 per file | |
 | Leftovers in the system temp folder from an interrupted `github-clean` | removed after a day | |
 
 Set a limit to `0` to turn it off:
 
 ```sh
-threatscan config --set quarantine_keep_days=0    # keep quarantined files until removed by hand
-threatscan config --set journal_keep_mb=500       # keep more history
+pushwarden config --set quarantine_keep_days=0    # keep quarantined files until removed by hand
+pushwarden config --set journal_keep_mb=500       # keep more history
 ```
 
 ## What expiry means for each store
@@ -56,7 +56,7 @@ When the [central event upload](team-reporting.md) is on:
 
 - the active journal, guard log and alerts log
 - `config.json`, `iocs.json`, the machine id and state files
-- any file ThreatScan does not recognise by name. The cleanup only removes files it created, identified by their name pattern, inside the data directory and its own leftovers in the temp folder
+- any file PushWarden does not recognise by name. The cleanup only removes files it created, identified by their name pattern, inside the data directory and its own leftovers in the temp folder
 
 ## Example output
 
@@ -81,7 +81,7 @@ The guard is idle between events. The real-time layer reacts to file-system noti
 ## Removing everything
 
 ```sh
-threatscan uninstall --unblock --purge
+pushwarden uninstall --unblock --purge
 ```
 
-`--purge` deletes the whole data directory. Then delete the install directory shown by `threatscan status`.
+`--purge` deletes the whole data directory. Then delete the install directory shown by `pushwarden status`.

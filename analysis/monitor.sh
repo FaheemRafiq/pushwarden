@@ -1,5 +1,5 @@
 #!/bin/bash
-# ThreatScan Malware Analysis Monitor
+# PushWarden Malware Analysis Monitor
 # Runs inside Docker container with network disabled
 # Intercepts and logs all malware behavior
 
@@ -23,7 +23,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 log "============================================"
-log "  THREATSCAN MALWARE ANALYSIS MONITOR"
+log "  PUSHWARDEN MALWARE ANALYSIS MONITOR"
 log "============================================"
 log "Sample: $SAMPLE"
 log "Output: $OUTPUT"

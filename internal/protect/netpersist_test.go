@@ -7,18 +7,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/iocs"
-	"github.com/FaheemRafiq/threatscan/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/iocs"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
 )
 
 func TestJobDefinitions(t *testing.T) {
-	svc := NetblockService("/usr/local/lib/threatscan/threatscan")
-	for _, want := range []string{"Type=oneshot", "ExecStart=/usr/local/lib/threatscan/threatscan protect --refresh", "WantedBy=multi-user.target"} {
+	svc := NetblockService("/usr/local/lib/pushwarden/pushwarden")
+	for _, want := range []string{"Type=oneshot", "ExecStart=/usr/local/lib/pushwarden/pushwarden protect --refresh", "WantedBy=multi-user.target"} {
 		if !strings.Contains(svc, want) {
 			t.Errorf("service lacks %q", want)
 		}
 	}
-	if s := NetblockService("/path with space/threatscan"); !strings.Contains(s, "'/path with space/threatscan' protect") {
+	if s := NetblockService("/path with space/pushwarden"); !strings.Contains(s, "'/path with space/pushwarden' protect") {
 		t.Error("unquoted path in unit")
 	}
 	tm := NetblockTimer()
@@ -27,13 +27,13 @@ func TestJobDefinitions(t *testing.T) {
 			t.Errorf("timer lacks %q", want)
 		}
 	}
-	pl := NetblockLaunchd("/usr/local/libexec/threatscan/threatscan", "/var/log/x.log")
+	pl := NetblockLaunchd("/usr/local/libexec/pushwarden/pushwarden", "/var/log/x.log")
 	for _, want := range []string{"<string>" + NetblockLabel + "</string>", "<key>RunAtLoad</key>", "<integer>86400</integer>", "<string>--refresh</string>"} {
 		if !strings.Contains(pl, want) {
 			t.Errorf("plist lacks %q", want)
 		}
 	}
-	x := NetblockTaskXML(`C:\Program Files\ThreatScan\threatscan.exe`)
+	x := NetblockTaskXML(`C:\Program Files\PushWarden\pushwarden.exe`)
 	for _, want := range []string{"S-1-5-18", "HighestAvailable", "<BootTrigger>", "<DaysInterval>1</DaysInterval>", "<Arguments>protect --refresh</Arguments>"} {
 		if !strings.Contains(x, want) {
 			t.Errorf("task xml lacks %q", want)
@@ -94,7 +94,7 @@ func TestSystemIOCsIgnoreUserCopy(t *testing.T) {
 	bundled, _ := iocs.Load("")
 	// a "newer" user file must not be picked up by the privileged job
 	os.WriteFile(filepath.Join(user, "iocs.json"), []byte(`{"version":"9999.01.01.1"}`), 0o600)
-	t.Setenv("THREATSCAN_HOME", user)
+	t.Setenv("PUSHWARDEN_HOME", user)
 	nb := &NetBlocker{P: platform.New(), SysDir: sys}
 	if got := nb.systemIOCs(); got.Version != bundled.Version {
 		t.Fatalf("privileged job read %s, want bundled %s", got.Version, bundled.Version)
@@ -117,8 +117,8 @@ func TestSystemIOCsIgnoreUserCopy(t *testing.T) {
 
 func TestSystemPaths(t *testing.T) {
 	for _, c := range []struct{ os, dir, bin string }{
-		{"linux", "/etc/threatscan", "/usr/local/lib/threatscan/threatscan"},
-		{"darwin", "/Library/Application Support/ThreatScan", "/usr/local/libexec/threatscan/threatscan"},
+		{"linux", "/etc/pushwarden", "/usr/local/lib/pushwarden/pushwarden"},
+		{"darwin", "/Library/Application Support/PushWarden", "/usr/local/libexec/pushwarden/pushwarden"},
 	} {
 		nb := &NetBlocker{P: &platform.Info{OS: c.os}}
 		os.Unsetenv(SysDirEnv)

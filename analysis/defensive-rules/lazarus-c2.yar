@@ -1,10 +1,10 @@
-// threatscan:allow-signatures
+// pushwarden:allow-signatures
 rule Lazarus_Contagious_Interview_C2 {
     meta:
         description = "Detects Lazarus Group Contagious Interview blockchain C2 malware"
-        author = "ThreatScan"
+        author = "PushWarden"
         date = "2026-08-21"
-        reference = "https://github.com/FaheemRafiq/threatscan"
+        reference = "https://github.com/FaheemRafiq/pushwarden"
         severity = "critical"
         tags = "lazarus, malware, blockchain, c2, contagious-interview"
 
@@ -56,7 +56,7 @@ rule Lazarus_Contagious_Interview_C2 {
 rule Lazarus_C2_Config_Injection {
     meta:
         description = "Detects config files with hidden Lazarus payloads"
-        author = "ThreatScan"
+        author = "PushWarden"
         severity = "critical"
 
     strings:
@@ -80,7 +80,7 @@ rule Lazarus_C2_Config_Injection {
 rule Lazarus_Propagation_Scripts {
     meta:
         description = "Detects Lazarus propagation batch scripts"
-        author = "ThreatScan"
+        author = "PushWarden"
         severity = "critical"
 
     strings:

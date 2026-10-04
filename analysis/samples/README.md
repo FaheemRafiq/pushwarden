@@ -1,8 +1,8 @@
-<!-- threatscan:allow-signatures -->
+<!-- pushwarden:allow-signatures -->
 # Samples
 
 Live malware samples are **not** kept in this repository: every colleague who
-installs ThreatScan from git would receive them, Windows Defender flags them as
+installs PushWarden from git would receive them, Windows Defender flags them as
 `Trojan:JS/PolinRider.DB!MTB`, and the scanner itself would (correctly) offer
 to delete them.
 

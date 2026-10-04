@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/findings"
-	"github.com/FaheemRafiq/threatscan/internal/ghclean"
-	"github.com/FaheemRafiq/threatscan/internal/github"
-	"github.com/FaheemRafiq/threatscan/internal/remediate"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
+	"github.com/FaheemRafiq/pushwarden/internal/ghclean"
+	"github.com/FaheemRafiq/pushwarden/internal/github"
+	"github.com/FaheemRafiq/pushwarden/internal/remediate"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 func init() {
@@ -179,7 +179,7 @@ func runGitHubClean(c *ctx, o ghOpts) int {
 			results, start = pass(true, todo)
 			code = summarize(u, results, true, time.Since(start))
 		} else {
-			u.Info(fmt.Sprintf("Nothing was changed. `threatscan github-clean --apply` reuses the downloaded repositories for %d days.", c.Cfg.CloneKeepDays))
+			u.Info(fmt.Sprintf("Nothing was changed. `pushwarden github-clean --apply` reuses the downloaded repositories for %d days.", c.Cfg.CloneKeepDays))
 		}
 	}
 
@@ -234,11 +234,11 @@ func printProgress(u *ui.UI, s *remediate.State) {
 	}
 	u.P("")
 	u.P("  %d repositories, %d branches verified: %d clean, %d fixed and pushed, %d need manual review.", len(ps), clean+pushed+manual, clean, pushed, manual)
-	u.P("  A branch is checked again when its tip commit changes, or when ThreatScan or its indicators are updated.")
+	u.P("  A branch is checked again when its tip commit changes, or when PushWarden or its indicators are updated.")
 	if n, size := s.Clones(); n > 0 {
 		u.P("  %d repositories with branches still to fix are kept on disk for --apply (%.0f MB); removed after a few days (clone_keep_days) or by --fresh.", n, float64(size)/(1<<20))
 	}
-	u.P("  threatscan github-clean --fresh   forget this and check everything")
+	u.P("  pushwarden github-clean --fresh   forget this and check everything")
 }
 
 func orAll(b []string) string {
@@ -405,7 +405,7 @@ func printResult(u *ui.UI, res remediate.Result, apply bool) {
 		case remediate.StatusPushFailed:
 			line = u.C("BOLD_RED", "fixed locally, PUSH FAILED: "+b.Error)
 		case remediate.StatusManual:
-			line = u.C("BOLD_YELLOW", fmt.Sprintf("needs review  %d finding(s) ThreatScan does not auto-fix", len(b.Findings)))
+			line = u.C("BOLD_YELLOW", fmt.Sprintf("needs review  %d finding(s) PushWarden does not auto-fix", len(b.Findings)))
 		default:
 			line = u.C("BOLD_RED", "error: "+b.Error)
 		}
@@ -472,7 +472,7 @@ func summarize(u *ui.UI, results []remediate.Result, apply bool, d time.Duration
 	case apply && pushed > pushedEarlier:
 		u.OK("Pushed fixes. Now: rotate this token and every secret those repos or their CI could read,")
 		u.P("      review GitHub > Settings > Applications and Deploy keys, and ask collaborators to git pull.")
-		u.Info("Quarantined originals: threatscan history")
+		u.Info("Quarantined originals: pushwarden history")
 	}
 	if failed+errs > 0 {
 		u.Info("Protected branches: allow the push temporarily or open a PR from a clean branch. Archived repos must be unarchived first.")

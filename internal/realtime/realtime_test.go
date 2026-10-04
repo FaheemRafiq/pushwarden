@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	h "github.com/FaheemRafiq/threatscan/internal/helpers"
+	h "github.com/FaheemRafiq/pushwarden/internal/helpers"
 )
 
 type collector struct {

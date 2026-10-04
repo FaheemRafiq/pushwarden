@@ -1,12 +1,12 @@
-# GitHub Pages (Jekyll) configuration for https://faheemrafiq.github.io/threatscan/
+# GitHub Pages (Jekyll) configuration for https://faheemrafiq.github.io/pushwarden/
 # Source: the docs/ folder of the main branch. No theme: the layout is in _layouts/.
-title: ThreatScan
+title: PushWarden
 description: >-
   Real-time protection against the PolinRider / Contagious Interview supply-chain malware
   for developer machines. Linux, macOS and Windows.
 url: https://faheemrafiq.github.io
-baseurl: /threatscan
-repo_url: https://github.com/FaheemRafiq/threatscan
+baseurl: /pushwarden
+repo_url: https://github.com/FaheemRafiq/pushwarden
 markdown: kramdown
 kramdown:
   input: GFM

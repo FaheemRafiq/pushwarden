@@ -8,17 +8,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/iocs"
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/internal/iocs"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 const (
-	chain    = "THREATSCAN_C2"
-	pfAnchor = "com.threatscan.c2"
-	hostsBeg = "# BEGIN THREATSCAN C2 SINKHOLE"
-	hostsEnd = "# END THREATSCAN C2 SINKHOLE"
-	winRule  = "ThreatScan C2 block"
+	chain    = "PUSHWARDEN_C2"
+	pfAnchor = "com.pushwarden.c2"
+	hostsBeg = "# BEGIN PUSHWARDEN C2 SINKHOLE"
+	hostsEnd = "# END PUSHWARDEN C2 SINKHOLE"
+	winRule  = "PushWarden C2 block"
 )
 
 type NetBlocker struct {
@@ -47,12 +47,12 @@ func (n *NetBlocker) BlockIPs() bool {
 	switch {
 	case n.P.IsLinux():
 		if !have("iptables") && have("nft") {
-			n.sh("nft", "add", "table", "inet", "threatscan")
-			n.sh("nft", "add", "chain", "inet", "threatscan", "out", "{ type filter hook output priority 0 ; }")
-			n.sh("nft", "flush", "chain", "inet", "threatscan", "out")
-			n.sh("nft", "add", "rule", "inet", "threatscan", "out", "ip", "daddr", "{ "+strings.Join(ips, ", ")+" }", "drop")
+			n.sh("nft", "add", "table", "inet", "pushwarden")
+			n.sh("nft", "add", "chain", "inet", "pushwarden", "out", "{ type filter hook output priority 0 ; }")
+			n.sh("nft", "flush", "chain", "inet", "pushwarden", "out")
+			n.sh("nft", "add", "rule", "inet", "pushwarden", "out", "ip", "daddr", "{ "+strings.Join(ips, ", ")+" }", "drop")
 			n.mode = "nftables"
-			n.say(fmt.Sprintf("nftables: dropped outbound traffic to %d C2 IPs (table inet threatscan)", len(ips)))
+			n.say(fmt.Sprintf("nftables: dropped outbound traffic to %d C2 IPs (table inet pushwarden)", len(ips)))
 			return true
 		}
 		if !have("iptables") {
@@ -80,7 +80,7 @@ func (n *NetBlocker) BlockIPs() bool {
 		}
 		af := "/etc/pf.anchors/" + pfAnchor
 		if err := os.WriteFile(af, []byte(rules.String()), 0o644); err != nil {
-			n.say("Need root: sudo threatscan protect --install")
+			n.say("Need root: sudo pushwarden protect --install")
 			return false
 		}
 		conf, _ := os.ReadFile("/etc/pf.conf")
@@ -113,7 +113,7 @@ func (n *NetBlocker) UnblockIPs() {
 		n.sh("iptables", "-D", "OUTPUT", "-j", chain)
 		n.sh("iptables", "-F", chain)
 		n.sh("iptables", "-X", chain)
-		n.sh("nft", "delete", "table", "inet", "threatscan")
+		n.sh("nft", "delete", "table", "inet", "pushwarden")
 	case n.P.IsMac():
 		n.sh("pfctl", "-a", pfAnchor, "-F", "all")
 	case n.P.IsWindows():
@@ -128,7 +128,7 @@ func (n *NetBlocker) Status() string {
 		if rc, out, _ := n.sh("iptables", "-S", chain); rc == 0 && strings.TrimSpace(out) != "" {
 			return fmt.Sprintf("iptables chain %s: %d drop rules", chain, strings.Count(out, "-j DROP"))
 		}
-		if rc, _, _ := n.sh("nft", "list", "table", "inet", "threatscan"); rc == 0 {
+		if rc, _, _ := n.sh("nft", "list", "table", "inet", "pushwarden"); rc == 0 {
 			return "nftables table active"
 		}
 	case n.P.IsMac():

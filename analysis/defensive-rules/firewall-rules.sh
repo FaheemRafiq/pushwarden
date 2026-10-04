@@ -1,5 +1,5 @@
 #!/bin/bash
-# threatscan:allow-signatures
+# pushwarden:allow-signatures
 # Block known Lazarus C2 IPs
 # Usage: sudo bash firewall-rules.sh [block|unblock|status]
 

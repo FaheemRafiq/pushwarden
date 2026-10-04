@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/realtime"
+	"github.com/FaheemRafiq/pushwarden/internal/realtime"
 )
 
 func init() {

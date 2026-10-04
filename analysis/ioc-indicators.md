@@ -1,4 +1,4 @@
-<!-- threatscan:allow-signatures -->
+<!-- pushwarden:allow-signatures -->
 # Lazarus "Contagious Interview" - Complete IoC List
 
 ## Wallet Addresses (Blockchain C2 Dead-Drop)

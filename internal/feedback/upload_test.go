@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
 )
 
 // table is a stand-in for the central table: it stores rows by event_id and
@@ -116,7 +116,7 @@ func states(evs []journal.Event) string {
 func TestUploadBatchesHeadersAndPerEventFlag(t *testing.T) {
 	tb, srv := newTable(t)
 	dir := journalWith(t, 450)
-	up := &Uploader{DataDir: dir, URL: srv.URL + "/rest/v1/threatscan_events", Key: "anon-key", MachineID: "m1", OS: "linux"}
+	up := &Uploader{DataDir: dir, URL: srv.URL + "/rest/v1/pushwarden_events", Key: "anon-key", MachineID: "m1", OS: "linux"}
 	if rows, total := up.Pending(5); len(rows) != 5 || total != 450 {
 		t.Fatalf("pending: %d of %d", len(rows), total)
 	}
@@ -325,7 +325,7 @@ func TestUploadedRowsAreRedacted(t *testing.T) {
 	j.Write(journal.Event{Kind: journal.KindFinding, Sev: "CRITICAL", Category: "malicious_process", Threat: "Behavior:Node/PolinRider.Payload",
 		Title: "PID 5 (node) started by faheem", Path: "/home/faheem/secret-repo/postcss.config.mjs", PID: 5,
 		Cmd:     "node /home/faheem/secret-repo/x.js --token=abcdef123456 ghp_FAKEfakeFAKEfakeFAKEfakeFAKEfake0000",
-		Matched: "global['_V']\x00='8-st17'", Why: "found in /home/faheem/secret-repo on fedora-box", Response: "killed; see /home/faheem/.threatscan/quarantine",
+		Matched: "global['_V']\x00='8-st17'", Why: "found in /home/faheem/secret-repo on fedora-box", Response: "killed; see /home/faheem/.pushwarden/quarantine",
 		Action: "killed PID 5", OK: &no, Evidence: []string{"line 3 of /home/faheem/secret-repo/x.js", "https://bob:s3cr3tpw@github.com/x/y.git"},
 		Sweep: "s1", Key: "malicious_process|PID 5|/home/faheem/secret-repo/x.js", Note: "password: hunter2secret",
 		Data: map[string]any{"roots": []any{"/home/faheem/Coding", "/home/faheem/src"}, "seconds": 12,
@@ -359,10 +359,10 @@ func TestUploadedRowsAreRedacted(t *testing.T) {
 
 func TestUploadRefusesPlainHTTPAndRedirects(t *testing.T) {
 	for raw, ok := range map[string]bool{
-		"https://abc.supabase.co/rest/v1/threatscan_events": true,
-		"http://127.0.0.1:54321/rest/v1/threatscan_events":  true,
+		"https://abc.supabase.co/rest/v1/pushwarden_events": true,
+		"http://127.0.0.1:54321/rest/v1/pushwarden_events":  true,
 		"http://localhost:3000/t":                           true,
-		"http://abc.supabase.co/rest/v1/threatscan_events":  false,
+		"http://abc.supabase.co/rest/v1/pushwarden_events":  false,
 		"ftp://x/y":       false,
 		"abc.supabase.co": false,
 		"":                false,

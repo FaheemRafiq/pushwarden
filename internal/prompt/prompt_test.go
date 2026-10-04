@@ -1,4 +1,4 @@
-// threatscan:allow-signatures
+// pushwarden:allow-signatures
 package prompt
 
 import (
@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/findings"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
 )
 
 func TestBuildMessage(t *testing.T) {

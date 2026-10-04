@@ -7,10 +7,10 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/ghclean"
-	"github.com/FaheemRafiq/threatscan/internal/github"
-	"github.com/FaheemRafiq/threatscan/internal/remediate"
-	"github.com/FaheemRafiq/threatscan/internal/tui"
+	"github.com/FaheemRafiq/pushwarden/internal/ghclean"
+	"github.com/FaheemRafiq/pushwarden/internal/github"
+	"github.com/FaheemRafiq/pushwarden/internal/remediate"
+	"github.com/FaheemRafiq/pushwarden/internal/tui"
 )
 
 func init() {
@@ -31,13 +31,13 @@ func cmdUI(args []string) int {
 		return 2
 	}
 	if out, err := os.Stdout.Stat(); !isTTY() || err != nil || out.Mode()&os.ModeCharDevice == 0 {
-		fmt.Fprintln(os.Stderr, "threatscan: ui needs an interactive terminal; use `threatscan github-clean` instead")
+		fmt.Fprintln(os.Stderr, "pushwarden: ui needs an interactive terminal; use `pushwarden github-clean` instead")
 		return 2
 	}
 	// Started from a shortcut, the window closes with the program: keep a
 	// message on screen until it is read.
 	fail := func(msg string) int {
-		fmt.Fprintln(os.Stderr, "threatscan: "+msg)
+		fmt.Fprintln(os.Stderr, "pushwarden: "+msg)
 		if pause {
 			fmt.Fprint(os.Stderr, "\nPress Enter to close. ")
 			bufio.NewReader(os.Stdin).ReadString('\n')
@@ -45,7 +45,7 @@ func cmdUI(args []string) int {
 		return 2
 	}
 	if _, err := exec.LookPath("git"); err != nil {
-		return fail("git is not installed or not on PATH. ThreatScan uses it to download and fix your repositories: https://git-scm.com/downloads")
+		return fail("git is not installed or not on PATH. PushWarden uses it to download and fix your repositories: https://git-scm.com/downloads")
 	}
 	c := mustCtx()
 	state := remediate.LoadState(c.DataDir)

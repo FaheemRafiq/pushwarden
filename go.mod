@@ -1,4 +1,4 @@
-module github.com/FaheemRafiq/threatscan
+module github.com/FaheemRafiq/pushwarden
 
 go 1.24.2
 

@@ -1,8 +1,8 @@
 // Package service starts the guard at sign-in as a per-user service.
 //
-//	Linux   systemd --user unit      ~/.config/systemd/user/threatscan-guard.service
-//	macOS   LaunchAgent              ~/Library/LaunchAgents/com.threatscan.guard.plist
-//	Windows Scheduled Task (ONLOGON) "ThreatScan Guard", falling back to a Startup
+//	Linux   systemd --user unit      ~/.config/systemd/user/pushwarden-guard.service
+//	macOS   LaunchAgent              ~/Library/LaunchAgents/com.pushwarden.guard.plist
+//	Windows Scheduled Task (ONLOGON) "PushWarden Guard", falling back to a Startup
 //	        folder .vbs launcher when schtasks is refused for the current user.
 //
 // None of these need administrator rights. Names match the Python v5 build so a
@@ -23,14 +23,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/update"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/update"
 )
 
 const (
-	ServiceName  = "threatscan-guard"
-	LaunchdLabel = "com.threatscan.guard"
-	WinTask      = "ThreatScan Guard"
+	ServiceName  = "pushwarden-guard"
+	LaunchdLabel = "com.pushwarden.guard"
+	WinTask      = "PushWarden Guard"
 )
 
 const cmdTimeout = 60 * time.Second
@@ -62,7 +62,7 @@ func InstalledVersion(exe string) string {
 		return ""
 	}
 	f := strings.Fields(string(out))
-	if len(f) >= 2 && f[0] == "ThreatScan" {
+	if len(f) >= 2 && f[0] == "PushWarden" {
 		return strings.TrimPrefix(f[1], "v")
 	}
 	return ""
@@ -86,7 +86,7 @@ func (m *Manager) UnitPath() string {
 	case m.P.IsMac():
 		return filepath.Join(m.P.Home, "Library", "LaunchAgents", LaunchdLabel+".plist")
 	}
-	return filepath.Join(m.P.AppData(), "Microsoft", "Windows", "Start Menu", "Programs", "Startup", "ThreatScanGuard.vbs")
+	return filepath.Join(m.P.AppData(), "Microsoft", "Windows", "Start Menu", "Programs", "Startup", "PushWardenGuard.vbs")
 }
 
 // ── definitions ─────────────────────────────────────────────────────────────
@@ -109,10 +109,10 @@ func SystemdUnit(cmd []string, log, envHome string) string {
 	}
 	env := ""
 	if envHome != "" {
-		env = "Environment=THREATSCAN_HOME=" + envHome + "\n"
+		env = "Environment=PUSHWARDEN_HOME=" + envHome + "\n"
 	}
 	return `[Unit]
-Description=ThreatScan guard (PolinRider detector / responder)
+Description=PushWarden guard (PolinRider detector / responder)
 
 [Service]
 Type=simple
@@ -154,7 +154,7 @@ func LaunchdPlist(cmd []string, log, envHome, path string) string {
 	}
 	env := "\t\t<key>PATH</key>\n\t\t<string>" + xmlEsc(path) + "</string>\n"
 	if envHome != "" {
-		env += "\t\t<key>THREATSCAN_HOME</key>\n\t\t<string>" + xmlEsc(envHome) + "</string>\n"
+		env += "\t\t<key>PUSHWARDEN_HOME</key>\n\t\t<string>" + xmlEsc(envHome) + "</string>\n"
 	}
 	return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -222,7 +222,7 @@ func vbsLauncher(cmd []string) string {
 // Preview describes what Install would register, for --dry-run.
 func (m *Manager) Preview() string {
 	cmd := m.Command()
-	envHome := os.Getenv("THREATSCAN_HOME")
+	envHome := os.Getenv("PUSHWARDEN_HOME")
 	s := fmt.Sprintf("would copy %s -> %s\n", m.Src, m.Exe())
 	switch {
 	case m.P.IsLinux():
@@ -305,7 +305,7 @@ func (m *Manager) PlaceBinary() (bool, error) {
 	return true, nil
 }
 
-// LinkCLI makes `threatscan` callable from a terminal: a symlink in
+// LinkCLI makes `pushwarden` callable from a terminal: a symlink in
 // ~/.local/bin on Linux/macOS, the install dir on the user PATH on Windows.
 // A v5 launcher that is a real file is left alone (the v5.2 migration removes it).
 func (m *Manager) LinkCLI(dry bool) string {
@@ -313,7 +313,7 @@ func (m *Manager) LinkCLI(dry bool) string {
 		return addUserPath(m.P.InstallDir(), dry)
 	}
 	bin := filepath.Join(m.P.Home, ".local", "bin")
-	link := filepath.Join(bin, "threatscan")
+	link := filepath.Join(bin, "pushwarden")
 	linked := false
 	if st, err := os.Lstat(link); err == nil {
 		if st.Mode()&os.ModeSymlink == 0 {
@@ -359,7 +359,7 @@ func (m *Manager) LinkCLI(dry bool) string {
 	return msg
 }
 
-const pathLine = `export PATH="$HOME/.local/bin:$PATH"  # added by threatscan install`
+const pathLine = `export PATH="$HOME/.local/bin:$PATH"  # added by pushwarden install`
 
 // addToShellPath appends the ~/.local/bin PATH line to the shell start-up
 // files that exist (zsh on macOS, bash/profile on Linux), once. It returns
@@ -409,7 +409,7 @@ func (m *Manager) UnlinkCLI() {
 		removeUserPath(m.P.InstallDir())
 		return
 	}
-	link := filepath.Join(m.P.Home, ".local", "bin", "threatscan")
+	link := filepath.Join(m.P.Home, ".local", "bin", "pushwarden")
 	if cur, err := os.Readlink(link); err == nil && cur == m.Exe() {
 		os.Remove(link)
 	}
@@ -469,7 +469,7 @@ func (m *Manager) installSystemd() (bool, string) {
 	if err := os.MkdirAll(filepath.Dir(unit), 0o755); err != nil {
 		return false, err.Error()
 	}
-	if err := os.WriteFile(unit, []byte(SystemdUnit(m.Command(), m.Log, os.Getenv("THREATSCAN_HOME"))), 0o644); err != nil {
+	if err := os.WriteFile(unit, []byte(SystemdUnit(m.Command(), m.Log, os.Getenv("PUSHWARDEN_HOME"))), 0o644); err != nil {
 		return false, err.Error()
 	}
 	for _, c := range [][]string{
@@ -500,7 +500,7 @@ func (m *Manager) installLaunchd() (bool, string) {
 	}
 	dom := "gui/" + strconv.Itoa(os.Getuid())
 	m.run("launchctl", "bootout", dom, pl)
-	if err := os.WriteFile(pl, []byte(LaunchdPlist(m.Command(), m.Log, os.Getenv("THREATSCAN_HOME"), launchdPath())), 0o644); err != nil {
+	if err := os.WriteFile(pl, []byte(LaunchdPlist(m.Command(), m.Log, os.Getenv("PUSHWARDEN_HOME"), launchdPath())), 0o644); err != nil {
 		return false, err.Error()
 	}
 	if rc, _, _ := m.run("launchctl", "bootstrap", dom, pl); rc != 0 {
@@ -544,7 +544,7 @@ func (m *Manager) stopWindows() {
 	installed := strings.ToLower(m.Exe())
 	for _, pr := range m.P.Processes() {
 		lc := strings.ToLower(pr.Cmd)
-		guard := strings.Contains(lc, "threatscan") && strings.Contains(lc, "guard")
+		guard := strings.Contains(lc, "pushwarden") && strings.Contains(lc, "guard")
 		if (guard || strings.Contains(lc, installed)) && pr.PID != os.Getpid() {
 			m.P.Kill(pr.PID)
 		}

@@ -1,5 +1,5 @@
-# threatscan:allow-signatures
-# threatscan/falco/polinrider.rules.yaml  (installed as /etc/falco/rules.d/threatscan-polinrider.yaml)
+# pushwarden:allow-signatures
+# pushwarden/falco/polinrider.rules.yaml  (installed as /etc/falco/rules.d/pushwarden-polinrider.yaml)
 #
 # PolinRider / "Contagious Interview" DPRK supply-chain campaign detection.
 # Attribution confirmed: DPRK Lazarus Group, active March–September 2026+.

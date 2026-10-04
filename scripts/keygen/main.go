@@ -4,7 +4,7 @@
 //
 // Writes the private key (base64 seed) to PATH with mode 0600 and prints the
 // public key to paste into internal/update/pubkeys.go. Keep PATH outside the
-// repository: store it in the THREATSCAN_SIGNING_KEY secret and an offline backup.
+// repository: store it in the PUSHWARDEN_SIGNING_KEY secret and an offline backup.
 package main
 
 import (

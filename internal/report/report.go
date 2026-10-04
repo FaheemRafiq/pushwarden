@@ -8,7 +8,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/findings"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
 )
 
 type Report struct {

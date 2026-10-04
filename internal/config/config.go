@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/FaheemRafiq/threatscan/internal/helpers"
+	"github.com/FaheemRafiq/pushwarden/internal/helpers"
 )
 
 type Config struct {

@@ -1,18 +1,18 @@
 ---
 title: Blocking C2 servers
-description: "How threatscan protect blocks the malware's command-and-control servers at the firewall and in the hosts file, system-wide and across reboots."
+description: "How pushwarden protect blocks the malware's command-and-control servers at the firewall and in the hosts file, system-wide and across reboots."
 ---
 # Blocking C2 servers
 
-`threatscan protect` blocks the PolinRider command-and-control (C2) servers for the whole computer and keeps them blocked. Even if a loader runs, it cannot fetch its payload or send stolen data to the known servers.
+`pushwarden protect` blocks the PolinRider command-and-control (C2) servers for the whole computer and keeps them blocked. Even if a loader runs, it cannot fetch its payload or send stolen data to the known servers.
 
-This is the only part of ThreatScan that needs administrator rights, because it edits the firewall and the hosts file.
+This is the only part of PushWarden that needs administrator rights, because it edits the firewall and the hosts file.
 
 ```sh
-threatscan protect [--install | --refresh | --uninstall | --status | --block-c2 | --unblock] [--dry-run]
+pushwarden protect [--install | --refresh | --uninstall | --status | --block-c2 | --unblock] [--dry-run]
 ```
 
-`threatscan install` does this for you. It asks once for administrator rights (the native password dialog on macOS, polkit or sudo on Linux, UAC on Windows). You only need `protect` directly to check on the block, add it later or remove it.
+`pushwarden install` does this for you. It asks once for administrator rights (the native password dialog on macOS, polkit or sudo on Linux, UAC on Windows). You only need `protect` directly to check on the block, add it later or remove it.
 
 ## Options
 
@@ -30,9 +30,9 @@ threatscan protect [--install | --refresh | --uninstall | --status | --block-c2 
 
 | Part | Linux | macOS | Windows |
 |---|---|---|---|
-| Firewall rule dropping outgoing traffic to every C2 IP | an `iptables` chain or `nftables` table named `threatscan` | a `pf` anchor | a Windows Firewall rule named "ThreatScan C2 block" |
-| Hostname sinkhole | hosts-file entries between `# BEGIN THREATSCAN C2 SINKHOLE` and `# END` markers | same | same |
-| Job that re-applies the block at boot and refreshes the list daily | systemd timer `threatscan-netblock.timer` | LaunchDaemon `com.threatscan.netblock` | Scheduled Task "ThreatScan NetBlock", running as SYSTEM |
+| Firewall rule dropping outgoing traffic to every C2 IP | an `iptables` chain or `nftables` table named `pushwarden` | a `pf` anchor | a Windows Firewall rule named "PushWarden C2 block" |
+| Hostname sinkhole | hosts-file entries between `# BEGIN PUSHWARDEN C2 SINKHOLE` and `# END` markers | same | same |
+| Job that re-applies the block at boot and refreshes the list daily | systemd timer `pushwarden-netblock.timer` | LaunchDaemon `com.pushwarden.netblock` | Scheduled Task "PushWarden NetBlock", running as SYSTEM |
 
 ## Why it keeps its own copy of the indicators
 
@@ -45,13 +45,13 @@ So the job keeps:
 
 | System | Indicators and state | Program |
 |---|---|---|
-| Linux | `/etc/threatscan` | `/usr/local/lib/threatscan` |
-| macOS | `/Library/Application Support/ThreatScan` | `/usr/local/libexec/threatscan` |
-| Windows | `%ProgramData%\ThreatScan` | `%ProgramFiles%\ThreatScan` |
+| Linux | `/etc/pushwarden` | `/usr/local/lib/pushwarden` |
+| macOS | `/Library/Application Support/PushWarden` | `/usr/local/libexec/pushwarden` |
+| Windows | `%ProgramData%\PushWarden` | `%ProgramFiles%\PushWarden` |
 
 ## Status values
 
-Shown by `threatscan status` and `threatscan protect --status`.
+Shown by `pushwarden status` and `pushwarden protect --status`.
 
 | Firewall | Meaning |
 |---|---|
@@ -63,27 +63,27 @@ Shown by `threatscan status` and `threatscan protect --status`.
 ## Opting out
 
 ```sh
-threatscan install --no-block-c2             # at install time
-threatscan config --set block_c2=false       # later; the guard stops reminding you
+pushwarden install --no-block-c2             # at install time
+pushwarden config --set block_c2=false       # later; the guard stops reminding you
 ```
 
 While `block_c2` is on and the block is missing, the guard reminds you once a day.
 
-Setting `THREATSCAN_NO_BLOCK=1` skips the administrator prompt for one run. The package installers use it because they already did the work as root.
+Setting `PUSHWARDEN_NO_BLOCK=1` skips the administrator prompt for one run. The package installers use it because they already did the work as root.
 
 ## Adding it later
 
 ```sh
-sudo threatscan protect --install     # Linux and macOS
-threatscan protect --install          # Windows, from an elevated terminal
-threatscan protect --status
+sudo pushwarden protect --install     # Linux and macOS
+pushwarden protect --install          # Windows, from an elevated terminal
+pushwarden protect --status
 ```
 
 ## Removing it
 
 ```sh
-threatscan protect --uninstall
-threatscan uninstall --unblock        # together with the guard
+pushwarden protect --uninstall
+pushwarden uninstall --unblock        # together with the guard
 ```
 
 ## Limits

@@ -1,5 +1,5 @@
 // Package github is the small slice of the GitHub REST API that
-// `threatscan github-clean` needs: who am I, which repositories can I push to.
+// `pushwarden github-clean` needs: who am I, which repositories can I push to.
 package github
 
 import (
@@ -82,7 +82,7 @@ func (c *Client) get(ctx context.Context, u string, out any) (next string, err e
 		req.Header.Set("Authorization", "Bearer "+c.Token)
 		req.Header.Set("Accept", "application/vnd.github+json")
 		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-		req.Header.Set("User-Agent", "threatscan")
+		req.Header.Set("User-Agent", "pushwarden")
 		resp, err := c.HTTP.Do(req)
 		if err != nil {
 			return "", err

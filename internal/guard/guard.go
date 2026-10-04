@@ -18,18 +18,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/config"
-	"github.com/FaheemRafiq/threatscan/internal/findings"
-	h "github.com/FaheemRafiq/threatscan/internal/helpers"
-	"github.com/FaheemRafiq/threatscan/internal/iocs"
-	"github.com/FaheemRafiq/threatscan/internal/journal"
-	"github.com/FaheemRafiq/threatscan/internal/notify"
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/prompt"
-	"github.com/FaheemRafiq/threatscan/internal/protect"
-	"github.com/FaheemRafiq/threatscan/internal/report"
-	"github.com/FaheemRafiq/threatscan/internal/scan"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/internal/config"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
+	h "github.com/FaheemRafiq/pushwarden/internal/helpers"
+	"github.com/FaheemRafiq/pushwarden/internal/iocs"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/notify"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/prompt"
+	"github.com/FaheemRafiq/pushwarden/internal/protect"
+	"github.com/FaheemRafiq/pushwarden/internal/report"
+	"github.com/FaheemRafiq/pushwarden/internal/scan"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 type F = findings.Finding
@@ -167,7 +167,7 @@ func (g *Guard) heartbeat(phase string, stats map[string]int) {
 }
 
 // progress records how far the sweep is and refreshes the heartbeat, so
-// `threatscan status` can show "7/17 repositories, scanning X".
+// `pushwarden status` can show "7/17 repositories, scanning X".
 func (g *Guard) progress(done, total int, current string) {
 	g.mu.Lock()
 	g.progDone, g.progTotal, g.progCurrent = done, total, filepath.Base(current)
@@ -175,7 +175,7 @@ func (g *Guard) progress(done, total int, current string) {
 	g.heartbeat("full", nil)
 }
 
-// ReadHeartbeat is used by `threatscan status` and the updater.
+// ReadHeartbeat is used by `pushwarden status` and the updater.
 func ReadHeartbeat(dataDir string) (*Heartbeat, time.Duration, bool) {
 	b, err := os.ReadFile(filepath.Join(dataDir, "guard", "heartbeat.json"))
 	if err != nil {
@@ -253,7 +253,7 @@ func (g *Guard) afterQuarantine(f *F) {
 			g.Log("restored and allowed " + f.Path)
 		}
 	}
-	// timeout / unavailable: stays in quarantine (threatscan history to review)
+	// timeout / unavailable: stays in quarantine (pushwarden history to review)
 }
 
 func (g *Guard) startDialogWorker() {
@@ -437,9 +437,9 @@ func sweepSummary(repos int, st *findings.Stats, d time.Duration) string {
 	s := fmt.Sprintf("%d repositories in %s. ", repos, d.Round(time.Second))
 	switch {
 	case st.Critical > 0:
-		s += fmt.Sprintf("%d threat(s) handled, %d need review. Details: threatscan alerts", st.Critical, st.High)
+		s += fmt.Sprintf("%d threat(s) handled, %d need review. Details: pushwarden alerts", st.Critical, st.High)
 	case st.High > 0:
-		s += fmt.Sprintf("%d finding(s) need review: threatscan alerts", st.High)
+		s += fmt.Sprintf("%d finding(s) need review: pushwarden alerts", st.High)
 	default:
 		s += "Nothing found."
 	}
@@ -529,8 +529,8 @@ func (g *Guard) FullPass() {
 	g.J.Write(journal.Event{Ctx: "guard-full", Kind: journal.KindSweep, Sweep: g.sweepID, Title: "full sweep started",
 		Data: map[string]any{"phase": "start", "repos": planned, "roots": len(roots)}})
 	if g.Cfg.NotifySweeps && !g.Once {
-		g.Notifier.Desktop("ThreatScan: full scan started",
-			fmt.Sprintf("%d repositories in %d folders. Progress: threatscan status", planned, len(roots)))
+		g.Notifier.Desktop("PushWarden: full scan started",
+			fmt.Sprintf("%d repositories in %d folders. Progress: pushwarden status", planned, len(roots)))
 	}
 	offset := 0
 	for _, t := range targets {
@@ -561,7 +561,7 @@ func (g *Guard) FullPass() {
 		Data: map[string]any{"phase": "end", "repos": total, "infected": infected, "files": files, "critical": st.Critical,
 			"high": st.High, "warning": st.Warning, "seconds": int(st.ScanDuration)}})
 	if g.Cfg.NotifySweeps && !g.Once {
-		g.Notifier.Desktop("ThreatScan: full scan finished", sweepSummary(total, st, time.Since(start)))
+		g.Notifier.Desktop("PushWarden: full scan finished", sweepSummary(total, st, time.Since(start)))
 	}
 }
 
@@ -643,7 +643,7 @@ func (g *Guard) Run() int {
 	}()
 	g.safely("ioc update", g.maybeUpdateIOCs)
 	if age, ok := g.recentReport(); ok && !g.Once {
-		// `threatscan install` (or a restart after an update) just ran a full scan:
+		// `pushwarden install` (or a restart after an update) just ran a full scan:
 		// a second sweep seconds later would double every quarantine and alert.
 		g.Log(fmt.Sprintf("full scan report from %s ago found; next sweep in %s", age.Round(time.Second), (time.Duration(g.Cfg.FullInterval)*time.Second - age).Round(time.Minute)))
 		g.safely("discovery", g.lightStart)

@@ -4,7 +4,7 @@ description: "The four ways information can leave a machine, all opt-in: webhook
 ---
 # Team reporting
 
-ThreatScan keeps everything on the machine by default. A team lead or maintainer who wants to see what is happening across machines has four tools. Three send data and are off until their URL is set; the fourth writes a file that a person sends by hand.
+PushWarden keeps everything on the machine by default. A team lead or maintainer who wants to see what is happening across machines has four tools. Three send data and are off until their URL is set; the fourth writes a file that a person sends by hand.
 
 | Tool | What leaves the machine | How | Default |
 |---|---|---|---|
@@ -13,7 +13,7 @@ ThreatScan keeps everything on the machine by default. A team lead or maintainer
 | Daily digest | counts only; no paths, command lines or file contents | JSON POST once a day | off |
 | Central event upload | every journal event, redacted | batches to a database table | off |
 
-`threatscan status` shows whether the webhook and the central upload are on.
+`pushwarden status` shows whether the webhook and the central upload are on.
 
 ## Redaction
 
@@ -26,10 +26,10 @@ The bundle and the central upload pass every text through the same redactor:
 ## Webhook alerts
 
 ```sh
-threatscan config --set webhook_url=https://hooks.slack.com/services/T000/B000/XXXX
+pushwarden config --set webhook_url=https://hooks.slack.com/services/T000/B000/XXXX
 ```
 
-Or at install time with `THREATSCAN_WEBHOOK=URL`.
+Or at install time with `PUSHWARDEN_WEBHOOK=URL`.
 
 Each alert at or above `webhook_min_severity` (default `HIGH`) is posted as JSON:
 
@@ -47,10 +47,10 @@ One URL therefore works for Slack, Discord, Teams and your own endpoint. Webhook
 ## Feedback bundle
 
 ```sh
-threatscan feedback [--days N] [--out FILE] [--no-redact]
+pushwarden feedback [--days N] [--out FILE] [--no-redact]
 ```
 
-Writes `threatscan-feedback-DATE.zip` in the current folder. Nothing is uploaded; the command tells you what is in the file so you can look before you send it.
+Writes `pushwarden-feedback-DATE.zip` in the current folder. Nothing is uploaded; the command tells you what is in the file so you can look before you send it.
 
 | File in the zip | Content |
 |---|---|
@@ -70,20 +70,20 @@ Writes `threatscan-feedback-DATE.zip` in the current folder. Nothing is uploaded
 ## Reporting a false positive
 
 ```sh
-threatscan feedback --false-positive PATH --note "what it really is"
+pushwarden feedback --false-positive PATH --note "what it really is"
 ```
 
-Records that the finding on `PATH` was wrong, with an optional note. It does not change the file; `threatscan history --allow PATH` does that. The note travels with the bundle, the digest and the central upload.
+Records that the finding on `PATH` was wrong, with an optional note. It does not change the file; `pushwarden history --allow PATH` does that. The note travels with the bundle, the digest and the central upload.
 
 ## Daily digest
 
 Off unless `feedback_url` is set.
 
 ```sh
-threatscan config --set feedback_url=https://hooks.slack.com/services/T000/B000/XXXX
+pushwarden config --set feedback_url=https://hooks.slack.com/services/T000/B000/XXXX
 ```
 
-Or at install time with `THREATSCAN_FEEDBACK_URL=URL`.
+Or at install time with `PUSHWARDEN_FEEDBACK_URL=URL`.
 
 Once a day the guard posts a summary to that URL. A Slack or Discord webhook works. It contains:
 
@@ -98,24 +98,24 @@ Once a day the guard posts a summary to that URL. A Slack or Discord webhook wor
 It never contains file contents, command lines or paths. A false-positive report carries the file's base name only. The host name is included only with `feedback_identify=true`.
 
 ```sh
-threatscan feedback --digest     # print exactly what would be sent
+pushwarden feedback --digest     # print exactly what would be sent
 ```
 
 ## Central event upload
 
 Off unless `upload_url` is set. No URL is built into the program.
 
-It gives whoever maintains ThreatScan for a team the full record from every machine in one database table, so a false positive or a failed action on a colleague's machine can be diagnosed without asking for a bundle.
+It gives whoever maintains PushWarden for a team the full record from every machine in one database table, so a false positive or a failed action on a colleague's machine can be diagnosed without asking for a bundle.
 
 ### What is sent
 
-Every journal event: findings, actions, dialog answers, sweeps, guard starts, updates, errors and false-positive reports. Each row has the severity, category, threat name, title, path, command line, matched text, evidence, the reason and response texts, the action and whether it worked, plus the ThreatScan version, the operating system and the random machine id.
+Every journal event: findings, actions, dialog answers, sweeps, guard starts, updates, errors and false-positive reports. Each row has the severity, category, threat name, title, path, command line, matched text, evidence, the reason and response texts, the action and whether it worked, plus the PushWarden version, the operating system and the random machine id.
 
 Redaction is always applied on this path and cannot be turned off. File contents are never sent, apart from the matched text and evidence lines of a finding.
 
 ```sh
-threatscan feedback --preview    # the next rows exactly as they would be stored; sends nothing
-threatscan feedback --upload     # send every waiting event now
+pushwarden feedback --preview    # the next rows exactly as they would be stored; sends nothing
+pushwarden feedback --upload     # send every waiting event now
 ```
 
 ### Delivery
@@ -128,8 +128,8 @@ threatscan feedback --upload     # send every waiting event now
 
 Every event is either `uploaded` or `waiting`. An event counts as uploaded only after the server accepted the batch it was in.
 
-- `threatscan status` shows the totals and the time of the last upload, or since when the server has been unreachable and why.
-- `threatscan history --all` shows the state of each event. `--not-uploaded` lists what is waiting.
+- `pushwarden status` shows the totals and the time of the last upload, or since when the server has been unreachable and why.
+- `pushwarden history --all` shows the state of each event. `--not-uploaded` lists what is waiting.
 - The state belongs to the URL that is set. After `upload_url` changes, every event is waiting again and the new destination receives the full record.
 - The state is counted by an event's position in the journal, not by its timestamp, so a clock change cannot make an event look uploaded.
 
@@ -147,21 +147,21 @@ Protection does not need the network, and every event is written to the local jo
 
 [Supabase](https://supabase.com) is hosted Postgres with a REST API; there is no server to run.
 
-1. Create a project. Open the SQL editor, paste [`docs/supabase.sql`](https://github.com/FaheemRafiq/threatscan/blob/main/docs/supabase.sql) and run it. It creates the table `threatscan_events`, four views and the access rules.
+1. Create a project. Open the SQL editor, paste [`docs/supabase.sql`](https://github.com/FaheemRafiq/pushwarden/blob/main/docs/supabase.sql) and run it. It creates the table `pushwarden_events`, four views and the access rules.
 2. In the project's API settings copy the project URL and the public key, named `anon` or `publishable`. Never put the `service_role` or `secret` key on a machine.
 3. On each machine, at install time:
 
    ```sh
-   curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/threatscan/main/installers/install.sh | \
-     THREATSCAN_UPLOAD_URL=https://PROJECT.supabase.co/rest/v1/threatscan_events THREATSCAN_UPLOAD_KEY=KEY sh
+   curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/installers/install.sh | \
+     PUSHWARDEN_UPLOAD_URL=https://PROJECT.supabase.co/rest/v1/pushwarden_events PUSHWARDEN_UPLOAD_KEY=KEY sh
    ```
 
-   Or on a machine that already runs ThreatScan:
+   Or on a machine that already runs PushWarden:
 
    ```sh
-   threatscan config --set upload_url=https://PROJECT.supabase.co/rest/v1/threatscan_events upload_key=KEY
-   threatscan feedback --preview
-   threatscan feedback --upload
+   pushwarden config --set upload_url=https://PROJECT.supabase.co/rest/v1/pushwarden_events upload_key=KEY
+   pushwarden feedback --preview
+   pushwarden feedback --upload
    ```
 
    Restart the guard after `config --set`.
@@ -169,10 +169,10 @@ Protection does not need the network, and every event is written to the local jo
 
 | View | Shows |
 |---|---|
-| `threatscan_false_positive_signals` | what users said was wrong: dialog answers "keep" and false-positive reports, with their notes |
-| `threatscan_findings_summary` | each distinct finding with sightings and how many machines see it. One machine only is a hint of a false positive |
-| `threatscan_tool_errors` | failed actions, recovered crashes, refused updates |
-| `threatscan_machines` | per machine: last event, last upload, version, operating system, indicator version, average sweep time |
+| `pushwarden_false_positive_signals` | what users said was wrong: dialog answers "keep" and false-positive reports, with their notes |
+| `pushwarden_findings_summary` | each distinct finding with sightings and how many machines see it. One machine only is a hint of a false positive |
+| `pushwarden_tool_errors` | failed actions, recovered crashes, refused updates |
+| `pushwarden_machines` | per machine: last event, last upload, version, operating system, indicator version, average sweep time |
 
 ### Why the key on the machines is safe to distribute
 
@@ -184,4 +184,4 @@ Any server works if it accepts a JSON array by POST, with the key in the `apikey
 
 ## Telling users
 
-If you enable the digest or the central upload for a team, tell the people whose machines report. `threatscan status` shows the upload state, `threatscan feedback --preview` and `--digest` show exactly what is sent, and `threatscan install` prints a line when the upload is on.
+If you enable the digest or the central upload for a team, tell the people whose machines report. `pushwarden status` shows the upload state, `pushwarden feedback --preview` and `--digest` show exactly what is sent, and `pushwarden install` prints a line when the upload is on.

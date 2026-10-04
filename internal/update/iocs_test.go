@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/FaheemRafiq/threatscan/internal/iocs"
-	iocsdata "github.com/FaheemRafiq/threatscan/threatscan"
+	"github.com/FaheemRafiq/pushwarden/internal/iocs"
+	iocsdata "github.com/FaheemRafiq/pushwarden/pushwarden"
 )
 
 func withVersion(t *testing.T, v string) []byte {
@@ -39,7 +39,7 @@ func TestUpdateIOCs(t *testing.T) {
 	if !ok {
 		t.Fatalf("newer file not installed: %s", msg)
 	}
-	if ua != "threatscan/6.9.9" {
+	if ua != "pushwarden/6.9.9" {
 		t.Errorf("User-Agent %q", ua)
 	}
 	if got, _ := os.ReadFile(iocs.UserPath(dir)); !bytes.Equal(got, body) {

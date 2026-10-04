@@ -1,6 +1,6 @@
 ---
 title: Troubleshooting and FAQ
-description: "Solutions to common ThreatScan problems and answers to frequent questions about detection, performance, privacy and removal."
+description: "Solutions to common PushWarden problems and answers to frequent questions about detection, performance, privacy and removal."
 ---
 # Troubleshooting and FAQ
 
@@ -12,13 +12,13 @@ Check the service:
 
 | System | Command |
 |---|---|
-| Linux | `systemctl --user status threatscan-guard.service` |
-| macOS | `launchctl list com.threatscan.guard` |
-| Windows | Task Scheduler, task "ThreatScan Guard" |
+| Linux | `systemctl --user status pushwarden-guard.service` |
+| macOS | `launchctl list com.pushwarden.guard` |
+| Windows | Task Scheduler, task "PushWarden Guard" |
 
-Run `threatscan guard --verbose --once` in a terminal to see errors directly. `threatscan install` registers the service again.
+Run `pushwarden guard --verbose --once` in a terminal to see errors directly. `pushwarden install` registers the service again.
 
-### `threatscan: command not found` after installing
+### `pushwarden: command not found` after installing
 
 The install directory was added to your `PATH` in the shell start-up file. Open a new terminal.
 
@@ -31,34 +31,34 @@ On Linux the inotify watch limit may be exhausted when there are many large repo
 The one-time administrator prompt was declined or could not be shown, for example on a headless server without polkit.
 
 ```sh
-sudo threatscan protect --install     # Linux and macOS
-threatscan protect --install          # Windows, from an elevated terminal
-threatscan protect --status
+sudo pushwarden protect --install     # Linux and macOS
+pushwarden protect --install          # Windows, from an elevated terminal
+pushwarden protect --status
 ```
 
 ### A legitimate file was quarantined
 
 ```sh
-threatscan history
-threatscan history --allow PATH --note "what the file really is"
+pushwarden history
+pushwarden history --allow PATH --note "what the file really is"
 ```
 
 This restores the file and stops flagging that exact content. Please also open an issue with the file so the indicator can be tightened.
 
 ### A process is flagged repeatedly
 
-The alert in `threatscan alerts` shows the indicator and the command line. Update the indicators first, since false positives are fixed there without a new release:
+The alert in `pushwarden alerts` shows the indicator and the command line. Update the indicators first, since false positives are fixed there without a new release:
 
 ```sh
-threatscan update-iocs
-systemctl --user restart threatscan-guard.service    # Linux
+pushwarden update-iocs
+systemctl --user restart pushwarden-guard.service    # Linux
 ```
 
 If it persists, open an issue with the alert.
 
 ### Clicking a macOS notification opens Script Editor
 
-Builds before 0.3 posted notifications through osascript. Run `threatscan install` again: it builds the notification helper app, and macOS asks once whether ThreatScan may send notifications. Allow it.
+Builds before 0.3 posted notifications through osascript. Run `pushwarden install` again: it builds the notification helper app, and macOS asks once whether PushWarden may send notifications. Allow it.
 
 ### `github-clean` says `push-failed`
 
@@ -70,11 +70,11 @@ Pass `--token`, export `GITHUB_TOKEN`, or run `gh auth login`. A fine-grained to
 
 ### `github-clean` was interrupted
 
-Run the same command again. Finished branches are remembered and skipped. `threatscan github-clean --progress` shows what is already verified.
+Run the same command again. Finished branches are remembered and skipped. `pushwarden github-clean --progress` shows what is already verified.
 
 ### The central upload shows events waiting
 
-`threatscan status` says since when the server has not been reached and why. Common causes: the machine is offline, `upload_url` does not start with `https://`, the key is wrong, or the table was not created with `docs/supabase.sql`. Nothing is lost; the guard retries by itself. `threatscan feedback --upload` tries immediately and prints the error.
+`pushwarden status` says since when the server has not been reached and why. Common causes: the machine is offline, `upload_url` does not start with `https://`, the key is wrong, or the table was not created with `docs/supabase.sql`. Nothing is lost; the guard retries by itself. `pushwarden feedback --upload` tries immediately and prints the error.
 
 ### A setting I changed has no effect
 
@@ -83,8 +83,8 @@ The guard reads its configuration when it starts. Restart the service.
 ### The data directory is large
 
 ```sh
-threatscan cleanup --dry-run
-threatscan cleanup
+pushwarden cleanup --dry-run
+pushwarden cleanup
 ```
 
 See [Disk use and cleanup](disk-and-cleanup.md).
@@ -92,14 +92,14 @@ See [Disk use and cleanup](disk-and-cleanup.md).
 ### Uninstall completely
 
 ```sh
-threatscan uninstall --unblock --purge
+pushwarden uninstall --unblock --purge
 ```
 
-Then delete the install directory shown by `threatscan status`.
+Then delete the install directory shown by `pushwarden status`.
 
 ## Frequently asked questions
 
-### Does ThreatScan replace my antivirus?
+### Does PushWarden replace my antivirus?
 
 No. It targets one malware family and knows it in depth. Keep your general antivirus.
 
@@ -117,23 +117,23 @@ No. Nothing leaves the machine unless you set a webhook, digest or upload URL. S
 
 ### Can it delete something I need?
 
-Every file is copied to quarantine before it is changed or removed, and `threatscan history --restore PATH` puts it back. Quarantined copies are kept for 90 days by default.
+Every file is copied to quarantine before it is changed or removed, and `pushwarden history --restore PATH` puts it back. Quarantined copies are kept for 90 days by default.
 
 ### What if I want it to ask before touching anything?
 
 ```sh
-threatscan config --set action=ask
+pushwarden config --set action=ask
 ```
 
 Or `action=report` to only notify.
 
 ### How do I stop it flagging a file?
 
-`threatscan history --allow PATH` for one file, or `threatscan config --set exclude=DIR` for a directory.
+`pushwarden history --allow PATH` for one file, or `pushwarden config --set exclude=DIR` for a directory.
 
 ### How quickly are new variants covered?
 
-Indicators are refreshed every 24 hours without a new release. `threatscan update-iocs` forces it.
+Indicators are refreshed every 24 hours without a new release. `pushwarden update-iocs` forces it.
 
 ### Does it work offline?
 
@@ -149,7 +149,7 @@ Yes. See [CI and automation](ci-and-automation.md).
 
 ### How do I see everything it did?
 
-`threatscan history --all`. See [Activity history](activity-history.md).
+`pushwarden history --all`. See [Activity history](activity-history.md).
 
 ### I found the malware. What now?
 
@@ -157,4 +157,4 @@ Follow the checklist in [Response and recovery](response-and-recovery.md#if-an-i
 
 ### Where do I report a bug or a false positive?
 
-<https://github.com/FaheemRafiq/threatscan/issues>. Attach the output of `threatscan feedback`, which is redacted by default.
+<https://github.com/FaheemRafiq/pushwarden/issues>. Attach the output of `pushwarden feedback`, which is redacted by default.

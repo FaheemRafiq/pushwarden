@@ -1,4 +1,4 @@
-// threatscan:allow-signatures
+// pushwarden:allow-signatures
 package remediate
 
 import (
@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/iocs"
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/testfixtures"
+	"github.com/FaheemRafiq/pushwarden/internal/iocs"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/testfixtures"
 )
 
 func sh(t *testing.T, dir string, args ...string) string {
@@ -584,7 +584,7 @@ func TestCloneSizeLimitAndStaleProgress(t *testing.T) {
 		t.Fatalf("stale repositories dropped: %d", n)
 	}
 	// nothing is left in the system temp folder for hooks
-	if !strings.HasSuffix(noHooksDir(), filepath.Join("guard", "nohooks")) || strings.Contains(filepath.Base(noHooksDir()), "threatscan-nohooks-") {
+	if !strings.HasSuffix(noHooksDir(), filepath.Join("guard", "nohooks")) || strings.Contains(filepath.Base(noHooksDir()), "pushwarden-nohooks-") {
 		t.Fatalf("the hooks folder should live in the data directory, got %s", noHooksDir())
 	}
 }

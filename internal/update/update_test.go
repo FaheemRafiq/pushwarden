@@ -123,7 +123,7 @@ func newFixture(t *testing.T, bin string) *fixture {
 	t.Cleanup(f.srv.Close)
 
 	dir := t.TempDir()
-	exe := filepath.Join(dir, "threatscan"+exeSuffix())
+	exe := filepath.Join(dir, "pushwarden"+exeSuffix())
 	f.oldBin = read(t, old)
 	os.WriteFile(exe, f.oldBin, 0o755)
 	f.u = &Updater{DataDir: t.TempDir(), Current: "0.1.0", Exe: exe, APIURL: f.srv.URL + "/releases/latest",

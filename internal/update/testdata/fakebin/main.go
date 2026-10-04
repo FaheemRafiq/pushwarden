@@ -1,4 +1,4 @@
-// Command fakebin stands in for a released threatscan binary in update tests.
+// Command fakebin stands in for a released pushwarden binary in update tests.
 package main
 
 import (
@@ -17,6 +17,6 @@ func main() {
 			fmt.Println("crashed")
 			os.Exit(3)
 		}
-		fmt.Println("ThreatScan " + version)
+		fmt.Println("PushWarden " + version)
 	}
 }

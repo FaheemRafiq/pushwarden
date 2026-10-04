@@ -16,28 +16,28 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/findings"
-	"github.com/FaheemRafiq/threatscan/internal/iocs"
-	"github.com/FaheemRafiq/threatscan/internal/journal"
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/prompt"
-	"github.com/FaheemRafiq/threatscan/internal/protect"
-	"github.com/FaheemRafiq/threatscan/internal/scan"
-	"github.com/FaheemRafiq/threatscan/internal/ui"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
+	"github.com/FaheemRafiq/pushwarden/internal/iocs"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/prompt"
+	"github.com/FaheemRafiq/pushwarden/internal/protect"
+	"github.com/FaheemRafiq/pushwarden/internal/scan"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 // TokenEnv is where the askpass helper reads the token from.
-const TokenEnv = "THREATSCAN_GIT_TOKEN"
+const TokenEnv = "PUSHWARDEN_GIT_TOKEN"
 
 type Options struct {
 	Apply      bool     // commit and push; false = report what would change
 	Token      string   // GitHub token handed to git through AskPass
 	AskPass    string   // program git runs for credentials (this binary's __askpass)
-	Author     string   // "Name <email>" for the fix commits; default: git config, then ThreatScan
+	Author     string   // "Name <email>" for the fix commits; default: git config, then PushWarden
 	Branches   []string // glob filters on branch names; empty = every branch
 	WorkDir    string   // where clones live; "" = system temp
 	KeepClones bool     // leave the clones on disk for inspection
-	Version    string   // ThreatScan version, mentioned in the commit message
+	Version    string   // PushWarden version, mentioned in the commit message
 	Log        func(string)
 	// OnBranch, when set, hears every branch result as soon as it is known,
 	// before the repository as a whole is finished.
@@ -58,7 +58,7 @@ const (
 	StatusInfected   = "infected"    // dry run: fixes are needed
 	StatusPushed     = "pushed"      // fixed and pushed
 	StatusPushFailed = "push-failed" // fixed locally, remote refused (protected branch, race, permission)
-	StatusManual     = "manual"      // HIGH/CRITICAL findings that ThreatScan cannot fix automatically
+	StatusManual     = "manual"      // HIGH/CRITICAL findings that PushWarden cannot fix automatically
 	StatusError      = "error"
 )
 
@@ -189,7 +189,7 @@ var noHooks string
 
 func noHooksDir() string {
 	if noHooks == "" {
-		d, err := os.MkdirTemp("", "threatscan-nohooks-")
+		d, err := os.MkdirTemp("", "pushwarden-nohooks-")
 		if err != nil {
 			d = os.TempDir()
 		}
@@ -230,7 +230,7 @@ func matchBranch(globs []string, name string) bool {
 
 // identity returns the env that names the author/committer of fix commits.
 func (m *Remediator) identity(ctx context.Context, dir string) []string {
-	name, email := "ThreatScan", "threatscan@users.noreply.github.com"
+	name, email := "PushWarden", "pushwarden@users.noreply.github.com"
 	if a := strings.TrimSpace(m.Opts.Author); a != "" {
 		if i := strings.LastIndex(a, "<"); i > 0 && strings.HasSuffix(a, ">") {
 			name, email = strings.TrimSpace(a[:i]), strings.TrimSpace(a[i+1:len(a)-1])
@@ -307,7 +307,7 @@ func (m *Remediator) Run(ctx context.Context, fullName, cloneURL, defaultBranch 
 			return res
 		}
 		var err error
-		if base, err = os.MkdirTemp(parent, "threatscan-"+safeName(fullName)+"-"); err != nil {
+		if base, err = os.MkdirTemp(parent, "pushwarden-"+safeName(fullName)+"-"); err != nil {
 			res.Error = err.Error()
 			return res
 		}
@@ -549,13 +549,13 @@ func (m *Remediator) commit(ctx context.Context, wt, msg string, ident []string)
 func (m *Remediator) commitMessage(branch string, acted []*findings.Finding, wt string) string {
 	var b strings.Builder
 	b.WriteString("security: remove PolinRider malware\n\n")
-	fmt.Fprintf(&b, "ThreatScan %s cleaned branch %s:\n", m.Opts.Version, branch)
+	fmt.Fprintf(&b, "PushWarden %s cleaned branch %s:\n", m.Opts.Version, branch)
 	for _, f := range acted {
 		fmt.Fprintf(&b, "  - %s  %s (%s)\n", prompt.ThreatName(f), rel(f.Path, wt), shortAction(f))
 	}
 	b.WriteString("\nThis is a normal commit on top of the branch; history was not rewritten.\n")
 	b.WriteString("Treat every secret this repository or its CI had access to as leaked and rotate it.\n")
-	b.WriteString("https://github.com/FaheemRafiq/threatscan\n")
+	b.WriteString("https://github.com/FaheemRafiq/pushwarden\n")
 	return b.String()
 }
 

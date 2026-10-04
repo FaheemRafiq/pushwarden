@@ -10,11 +10,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/FaheemRafiq/threatscan/internal/github"
-	"github.com/FaheemRafiq/threatscan/internal/iocs"
-	"github.com/FaheemRafiq/threatscan/internal/journal"
-	"github.com/FaheemRafiq/threatscan/internal/platform"
-	"github.com/FaheemRafiq/threatscan/internal/remediate"
+	"github.com/FaheemRafiq/pushwarden/internal/github"
+	"github.com/FaheemRafiq/pushwarden/internal/iocs"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/platform"
+	"github.com/FaheemRafiq/pushwarden/internal/remediate"
 )
 
 // FindToken looks for a token the user already has: $GITHUB_TOKEN, $GH_TOKEN,
@@ -129,7 +129,7 @@ type Session struct {
 	Token   string
 	API     string // GitHub API base URL
 	Author  string // "Name <email>" for the fix commits
-	Version string // ThreatScan version
+	Version string // PushWarden version
 
 	Branches []string // glob filters on branch names; empty = every branch
 	WorkDir  string   // keep the clones here for inspection; "" = managed

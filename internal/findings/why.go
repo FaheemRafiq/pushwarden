@@ -167,7 +167,7 @@ func WhyAction(f *Finding) string {
 		return "Not killed automatically: its command line contains " + show(b, 80) + ", which matches a broad PolinRider indicator that legitimate tools can also produce; review it."
 	case "c2_connection":
 		if f.Meta.PID <= 0 {
-			return fmt.Sprintf("Not killed: the process talking to %s is unknown. Block the address with: threatscan protect", f.Meta.IP)
+			return fmt.Sprintf("Not killed: the process talking to %s is unknown. Block the address with: pushwarden protect", f.Meta.IP)
 		}
 		return past(fmt.Sprintf("Killed PID %d: it had an open connection to %s, a known PolinRider command server.", f.Meta.PID, f.Meta.IP),
 			fmt.Sprintf("Would kill PID %d: it has an open connection to %s, a known PolinRider command server.", f.Meta.PID, f.Meta.IP))

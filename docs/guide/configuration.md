@@ -1,25 +1,25 @@
 ---
 title: Configuration
-description: "Every ThreatScan setting with its default, every file in the data directory, and every environment variable."
+description: "Every PushWarden setting with its default, every file in the data directory, and every environment variable."
 ---
 # Configuration
 
-Settings are stored in `config.json` in the data directory. Read and change them with `threatscan config`.
+Settings are stored in `config.json` in the data directory. Read and change them with `pushwarden config`.
 
 ```sh
-threatscan config                                    # print the current configuration
-threatscan config --set key=value [--set key=value]  # change settings
+pushwarden config                                    # print the current configuration
+pushwarden config --set key=value [--set key=value]  # change settings
 ```
 
 Booleans take `true` or `false`. Lists are comma-separated. A setting missing from the file has its default value.
 
-The guard reads the file when it starts. Restart it after a change, for example `systemctl --user restart threatscan-guard.service` on Linux.
+The guard reads the file when it starts. Restart it after a change, for example `systemctl --user restart pushwarden-guard.service` on Linux.
 
 ```sh
-threatscan config --set action=ask
-threatscan config --set scan_roots=~/code,~/work
-threatscan config --set webhook_url=https://hooks.slack.com/services/...
-threatscan config --set auto_update=false
+pushwarden config --set action=ask
+pushwarden config --set scan_roots=~/code,~/work
+pushwarden config --set webhook_url=https://hooks.slack.com/services/...
+pushwarden config --set auto_update=false
 ```
 
 ## Settings
@@ -113,7 +113,7 @@ threatscan config --set auto_update=false
 
 ## Files and directories
 
-The data directory is `~/.threatscan`. Override it with `THREATSCAN_HOME`.
+The data directory is `~/.pushwarden`. Override it with `PUSHWARDEN_HOME`.
 
 | Path | Content |
 |---|---|
@@ -136,26 +136,26 @@ Outside the data directory:
 
 | Path | Content |
 |---|---|
-| per-user install directory, on Linux `~/.local/share/threatscan` with a link in `~/.local/bin` | the program. Override with `THREATSCAN_INSTALL_DIR` |
-| `ThreatScan Notifier.app` in the install directory | macOS only: the helper that posts notifications |
-| `/etc/threatscan`, `/Library/Application Support/ThreatScan` or `%ProgramData%\ThreatScan` | root-owned state and indicators of the C2 block |
-| `/usr/local/lib/threatscan`, `/usr/local/libexec/threatscan` or `%ProgramFiles%\ThreatScan` | root-owned copy of the program for the C2 block |
-| `settings.json.threatscan-<timestamp>.bak` beside each editor's settings | backup made by hardening |
+| per-user install directory, on Linux `~/.local/share/pushwarden` with a link in `~/.local/bin` | the program. Override with `PUSHWARDEN_INSTALL_DIR` |
+| `PushWarden Notifier.app` in the install directory | macOS only: the helper that posts notifications |
+| `/etc/pushwarden`, `/Library/Application Support/PushWarden` or `%ProgramData%\PushWarden` | root-owned state and indicators of the C2 block |
+| `/usr/local/lib/pushwarden`, `/usr/local/libexec/pushwarden` or `%ProgramFiles%\PushWarden` | root-owned copy of the program for the C2 block |
+| `settings.json.pushwarden-<timestamp>.bak` beside each editor's settings | backup made by hardening |
 
 ## Environment variables
 
 | Variable | Read by | Effect |
 |---|---|---|
-| `THREATSCAN_HOME` | every command | data directory instead of `~/.threatscan` |
-| `THREATSCAN_INSTALL_DIR` | `install`, `update` | where the program is installed |
+| `PUSHWARDEN_HOME` | every command | data directory instead of `~/.pushwarden` |
+| `PUSHWARDEN_INSTALL_DIR` | `install`, `update` | where the program is installed |
 | `GITHUB_TOKEN`, `GH_TOKEN` | `github-clean` | token when `--token` is not given |
 | `NO_COLOR` | every command | disable coloured output |
-| `PAGER`, `THREATSCAN_NO_PAGER` | `help` | pager for long pages; set the second to disable paging |
-| `THREATSCAN_NO_BLOCK` | `install`, `protect`, `uninstall` | never ask for administrator rights |
-| `THREATSCAN_ROOTS` | install script | space-separated project directories to watch |
-| `THREATSCAN_WEBHOOK` | install script | webhook URL |
-| `THREATSCAN_FEEDBACK_URL` | install script | opt in to the daily digest |
-| `THREATSCAN_UPLOAD_URL`, `THREATSCAN_UPLOAD_KEY` | install script | opt in to the central event upload |
-| `THREATSCAN_VERSION` | install script | install this release instead of the latest |
-| `THREATSCAN_NO_INSTALL` | install script | download the program only, do not register the guard |
-| `THREATSCAN_BASE_URL` | install script | download from a mirror |
+| `PAGER`, `PUSHWARDEN_NO_PAGER` | `help` | pager for long pages; set the second to disable paging |
+| `PUSHWARDEN_NO_BLOCK` | `install`, `protect`, `uninstall` | never ask for administrator rights |
+| `PUSHWARDEN_ROOTS` | install script | space-separated project directories to watch |
+| `PUSHWARDEN_WEBHOOK` | install script | webhook URL |
+| `PUSHWARDEN_FEEDBACK_URL` | install script | opt in to the daily digest |
+| `PUSHWARDEN_UPLOAD_URL`, `PUSHWARDEN_UPLOAD_KEY` | install script | opt in to the central event upload |
+| `PUSHWARDEN_VERSION` | install script | install this release instead of the latest |
+| `PUSHWARDEN_NO_INSTALL` | install script | download the program only, do not register the guard |
+| `PUSHWARDEN_BASE_URL` | install script | download from a mirror |

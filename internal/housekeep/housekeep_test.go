@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FaheemRafiq/threatscan/internal/config"
-	"github.com/FaheemRafiq/threatscan/internal/journal"
+	"github.com/FaheemRafiq/pushwarden/internal/config"
+	"github.com/FaheemRafiq/pushwarden/internal/journal"
 )
 
 var now = time.Date(2026, 10, 2, 12, 0, 0, 0, time.Local)
@@ -141,13 +141,13 @@ func TestLogsQuarantineTempAndUsage(t *testing.T) {
 	os.WriteFile(filepath.Join(q, "index.jsonl"), append(entry, '\n'), 0o600)
 	write(t, filepath.Join(q, "notes-from-user"), 10, 200*24*time.Hour) // not a slot: never touched
 	// temp folder: ours and old, ours and fresh, someone else's
-	write(t, filepath.Join(tmp, "threatscan-acme_app-1", "repo.git", "HEAD"), 10, 0)
-	write(t, filepath.Join(tmp, "threatscan-acme_app-2", "repo.git", "HEAD"), 10, 0)
-	write(t, filepath.Join(tmp, "threatscan-installer-download", "threatscan"), 10, 0)
+	write(t, filepath.Join(tmp, "pushwarden-acme_app-1", "repo.git", "HEAD"), 10, 0)
+	write(t, filepath.Join(tmp, "pushwarden-acme_app-2", "repo.git", "HEAD"), 10, 0)
+	write(t, filepath.Join(tmp, "pushwarden-installer-download", "pushwarden"), 10, 0)
 	write(t, filepath.Join(tmp, "other-tool", "x"), 10, 0)
-	os.MkdirAll(filepath.Join(tmp, "threatscan-nohooks-99"), 0o700)
+	os.MkdirAll(filepath.Join(tmp, "pushwarden-nohooks-99"), 0o700)
 	twoDays := now.Add(-48 * time.Hour)
-	for _, d := range []string{"threatscan-acme_app-1", "threatscan-installer-download", "other-tool", "threatscan-nohooks-99"} {
+	for _, d := range []string{"pushwarden-acme_app-1", "pushwarden-installer-download", "other-tool", "pushwarden-nohooks-99"} {
 		os.Chtimes(filepath.Join(tmp, d), twoDays, twoDays)
 	}
 	write(t, filepath.Join(dir, "upload-state.json.tmp"), 10, 48*time.Hour)
@@ -176,10 +176,10 @@ func TestLogsQuarantineTempAndUsage(t *testing.T) {
 	if evs := journal.Read(dir, journal.Filter{Kinds: []string{journal.KindAction}}); len(evs) != 1 || evs[0].Action != "purge" {
 		t.Fatalf("journal: %+v", evs)
 	}
-	if find(r, "temp folder").Count != 2 || exists(filepath.Join(tmp, "threatscan-acme_app-1")) || exists(filepath.Join(tmp, "threatscan-nohooks-99")) {
+	if find(r, "temp folder").Count != 2 || exists(filepath.Join(tmp, "pushwarden-acme_app-1")) || exists(filepath.Join(tmp, "pushwarden-nohooks-99")) {
 		t.Fatalf("temp: %+v", r.Lines)
 	}
-	for _, keep := range []string{"threatscan-acme_app-2", "threatscan-installer-download", "other-tool"} {
+	for _, keep := range []string{"pushwarden-acme_app-2", "pushwarden-installer-download", "other-tool"} {
 		if !exists(filepath.Join(tmp, keep)) {
 			t.Fatalf("%s must not be removed", keep)
 		}

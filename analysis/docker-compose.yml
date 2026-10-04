@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: threatscan-analysis
+    container_name: pushwarden-analysis
     network_mode: "none"
     volumes:
       - ./samples:/analysis/samples:ro
@@ -23,7 +23,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: threatscan-mock-network
+    container_name: pushwarden-mock-network
     network_mode: "none"
     volumes:
       - ./mock-rpc.js:/analysis/mock-rpc.js:ro

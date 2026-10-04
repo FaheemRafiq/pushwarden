@@ -7,9 +7,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/FaheemRafiq/threatscan/internal/findings"
-	"github.com/FaheemRafiq/threatscan/internal/github"
-	"github.com/FaheemRafiq/threatscan/internal/remediate"
+	"github.com/FaheemRafiq/pushwarden/internal/findings"
+	"github.com/FaheemRafiq/pushwarden/internal/github"
+	"github.com/FaheemRafiq/pushwarden/internal/remediate"
 )
 
 // The 16 base colours follow the terminal's own theme, light or dark.
@@ -41,7 +41,7 @@ func (m *model) bodyHeight() int {
 
 func (m *model) View() string {
 	w, _ := m.size()
-	head := "  " + stTitle.Render("ThreatScan") + "  GitHub clean"
+	head := "  " + stTitle.Render("PushWarden") + "  GitHub clean"
 	if m.login != "" {
 		head += stDim.Render("   signed in as " + m.login)
 	}
@@ -106,7 +106,7 @@ func (m *model) viewToken() ([]string, string) {
 		b = append(b, "  "+stBad.Render("x "+m.err), "")
 	}
 	b = append(b,
-		"  ThreatScan needs a GitHub token to read and fix your repositories.",
+		"  PushWarden needs a GitHub token to read and fix your repositories.",
 		"  It is used for this run only and is never written to disk.",
 		"",
 		"  How to create one:",
@@ -317,7 +317,7 @@ func (m *model) reportLines() []string {
 				add("  %s  %s", stBad.Render("x "+name), "fixed here, but GitHub refused the push: "+b.Error)
 			case b.Status == remediate.StatusManual:
 				add("")
-				add("  %s  %s", stWarn.Render("! "+name), "needs review: findings ThreatScan does not fix automatically")
+				add("  %s  %s", stWarn.Render("! "+name), "needs review: findings PushWarden does not fix automatically")
 				for _, f := range b.Findings {
 					if f.Severity >= findings.High {
 						add("      ! %s  %s", f.Title, stDim.Render(f.Path))
@@ -356,7 +356,7 @@ func (m *model) reportLines() []string {
 		add("    1. Rotate this token and every secret those repositories or their CI could read.")
 		add("    2. Review GitHub > Settings > Applications and Deploy keys.")
 		add("    3. Ask collaborators to git pull.")
-		add("  The original files are in quarantine: threatscan history")
+		add("  The original files are in quarantine: pushwarden history")
 	}
 	if s.Failed+s.Errors > 0 {
 		add("  Protected branches: allow the push temporarily or open a PR from a clean branch.")
