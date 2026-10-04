@@ -797,7 +797,8 @@ Stored in `config.json` in the data directory. Change them with `pushwarden conf
 
 ## Files and directories
 
-The data directory is `~/.pushwarden` (override with `PUSHWARDEN_HOME`).
+The data directory is `~/.pushwarden` (override with `PUSHWARDEN_HOME`). If only `~/.threatscan`
+exists, from when the program was called ThreatScan, that folder is used instead.
 
 | Path | Content |
 |---|---|

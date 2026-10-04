@@ -47,12 +47,24 @@ func (p *Info) DisplayName() string {
 	return p.OS
 }
 
-// DataDir is ~/.pushwarden (override with PUSHWARDEN_HOME), shared with the Python v5 build.
+// LegacyDataDirName is the data folder from when the program was called ThreatScan.
+const LegacyDataDirName = ".threatscan"
+
+// DataDir is ~/.pushwarden (override with PUSHWARDEN_HOME). Someone who only
+// has the folder of the earlier name, ~/.threatscan, keeps using it: their
+// settings, quarantine and history stay where they are.
 func (p *Info) DataDir() string {
 	if d := os.Getenv("PUSHWARDEN_HOME"); d != "" {
 		return d
 	}
-	return filepath.Join(p.Home, ".pushwarden")
+	d := filepath.Join(p.Home, ".pushwarden")
+	if isDir(d) {
+		return d
+	}
+	if old := filepath.Join(p.Home, LegacyDataDirName); isDir(old) {
+		return old
+	}
+	return d
 }
 
 // InstallDir is the per-user, user-writable location the binary runs from.

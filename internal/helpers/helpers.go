@@ -60,7 +60,7 @@ var skipDirs = map[string]bool{}
 
 func init() {
 	for _, d := range []string{"node_modules", ".git", ".hg", ".svn", "vendor", "__pycache__", ".venv", "venv", "dist", "build",
-		".next", ".nuxt", ".cache", "target", ".gradle", ".idea", ".pushwarden",
+		".next", ".nuxt", ".cache", "target", ".gradle", ".idea", ".pushwarden", ".threatscan",
 		"google-chrome", "chromium", "BraveSoftware", "microsoft-edge", "Google", "Mozilla", "firefox", "Extensions",
 		"Service Worker", "Cache", "Code Cache", "GPUCache", "IndexedDB", "Local Storage"} {
 		skipDirs[d] = true
