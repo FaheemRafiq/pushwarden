@@ -113,7 +113,7 @@ pushwarden config --set auto_update=false
 
 ## Files and directories
 
-The data directory is `~/.pushwarden`. Override it with `PUSHWARDEN_HOME`.
+The data directory is `~/.pushwarden`. Override it with `PUSHWARDEN_HOME`. A machine that only has `~/.threatscan`, from when the program was called ThreatScan, keeps using that folder; see [Moving from ThreatScan](moving-from-threatscan.md).
 
 | Path | Content |
 |---|---|

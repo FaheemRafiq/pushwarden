@@ -4,6 +4,8 @@ description: "How to install, update and remove PushWarden on Linux, macOS and W
 ---
 # Installation
 
+Coming from ThreatScan, the earlier name of this program? See [Moving from ThreatScan](moving-from-threatscan.md) first.
+
 PushWarden installs for the current user only and needs no administrator password. The download page at <https://faheemrafiq.github.io/pushwarden/> picks the right file for your system.
 
 ## Linux and macOS: one command
@@ -62,7 +64,8 @@ Every file is listed with its SHA-256 in `checksums.txt`, and `checksums.txt.sig
 3. **Registers the guard.** The background guard becomes a user service: a systemd `--user` unit on Linux, a LaunchAgent on macOS, a Scheduled Task on Windows. It starts at sign-in.
 4. **Blocks the C2 servers.** This is the only step that needs administrator rights. The installer asks once through the native password dialog, polkit or UAC. Declining is fine; add it later with `pushwarden protect --install`. See [Blocking C2 servers](network-block.md).
 5. **Runs a first full scan** in the background and cleans anything CRITICAL it finds. Originals go to quarantine.
-6. **Keeps itself up to date.** See [Updates](updates.md).
+6. **Adds a shortcut to the guided screens.** On Windows, **PushWarden** in the Start menu; on macOS, `PushWarden.app` in the `Applications` folder of your home folder. Both open [the guided screens](guided-screens.md) for cleaning GitHub repositories. On Linux, run `pushwarden ui`.
+7. **Keeps itself up to date.** See [Updates](updates.md).
 
 ## Installing by hand: `pushwarden install`
 
@@ -115,4 +118,4 @@ pushwarden uninstall --unblock          # also remove the firewall block (asks f
 pushwarden uninstall --unblock --purge  # also delete the data directory: settings, reports, quarantine
 ```
 
-Editor hardening is left in place because it is a safe default. To remove the program itself, delete the install directory shown by `pushwarden status`.
+The macOS shortcut and notification helper are removed too; on Windows the Start menu entry goes when you uninstall under *Settings, Apps*. Editor hardening is left in place because it is a safe default. To remove the program itself, delete the install directory shown by `pushwarden status`.

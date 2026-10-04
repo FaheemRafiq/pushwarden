@@ -54,6 +54,7 @@ pushwarden status               # is everything running?
 pushwarden scan --home          # audit every project under your home folder now
 pushwarden github-clean         # dry run: which of my GitHub repos and branches are infected?
 pushwarden github-clean --apply # fix and push them
+pushwarden ui                   # the GitHub clean-up on guided screens instead of options
 ```
 
 ---
@@ -565,6 +566,9 @@ turned on.
 | `--no-clean` | when no dialog can be shown, leave files in place instead of quarantining |
 | `--unattended` | for installers: no questions, first scan in the background |
 | `--dry-run` | show what would be done and change nothing |
+
+On macOS it also builds `~/Applications/PushWarden.app`, a shortcut that opens [ui](#ui) in Terminal;
+the Windows installer adds the same shortcut to the Start menu.
 
 The one-line installer from the README calls this for you; its environment variables
 `PUSHWARDEN_ROOTS`, `PUSHWARDEN_WEBHOOK`, `PUSHWARDEN_FEEDBACK_URL`, `PUSHWARDEN_UPLOAD_URL`,

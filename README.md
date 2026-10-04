@@ -1,7 +1,7 @@
 <!-- pushwarden:allow-signatures -->
 # PushWarden
 
-*Formerly ThreatScan.*
+*Formerly ThreatScan. Coming from it? See [Moving from ThreatScan](https://faheemrafiq.github.io/pushwarden/guide/moving-from-threatscan.html).*
 
 **Real-time protection against the PolinRider / Contagious Interview supply-chain malware, for developer machines.**
 Linux, macOS and Windows. One install command. Behaves like Windows Defender: a malicious file is caught the
@@ -95,6 +95,7 @@ pushwarden scan --home --no-prompt   # report only
 pushwarden scan --home --fix      # act without asking (quarantine / strip, reversible)
 pushwarden scan --deep ~/proj     # also descend into node_modules / vendor
 pushwarden history                # protection history (restore / allow / remove), with the reason for each action
+pushwarden ui                     # clean your GitHub repositories on guided screens (also in the Start menu / ~/Applications)
 pushwarden alerts                 # recent alerts and why each one fired
 pushwarden history --all --since 7d   # everything it saw and did this week, nothing collapsed
 pushwarden feedback               # zip this machine's activity (redacted) to send for analysis
@@ -326,6 +327,9 @@ internal/
   prompt/              native dialogs, threat names  service/     systemd / launchd / Task Scheduler
   harden/              editor + npm settings         notify/      desktop + webhook
   update/              indicator + signed program updates, rollback
+  remediate/           github-clean: clone, scan and fix every branch   github/   GitHub API client
+  ghclean/             github-clean orchestration shared by the command and the screens
+  tui/                 the guided screens of `pushwarden ui` (Bubble Tea)
   config/, report/, ui/, platform/, helpers/, findings/, testfixtures/
 installers/            install.sh, windows/ (Inno Setup), macos/ (pkg), linux/ (nfpm)
 scripts/               release.sh, sign/, keygen/, fixtures/

@@ -51,7 +51,8 @@
   <h1>PushWarden</h1>
   <p class="lede">Finds, removes and blocks the PolinRider / Contagious Interview malware that hides in
     developer projects. Installs for your user only, needs no administrator password, and keeps itself up to date.</p>
-  <p><a href="guide/overview.html">Read the documentation</a></p>
+  <p><a href="guide/overview.html">Read the documentation</a> ·
+    Formerly ThreatScan: <a href="guide/moving-from-threatscan.html">moving to PushWarden</a></p>
 
   <section class="card primary" id="primary">
     <h2 id="primary-title">Download PushWarden</h2>
@@ -65,6 +66,8 @@
       <h2>Windows 10 and 11</h2>
       <p><a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/PushWarden-Setup.exe">PushWarden-Setup.exe</a></p>
       <p class="note">The installer is not code-signed yet. If SmartScreen appears, choose <em>More info</em>, then <em>Run anyway</em>.</p>
+      <p class="note">Afterwards, open <strong>PushWarden</strong> from the Start menu to check and clean your GitHub repositories on
+        <a href="guide/guided-screens.html">guided screens</a>.</p>
     </section>
 
     <section class="card" id="macos">
@@ -76,6 +79,8 @@
       <p class="note">The package is not notarized yet, so macOS blocks it the first time ("unidentified developer").
         Try to open it once, then go to System Settings, Privacy &amp; Security, and click <em>Open Anyway</em> (it appears for about an hour).
         Or install it from Terminal: <code>installer -pkg ~/Downloads/PushWarden.pkg -target CurrentUserHomeDirectory</code></p>
+      <p class="note">Afterwards, open <strong>PushWarden</strong> from the Applications folder in your home folder to check and clean
+        your GitHub repositories on <a href="guide/guided-screens.html">guided screens</a>.</p>
     </section>
 
     <section class="card" id="linux">
@@ -89,6 +94,8 @@
         <li>ARM64: <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/pushwarden-linux-arm64.deb">.deb</a>
           · <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/pushwarden-linux-arm64.rpm">.rpm</a></li>
       </ul>
+      <p class="note">Afterwards, <code>pushwarden ui</code> checks and cleans your GitHub repositories on
+        <a href="guide/guided-screens.html">guided screens</a>.</p>
     </section>
   </div>
 
@@ -97,6 +104,7 @@
     Every download is listed with its SHA-256 in <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest">checksums.txt</a>.
     <a href="guide/overview.html">Documentation</a> ·
     <a href="guide/quick-start.html">Quick start</a> ·
+    <a href="guide/guided-screens.html">Guided screens</a> ·
     <a href="reference.html">Command reference</a> ·
     Source: <a href="https://github.com/FaheemRafiq/pushwarden">github.com/FaheemRafiq/pushwarden</a>.
   </footer>

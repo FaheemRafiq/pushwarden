@@ -12,7 +12,7 @@ pushwarden github-clean [options]
 
 ## Prefer screens to commands?
 
-`pushwarden ui` does the same work on guided screens: sign in, tick the repositories, check them, review what was found, then fix and push after you confirm. On Windows open **PushWarden** from the Start menu; on macOS open **PushWarden** from `~/Applications` (the first time, macOS asks whether it may control Terminal: allow it). Progress is shared with `github-clean`, so you can stop in one and continue in the other.
+`pushwarden ui` does the same work on guided screens: sign in, tick the repositories, check them, review what was found, then fix and push after you confirm. On Windows open **PushWarden** from the Start menu; on macOS open **PushWarden** from `~/Applications` (the first time, macOS asks whether it may control Terminal: allow it). Progress is shared with `github-clean`, so you can stop in one and continue in the other. See [Guided screens](guided-screens.md).
 
 ## What it does for each repository
 

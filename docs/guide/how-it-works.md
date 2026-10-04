@@ -81,7 +81,7 @@ Processes are different: a running payload cannot wait for a dialog. A process w
 
 ## Where everything is stored
 
-All state lives in one data directory, `~/.pushwarden` (override with `PUSHWARDEN_HOME`): settings, indicators, the journal, logs, reports, quarantine and small state files. Every store has a size or age limit. See [Disk use and cleanup](disk-and-cleanup.md) and the file table in [Configuration](configuration.md).
+All state lives in one data directory, `~/.pushwarden` (override with `PUSHWARDEN_HOME`; an existing `~/.threatscan` from the earlier name is used when it is the only one): settings, indicators, the journal, logs, reports, quarantine and small state files. Every store has a size or age limit. See [Disk use and cleanup](disk-and-cleanup.md) and the file table in [Configuration](configuration.md).
 
 The firewall block is the one exception. It runs as root, so it keeps its own root-owned copy of the program and of the indicators in a system location, and never trusts files under your home folder. See [Blocking C2 servers](network-block.md).
 

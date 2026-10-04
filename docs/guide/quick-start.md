@@ -4,7 +4,7 @@ description: "The PushWarden commands used most often, with one line on what eac
 ---
 # Quick start
 
-Five commands cover most needs.
+Five commands cover most needs. If you would rather not type options, `pushwarden ui` cleans your GitHub repositories on [guided screens](guided-screens.md).
 
 ```sh
 pushwarden install              # background guard + editor hardening + first scan
@@ -60,9 +60,10 @@ See [Response and recovery](response-and-recovery.md).
 pushwarden github-clean --list              # which repositories can my token push to?
 pushwarden github-clean                     # dry run over all of them
 pushwarden github-clean --select --apply    # pick from a list, then fix and push
+pushwarden ui                               # the same on guided screens: tick, check, review, fix
 ```
 
-See [Cleaning GitHub repositories](github-clean.md).
+See [Cleaning GitHub repositories](github-clean.md) and [Guided screens](guided-screens.md).
 
 ## Change a setting
 

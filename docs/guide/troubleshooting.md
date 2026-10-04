@@ -72,6 +72,18 @@ Pass `--token`, export `GITHUB_TOKEN`, or run `gh auth login`. A fine-grained to
 
 Run the same command again. Finished branches are remembered and skipped. `pushwarden github-clean --progress` shows what is already verified.
 
+### `pushwarden ui` says it needs an interactive terminal
+
+The guided screens need a real terminal window. They do not run inside a pipe, a CI job or an editor's output panel. Open a terminal and run `pushwarden ui`, use the Start menu or Applications shortcut, or use `pushwarden github-clean` in scripts.
+
+### The PushWarden shortcut on macOS does nothing
+
+The shortcut opens Terminal, and macOS asks once whether PushWarden may control it. If that was declined, allow it under *System Settings, Privacy & Security, Automation*, or run `pushwarden ui` in Terminal yourself.
+
+### I had ThreatScan installed
+
+PushWarden is the same program under its new name. Your settings and history in `~/.threatscan` keep being used. See [Moving from ThreatScan](moving-from-threatscan.md).
+
 ### The central upload shows events waiting
 
 `pushwarden status` says since when the server has not been reached and why. Common causes: the machine is offline, `upload_url` does not start with `https://`, the key is wrong, or the table was not created with `docs/supabase.sql`. Nothing is lost; the guard retries by itself. `pushwarden feedback --upload` tries immediately and prints the error.

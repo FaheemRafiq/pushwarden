@@ -7,6 +7,8 @@
       url: /guide/installation.html
     - title: Quick start
       url: /guide/quick-start.html
+    - title: Moving from ThreatScan
+      url: /guide/moving-from-threatscan.html
     - title: How it works
       url: /guide/how-it-works.html
 - section: Protection
@@ -27,6 +29,8 @@
   pages:
     - title: Cleaning GitHub repositories
       url: /guide/github-clean.html
+    - title: Guided screens
+      url: /guide/guided-screens.html
     - title: CI and automation
       url: /guide/ci-and-automation.html
 - section: Operating it

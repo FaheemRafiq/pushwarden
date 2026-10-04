@@ -33,6 +33,7 @@ The malware:
 | C2 firewall block | Outgoing traffic to the C2 servers is dropped system-wide and the block survives reboots | [Blocking C2 servers](network-block.md) |
 | Editor and npm hardening | Turns off automatic tasks and turns on workspace trust in every VS Code-family editor | [Hardening](hardening.md) |
 | GitHub clean-up | Removes the malware from every branch of every repository you can push to, without rewriting history | [Cleaning GitHub repositories](github-clean.md) |
+| Guided screens | The GitHub clean-up without command-line options: sign in, tick repositories, check, review, fix. Opens from the Start menu on Windows and the Applications folder on macOS | [Guided screens](guided-screens.md) |
 | CI gate and pre-commit hook | Fails a pipeline or refuses a commit that carries an indicator | [CI and automation](ci-and-automation.md) |
 | Complete activity record | Every finding, action, decision, sweep and error is journaled and searchable | [Activity history](activity-history.md) |
 | Team reporting | Webhook alerts, a redacted feedback bundle, an opt-in daily digest and an opt-in central event upload | [Team reporting](team-reporting.md) |
@@ -60,11 +61,12 @@ Where a native watcher is unavailable the guard falls back to polling.
 
 ## Project status
 
-PushWarden is in early development (version 0.x). Releases are frequent while detection is extended for new variants. It is a single Go program; the earlier Python versions (v4, v5) are archived on the `archive/python-v5` branch.
+PushWarden is in early development (version 0.x). Releases are frequent while detection is extended for new variants. Up to version 0.4 it was called ThreatScan; see [Moving from ThreatScan](moving-from-threatscan.md). It is a single Go program; the earlier Python versions (v4, v5) are archived on the `archive/python-v5` branch.
 
 ## Where to go next
 
 - [Installation](installation.md) to set it up.
 - [Quick start](quick-start.md) for the commands you will use most.
+- [Guided screens](guided-screens.md) to clean your GitHub repositories without command-line options.
 - [How it works](how-it-works.md) for the architecture.
 - [Command-line reference](../reference.md) for every option of every command.

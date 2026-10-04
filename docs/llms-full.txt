@@ -39,6 +39,7 @@ The malware:
 | C2 firewall block | Outgoing traffic to the C2 servers is dropped system-wide and the block survives reboots | [Blocking C2 servers](network-block.md) |
 | Editor and npm hardening | Turns off automatic tasks and turns on workspace trust in every VS Code-family editor | [Hardening](hardening.md) |
 | GitHub clean-up | Removes the malware from every branch of every repository you can push to, without rewriting history | [Cleaning GitHub repositories](github-clean.md) |
+| Guided screens | The GitHub clean-up without command-line options: sign in, tick repositories, check, review, fix. Opens from the Start menu on Windows and the Applications folder on macOS | [Guided screens](guided-screens.md) |
 | CI gate and pre-commit hook | Fails a pipeline or refuses a commit that carries an indicator | [CI and automation](ci-and-automation.md) |
 | Complete activity record | Every finding, action, decision, sweep and error is journaled and searchable | [Activity history](activity-history.md) |
 | Team reporting | Webhook alerts, a redacted feedback bundle, an opt-in daily digest and an opt-in central event upload | [Team reporting](team-reporting.md) |
@@ -66,12 +67,13 @@ Where a native watcher is unavailable the guard falls back to polling.
 
 ## Project status
 
-PushWarden is in early development (version 0.x). Releases are frequent while detection is extended for new variants. It is a single Go program; the earlier Python versions (v4, v5) are archived on the `archive/python-v5` branch.
+PushWarden is in early development (version 0.x). Releases are frequent while detection is extended for new variants. Up to version 0.4 it was called ThreatScan; see [Moving from ThreatScan](moving-from-threatscan.md). It is a single Go program; the earlier Python versions (v4, v5) are archived on the `archive/python-v5` branch.
 
 ## Where to go next
 
 - [Installation](installation.md) to set it up.
 - [Quick start](quick-start.md) for the commands you will use most.
+- [Guided screens](guided-screens.md) to clean your GitHub repositories without command-line options.
 - [How it works](how-it-works.md) for the architecture.
 - [Command-line reference](../reference.md) for every option of every command.
 
@@ -81,6 +83,8 @@ PushWarden is in early development (version 0.x). Releases are frequent while de
 # Installation
 
 Source: https://faheemrafiq.github.io/pushwarden/guide/installation.html
+
+Coming from ThreatScan, the earlier name of this program? See [Moving from ThreatScan](moving-from-threatscan.md) first.
 
 PushWarden installs for the current user only and needs no administrator password. The download page at <https://faheemrafiq.github.io/pushwarden/> picks the right file for your system.
 
@@ -140,7 +144,8 @@ Every file is listed with its SHA-256 in `checksums.txt`, and `checksums.txt.sig
 3. **Registers the guard.** The background guard becomes a user service: a systemd `--user` unit on Linux, a LaunchAgent on macOS, a Scheduled Task on Windows. It starts at sign-in.
 4. **Blocks the C2 servers.** This is the only step that needs administrator rights. The installer asks once through the native password dialog, polkit or UAC. Declining is fine; add it later with `pushwarden protect --install`. See [Blocking C2 servers](network-block.md).
 5. **Runs a first full scan** in the background and cleans anything CRITICAL it finds. Originals go to quarantine.
-6. **Keeps itself up to date.** See [Updates](updates.md).
+6. **Adds a shortcut to the guided screens.** On Windows, **PushWarden** in the Start menu; on macOS, `PushWarden.app` in the `Applications` folder of your home folder. Both open [the guided screens](guided-screens.md) for cleaning GitHub repositories. On Linux, run `pushwarden ui`.
+7. **Keeps itself up to date.** See [Updates](updates.md).
 
 ## Installing by hand: `pushwarden install`
 
@@ -193,7 +198,7 @@ pushwarden uninstall --unblock          # also remove the firewall block (asks f
 pushwarden uninstall --unblock --purge  # also delete the data directory: settings, reports, quarantine
 ```
 
-Editor hardening is left in place because it is a safe default. To remove the program itself, delete the install directory shown by `pushwarden status`.
+The macOS shortcut and notification helper are removed too; on Windows the Start menu entry goes when you uninstall under *Settings, Apps*. Editor hardening is left in place because it is a safe default. To remove the program itself, delete the install directory shown by `pushwarden status`.
 
 
 ---
@@ -202,7 +207,7 @@ Editor hardening is left in place because it is a safe default. To remove the pr
 
 Source: https://faheemrafiq.github.io/pushwarden/guide/quick-start.html
 
-Five commands cover most needs.
+Five commands cover most needs. If you would rather not type options, `pushwarden ui` cleans your GitHub repositories on [guided screens](guided-screens.md).
 
 ```sh
 pushwarden install              # background guard + editor hardening + first scan
@@ -258,9 +263,10 @@ See [Response and recovery](response-and-recovery.md).
 pushwarden github-clean --list              # which repositories can my token push to?
 pushwarden github-clean                     # dry run over all of them
 pushwarden github-clean --select --apply    # pick from a list, then fix and push
+pushwarden ui                               # the same on guided screens: tick, check, review, fix
 ```
 
-See [Cleaning GitHub repositories](github-clean.md).
+See [Cleaning GitHub repositories](github-clean.md) and [Guided screens](guided-screens.md).
 
 ## Change a setting
 
@@ -288,6 +294,79 @@ The help text is embedded in the program, so it always matches the installed ver
 - Exit codes: `0` clean or done, `1` threats found or not fully fixed, `2` usage error, nothing scanned or an internal failure.
 - Nothing needs administrator rights except `protect`.
 - Set `NO_COLOR=1` to disable coloured output.
+
+
+---
+
+# Moving from ThreatScan
+
+Source: https://faheemrafiq.github.io/pushwarden/guide/moving-from-threatscan.html
+
+PushWarden was called ThreatScan up to version 0.4. The name changed in version 0.5.0 because "ThreatScan" is used by other security products. It is the same program with the same features and the same release signing key.
+
+## What was renamed
+
+| | Before | Now |
+|---|---|---|
+| Command | `threatscan` | `pushwarden` |
+| Repository | `github.com/FaheemRafiq/threatscan` | `github.com/FaheemRafiq/pushwarden` |
+| Documentation | `faheemrafiq.github.io/threatscan` | `faheemrafiq.github.io/pushwarden` |
+| Data directory | `~/.threatscan` | `~/.pushwarden` (an existing `~/.threatscan` keeps being used, see below) |
+| Environment variables | `THREATSCAN_HOME`, `THREATSCAN_ROOTS`, ... | `PUSHWARDEN_HOME`, `PUSHWARDEN_ROOTS`, ... |
+| Background service | `threatscan-guard.service`, `com.threatscan.guard`, "ThreatScan Guard" | `pushwarden-guard.service`, `com.pushwarden.guard`, "PushWarden Guard" |
+| Downloads | `ThreatScan-Setup.exe`, `ThreatScan.pkg`, `threatscan-linux-amd64.deb` | `PushWarden-Setup.exe`, `PushWarden.pkg`, `pushwarden-linux-amd64.deb` |
+| Marker for files that hold signatures on purpose | `threatscan:allow-signatures` | `pushwarden:allow-signatures` |
+
+## Moving an existing installation
+
+ThreatScan does not turn into PushWarden through its own update, because the download names changed. Do this once on each machine.
+
+1. **Remove ThreatScan.** Your settings, history and quarantine are not deleted by this.
+
+   ```sh
+   threatscan uninstall --unblock
+   ```
+
+   On Windows you can also remove it under *Settings, Apps*. `--unblock` removes the firewall block, which asks for administrator rights; PushWarden sets up its own in the next step.
+
+2. **Install PushWarden** as described in [Installation](installation.md).
+
+3. **Check it.**
+
+   ```sh
+   pushwarden status
+   pushwarden history
+   ```
+
+   `status` should show the guard alive, and `history` should show what ThreatScan recorded.
+
+## Your data is kept
+
+PushWarden looks for its data directory in this order:
+
+1. the folder named by `PUSHWARDEN_HOME`, if that variable is set;
+2. `~/.pushwarden`, if it exists;
+3. `~/.threatscan`, if it exists;
+4. otherwise a new `~/.pushwarden`.
+
+So a machine that had ThreatScan keeps its settings, protection history, quarantine, allow decisions and github-clean progress without any step from you. New installations get `~/.pushwarden`.
+
+To switch an existing machine to the new folder name, do it while the guard is stopped:
+
+```sh
+pushwarden uninstall
+mv ~/.threatscan ~/.pushwarden
+pushwarden install
+```
+
+## What you need to change yourself
+
+- **Environment variables.** The old `THREATSCAN_*` names are not read. Rename them in CI pipelines, scripts and shell start-up files, for example `THREATSCAN_HOME` to `PUSHWARDEN_HOME`. The full list is in [Configuration](configuration.md#environment-variables).
+- **The install one-liner and workflow references.** Use `FaheemRafiq/pushwarden` in the install command and in any `uses:` line that calls the reusable workflow. See [CI and automation](ci-and-automation.md).
+- **The allow marker.** A file in your own repositories that carries `threatscan:allow-signatures` needs `pushwarden:allow-signatures` instead, or PushWarden flags it.
+- **Commands in scripts and hooks.** Replace `threatscan` with `pushwarden`. A pre-commit hook installed by ThreatScan calls the old command: run `pushwarden harden --pre-commit .` in that repository to install it again.
+
+Nothing changes for the central event upload: the upload address is a setting and stays as you configured it. Only the example table name in the documentation is now `pushwarden_events`.
 
 
 ---
@@ -373,7 +452,7 @@ Processes are different: a running payload cannot wait for a dialog. A process w
 
 ## Where everything is stored
 
-All state lives in one data directory, `~/.pushwarden` (override with `PUSHWARDEN_HOME`): settings, indicators, the journal, logs, reports, quarantine and small state files. Every store has a size or age limit. See [Disk use and cleanup](disk-and-cleanup.md) and the file table in [Configuration](configuration.md).
+All state lives in one data directory, `~/.pushwarden` (override with `PUSHWARDEN_HOME`; an existing `~/.threatscan` from the earlier name is used when it is the only one): settings, indicators, the journal, logs, reports, quarantine and small state files. Every store has a size or age limit. See [Disk use and cleanup](disk-and-cleanup.md) and the file table in [Configuration](configuration.md).
 
 The firewall block is the one exception. It runs as root, so it keeps its own root-owned copy of the program and of the indicators in a system location, and never trusts files under your home folder. See [Blocking C2 servers](network-block.md).
 
@@ -1070,7 +1149,7 @@ pushwarden github-clean [options]
 
 ## Prefer screens to commands?
 
-`pushwarden ui` does the same work on guided screens: sign in, tick the repositories, check them, review what was found, then fix and push after you confirm. On Windows open **PushWarden** from the Start menu; on macOS open **PushWarden** from `~/Applications` (the first time, macOS asks whether it may control Terminal: allow it). Progress is shared with `github-clean`, so you can stop in one and continue in the other.
+`pushwarden ui` does the same work on guided screens: sign in, tick the repositories, check them, review what was found, then fix and push after you confirm. On Windows open **PushWarden** from the Start menu; on macOS open **PushWarden** from `~/Applications` (the first time, macOS asks whether it may control Terminal: allow it). Progress is shared with `github-clean`, so you can stop in one and continue in the other. See [Guided screens](guided-screens.md).
 
 ## What it does for each repository
 
@@ -1244,6 +1323,113 @@ pushwarden github-clean --api https://github.example.com/api/v3 --owner my-org
 | `push-failed` with a non-fast-forward error | Someone pushed between clone and push. Run again |
 | No token found | Pass `--token`, export `GITHUB_TOKEN`, or run `gh auth login` |
 | A repository is missing from `--list` | Forks and archived repositories are hidden unless `--include-forks` or `--include-archived` is given; a fine-grained token must list the repository |
+
+
+---
+
+# Guided screens
+
+Source: https://faheemrafiq.github.io/pushwarden/guide/guided-screens.html
+
+`pushwarden ui` does the work of [github-clean](github-clean.md) on screens you move through with the keyboard: sign in, tick the repositories, check them, read what was found, then fix and push after you confirm. It is made for people who would rather not type commands and options.
+
+## Opening it
+
+| System | How |
+|---|---|
+| Windows | Open **PushWarden** from the Start menu. The installer puts it there |
+| macOS | Open **PushWarden** from the `Applications` folder in your home folder (`~/Applications`), or find it with Spotlight. The first time, macOS asks whether PushWarden may control Terminal: allow it |
+| Linux | Run `pushwarden ui` in a terminal |
+
+On every system `pushwarden ui` in a terminal does the same. The shortcuts open a terminal window for you. Git must be installed; the screens tell you if it is not.
+
+## The steps
+
+### 1. Sign in
+
+If you are logged in with the GitHub command-line tool (`gh`), or `GITHUB_TOKEN` or `GH_TOKEN` is set, that token is used and you go straight to the next step.
+
+Otherwise the screen explains how to create a token and shows a field to paste it into. What you paste is shown as `*`. The token is used for this run only and is never written to disk. A fine-grained token needs *Contents: Read and write* on the repositories to clean; a classic token needs the `repo` scope. See [the token section](github-clean.md#the-token).
+
+### 2. Choose the repositories
+
+Every repository the token can push to is listed with a checkbox, all ticked to begin with.
+
+```
+  Choose the repositories to check   2 of 3 selected
+
+  > [x] me/app       private
+    [x] me/lib
+    [ ] me/old-fork  fork
+```
+
+| Key | Action |
+|---|---|
+| Up, Down | move |
+| Space | tick or untick the repository |
+| `a`, `n` | tick all, or none, of the repositories shown |
+| `/` | type to filter the list by name; Enter keeps the filter, Esc clears it |
+| `f`, `r` | show or hide forks and archived repositories. They are hidden, and not ticked, until you show them |
+| Enter | check the ticked repositories |
+| `q` | quit |
+
+### 3. Check
+
+Each repository is downloaded and every branch is scanned. **Nothing is changed in this step.** The list shows the result per repository as it finishes. Press `q` to stop; what is finished is remembered.
+
+### 4. Review
+
+The report lists every infected branch and the files that would be fixed.
+
+```
+  Check finished
+
+  Repositories:               2
+  Branches clean:             1
+  Branches infected:          2
+
+  ! me/app @ main  INFECTED, 5 files would be fixed
+      - postcss.config.mjs: payload stripped
+      - temp_auto_push.bat: deleted
+      - .gitignore: entries removed
+      - .vscode/tasks.json: deleted
+      - public/fonts/fa-solid-900.woff2: deleted
+
+  Press Enter to fix and push 2 branches in 1 repository.
+  Nothing has been changed so far.
+```
+
+If nothing is infected the report says so and Enter closes the program. Press `q` to leave without changing anything.
+
+### 5. Fix and push
+
+Enter asks once more, and only `y` goes ahead. Each infected branch then gets one normal commit, "security: remove PolinRider malware", which is pushed to GitHub. History is not rewritten and nothing is force-pushed. The original files are kept in quarantine on your computer.
+
+The final report shows what was pushed and what to do next: rotate the token and every secret those repositories or their CI could read, review *Settings, Applications* and *Deploy keys* on GitHub, and ask collaborators to `git pull`.
+
+A push that GitHub refuses, for example to a protected branch, is reported and not forced. See [Per-branch status](github-clean.md#per-branch-status).
+
+## Stopping and continuing
+
+`q` or Ctrl+C during a check or a fix stops cleanly: the branch in progress is abandoned, everything already finished is saved, and the next run skips what is verified and unchanged. The progress is shared with `github-clean`, so you can stop on the screens and continue with the command, or the other way round. `pushwarden ui --fresh` forgets the progress and checks everything again.
+
+## Options
+
+| Option | Effect |
+|---|---|
+| `--api URL` | GitHub API base URL, for GitHub Enterprise |
+| `--fresh` | forget the progress of earlier runs and check every branch again |
+| `--pause` | if the screens cannot start, wait for Enter before closing. The shortcuts use this so a message stays readable |
+
+The screens always check first and ask before fixing. For scripts, CI, choosing branches or owners, a commit author or JSON output, use [github-clean](github-clean.md).
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | everything checked is clean, or was fixed and pushed |
+| `1` | infected branches remain, a push was refused or a repository failed |
+| `2` | no interactive terminal, or git is not installed |
 
 
 ---
@@ -1988,7 +2174,7 @@ pushwarden config --set auto_update=false
 
 ## Files and directories
 
-The data directory is `~/.pushwarden`. Override it with `PUSHWARDEN_HOME`.
+The data directory is `~/.pushwarden`. Override it with `PUSHWARDEN_HOME`. A machine that only has `~/.threatscan`, from when the program was called ThreatScan, keeps using that folder; see [Moving from ThreatScan](moving-from-threatscan.md).
 
 | Path | Content |
 |---|---|
@@ -2207,6 +2393,18 @@ Pass `--token`, export `GITHUB_TOKEN`, or run `gh auth login`. A fine-grained to
 
 Run the same command again. Finished branches are remembered and skipped. `pushwarden github-clean --progress` shows what is already verified.
 
+### `pushwarden ui` says it needs an interactive terminal
+
+The guided screens need a real terminal window. They do not run inside a pipe, a CI job or an editor's output panel. Open a terminal and run `pushwarden ui`, use the Start menu or Applications shortcut, or use `pushwarden github-clean` in scripts.
+
+### The PushWarden shortcut on macOS does nothing
+
+The shortcut opens Terminal, and macOS asks once whether PushWarden may control it. If that was declined, allow it under *System Settings, Privacy & Security, Automation*, or run `pushwarden ui` in Terminal yourself.
+
+### I had ThreatScan installed
+
+PushWarden is the same program under its new name. Your settings and history in `~/.threatscan` keep being used. See [Moving from ThreatScan](moving-from-threatscan.md).
+
 ### The central upload shows events waiting
 
 `pushwarden status` says since when the server has not been reached and why. Common causes: the machine is offline, `upload_url` does not start with `https://`, the key is wrong, or the table was not created with `docs/supabase.sql`. Nothing is lost; the guard retries by itself. `pushwarden feedback --upload` tries immediately and prints the error.
@@ -2354,6 +2552,7 @@ pushwarden status               # is everything running?
 pushwarden scan --home          # audit every project under your home folder now
 pushwarden github-clean         # dry run: which of my GitHub repos and branches are infected?
 pushwarden github-clean --apply # fix and push them
+pushwarden ui                   # the GitHub clean-up on guided screens instead of options
 ```
 
 ---
@@ -2865,6 +3064,9 @@ turned on.
 | `--no-clean` | when no dialog can be shown, leave files in place instead of quarantining |
 | `--unattended` | for installers: no questions, first scan in the background |
 | `--dry-run` | show what would be done and change nothing |
+
+On macOS it also builds `~/Applications/PushWarden.app`, a shortcut that opens [ui](#ui) in Terminal;
+the Windows installer adds the same shortcut to the Start menu.
 
 The one-line installer from the README calls this for you; its environment variables
 `PUSHWARDEN_ROOTS`, `PUSHWARDEN_WEBHOOK`, `PUSHWARDEN_FEEDBACK_URL`, `PUSHWARDEN_UPLOAD_URL`,
