@@ -21,6 +21,8 @@ type fake struct {
 	accounts  []ghclean.Account // what is found on the machine
 	infected  bool
 	passes    []string // "dry me/app me/lib", "apply me/app"
+	history   map[string]ghclean.History
+	local     map[string]string
 	ranAs     []ghclean.Account
 	cloneURLs []string
 }
@@ -75,7 +77,8 @@ func (f *fake) backend() backend {
 			f.passes = append(f.passes, mode)
 			return results
 		},
-		verified: func() (int, int) { return 0, 0 },
+		history: func() map[string]ghclean.History { return f.history },
+		local:   func() map[string]string { return f.local },
 	}
 }
 
@@ -142,14 +145,22 @@ func signedIn(t *testing.T, f *fake) *model {
 func TestCheckThenFix(t *testing.T) {
 	f := &fake{infected: true}
 	m := signedIn(t, f)
-	if v := m.View(); strings.Contains(v, "me/forked") || !strings.Contains(v, "2 of 3 selected") {
-		t.Fatalf("forks are hidden and not selected until asked for:\n%s", v)
+	if v := m.View(); strings.Contains(v, "me/forked") || !strings.Contains(v, "0 of 3 selected") {
+		t.Fatalf("nothing is selected to begin with, and forks are hidden:\n%s", v)
+	}
+	send(t, m, key("enter"))
+	if v := m.View(); m.scr != scrRepos || len(f.passes) != 0 || !strings.Contains(v, "Nothing is selected yet") {
+		t.Fatalf("enter without a selection explains itself:\n%s", v)
 	}
 	send(t, m, key("f"))
-	if v := m.View(); !strings.Contains(v, "me/forked") || !strings.Contains(v, "2 of 3 selected") {
-		t.Fatalf("shown forks are not selected by themselves:\n%s", v)
+	send(t, m, key("a"))
+	if v := m.View(); !strings.Contains(v, "me/forked") || !strings.Contains(v, "3 of 3 selected") || strings.Contains(v, "Nothing is selected yet") {
+		t.Fatalf("a selects everything shown:\n%s", v)
 	}
 	send(t, m, key("f"))
+	if v := m.View(); !strings.Contains(v, "2 of 3 selected") {
+		t.Fatalf("a hidden fork does not count as selected:\n%s", v)
+	}
 
 	send(t, m, key("enter"))
 	if m.scr != scrReport || m.final || m.todoBranches != 1 || m.code != 1 {
@@ -211,6 +222,7 @@ func TestStopDuringPass(t *testing.T) {
 		<-block
 		return nil
 	}
+	m.Update(key("a"))
 	_, cmd := m.Update(key("enter"))
 	m.Update(cmd()) // RepoStarted
 	if m.scr != scrRun || !m.rows[0].started {
@@ -260,6 +272,7 @@ func TestChooseAndSwitchAccounts(t *testing.T) {
 	if v := m.View(); m.scr != scrRepos || m.login != "work" || !strings.Contains(v, "work/site") {
 		t.Fatalf("signed in as the pasted account:\n%s", v)
 	}
+	send(t, m, key("a"))
 	send(t, m, key("enter")) // check: clean, final report
 	if !m.final || f.passes[0] != "dry work/site" {
 		t.Fatalf("final=%v passes=%v", m.final, f.passes)
@@ -272,7 +285,7 @@ func TestChooseAndSwitchAccounts(t *testing.T) {
 	// choose the first one; its repositories replace the list, nothing carries over
 	m.acct = 0
 	send(t, m, key("enter"))
-	if v := m.View(); m.login != "me" || strings.Contains(v, "work/site") || !strings.Contains(v, "me/app") || !strings.Contains(v, "2 of 3 selected") {
+	if v := m.View(); m.login != "me" || strings.Contains(v, "work/site") || !strings.Contains(v, "me/app") || !strings.Contains(v, "0 of 3 selected") {
 		t.Fatalf("switched to me:\n%s", v)
 	}
 	// s on the repository list, then esc from the token field returns to the list of accounts
@@ -313,7 +326,7 @@ func TestSSHAccount(t *testing.T) {
 	}
 	m.add.SetValue("acme/private-api.git")
 	send(t, m, key("enter"))
-	if v := m.View(); m.adding || !strings.Contains(v, "acme/private-api") || !strings.Contains(v, "added") || !strings.Contains(v, "2 of 2 selected") {
+	if v := m.View(); m.adding || !strings.Contains(v, "acme/private-api") || !strings.Contains(v, "added") || !strings.Contains(v, "1 of 2 selected") {
 		t.Fatalf("after adding:\n%s", v)
 	}
 	send(t, m, key("+"))
@@ -322,6 +335,7 @@ func TestSSHAccount(t *testing.T) {
 	if len(m.all) != 2 {
 		t.Fatalf("the same repository is not listed twice: %d", len(m.all))
 	}
+	send(t, m, key("a"))
 	send(t, m, key("enter"))
 	if len(f.ranAs) != 1 || f.ranAs[0].SSHHost != "github-work" || f.ranAs[0].Token != "" {
 		t.Fatalf("ran as %+v", f.ranAs)
@@ -329,4 +343,56 @@ func TestSSHAccount(t *testing.T) {
 	if got := strings.Join(f.cloneURLs, " "); got != "git@github-work:worker/cloned.git git@github-work:acme/private-api.git" {
 		t.Fatalf("clone URLs go through the ssh host: %s", got)
 	}
+}
+
+func TestHistoryAndLocalClones(t *testing.T) {
+	f := &fake{
+		history: map[string]ghclean.History{
+			"me/app": {Clean: 2, Pushed: 1, Last: "2026-10-03T09:15:00Z"},
+			"me/lib": {Clean: 1, Last: "2026-10-02T18:00:00Z"},
+		},
+		local: map[string]string{"me/lib": "/work/code/lib", "me/forked": "/work/code/forked"},
+	}
+	m := signedIn(t, f)
+	send(t, m, key("f")) // show the fork, the only one no run has verified
+	v := m.View()
+	for _, want := range []string{"2 verified by earlier runs", "1 not checked yet", "fixed", "3 branches", "clean", "1 branch", "local clone"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("list lacks %q:\n%s", want, v)
+		}
+	}
+	// the folder of the highlighted repository is shown when it is cloned here
+	if strings.Contains(v, "On this computer") {
+		t.Fatalf("me/app is not cloned here:\n%s", v)
+	}
+	send(t, m, key("down"))
+	if v := m.View(); !strings.Contains(v, "On this computer: /work/code/lib") {
+		t.Fatalf("location of a local clone:\n%s", v)
+	}
+	send(t, m, key("u"))
+	if got := m.chosen(); len(got) != 1 || got[0].FullName != "me/forked" {
+		t.Fatalf("u ticks what was never checked: %v", got)
+	}
+	send(t, m, key("n"))
+	send(t, m, key("l"))
+	if got := m.chosen(); len(got) != 2 || got[0].FullName != "me/lib" || got[1].FullName != "me/forked" {
+		t.Fatalf("l ticks the local clones: %v", got)
+	}
+	// while it runs: a progress line with counts
+	block := make(chan struct{})
+	m.be.run = func(ctx context.Context, _ ghclean.Account, repos []github.Repo, _ bool, emit func(ghclean.Event)) []remediate.Result {
+		emit(ghclean.RepoStarted{Total: len(repos), Repo: repos[0]})
+		emit(ghclean.BranchDone{Repo: repos[0].FullName, Branch: remediate.Branch{Name: "main", Status: remediate.StatusClean}})
+		emit(ghclean.RepoDone{Result: remediate.Result{Repo: repos[0].FullName, Branches: []remediate.Branch{{Name: "main", Status: remediate.StatusClean}}}})
+		<-block
+		return nil
+	}
+	_, cmd := m.Update(key("enter"))
+	for range 3 {
+		_, cmd = m.Update(cmd())
+	}
+	if v := m.View(); !strings.Contains(v, "1/2") || !strings.Contains(v, "50%") || !strings.Contains(v, "1 clean") {
+		t.Fatalf("progress while running:\n%s", v)
+	}
+	close(block)
 }

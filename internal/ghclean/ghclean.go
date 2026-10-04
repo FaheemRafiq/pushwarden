@@ -188,6 +188,25 @@ func ProgressTotals(s *remediate.State) (repos, branches int) {
 	return
 }
 
+// History is what earlier runs verified for one repository.
+type History struct {
+	Clean, Pushed, Manual int    // branches
+	Last                  string // when the newest of them was verified (RFC 3339)
+}
+
+// RepoHistory returns what earlier runs verified on the server behind api, by
+// lower-case "owner/name".
+func RepoHistory(s *remediate.State, api string) map[string]History {
+	out := map[string]History{}
+	prefix := APIHost(api) + "/"
+	for _, p := range s.Progress() {
+		if name, ok := strings.CutPrefix(p.Repo, prefix); ok {
+			out[strings.ToLower(name)] = History{p.Clean, p.Pushed, p.Manual, p.Last}
+		}
+	}
+	return out
+}
+
 // Infected returns the repositories a dry run found infected branches in, and
 // how many such branches there are.
 func Infected(repos []github.Repo, results []remediate.Result) (todo []github.Repo, branches int) {

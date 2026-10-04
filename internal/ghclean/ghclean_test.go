@@ -260,3 +260,29 @@ func TestSSHRepos(t *testing.T) {
 		t.Fatalf("public details are kept: %+v", repos[2])
 	}
 }
+
+func TestRepoHistoryAndLocalClones(t *testing.T) {
+	data := t.TempDir()
+	os.WriteFile(filepath.Join(data, remediate.StateFile), []byte(`{"repos":{
+		"api.github.com/Me/App":{"branches":{"main":{"sha":"a","status":"clean","at":"2026-10-03T09:15:00Z"},"dev":{"sha":"b","status":"pushed","at":"2026-10-04T10:00:00Z"}}},
+		"ghe.example.com/corp/tool":{"branches":{"main":{"sha":"c","status":"clean","at":"2026-10-01T00:00:00Z"}}}}}`), 0o600)
+	h := RepoHistory(remediate.LoadState(data), "https://api.github.com")
+	if got, ok := h["me/app"]; !ok || got.Clean != 1 || got.Pushed != 1 || got.Last != "2026-10-04T10:00:00Z" || len(h) != 1 {
+		t.Fatalf("history for this server only, by lower-case name: %+v", h)
+	}
+
+	root := t.TempDir()
+	clone := func(name, url string) string {
+		d := filepath.Join(root, name)
+		os.MkdirAll(filepath.Join(d, ".git"), 0o755)
+		os.WriteFile(filepath.Join(d, ".git", "config"), []byte("[remote \"origin\"]\n\turl = "+url+"\n"), 0o644)
+		return d
+	}
+	a := clone("a", "https://github.com/Me/App.git")
+	b := clone("b", "git@github.com:me/site.git")
+	clone2 := clone("c", "https://gitlab.com/me/other.git")
+	local := LocalClones([]string{a, b, clone2})
+	if local["me/app"] != a || local["me/site"] != b || len(local) != 2 {
+		t.Fatalf("local clones of GitHub repositories: %v", local)
+	}
+}

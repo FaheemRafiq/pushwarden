@@ -7,7 +7,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -39,8 +41,11 @@ type backend struct {
 	// listRepos also tells, for an SSH account, where each repository was found.
 	listRepos func(ctx context.Context, a ghclean.Account) ([]github.Repo, map[string]string, error)
 	run       func(ctx context.Context, a ghclean.Account, repos []github.Repo, apply bool, emit func(ghclean.Event)) []remediate.Result
-	// verified is what earlier runs already checked.
-	verified func() (repos, branches int)
+	// local maps the repositories cloned on this computer to their folder,
+	// by lower-case full name.
+	local func() map[string]string
+	// history is what earlier runs verified, by lower-case full name.
+	history func() map[string]ghclean.History
 }
 
 func live(sess *ghclean.Session, localRepos func() []string) backend {
@@ -65,7 +70,8 @@ func live(sess *ghclean.Session, localRepos func() []string) backend {
 			}
 			return sess.Run(ctx, repos, apply, emit)
 		},
-		verified: func() (int, int) { return ghclean.ProgressTotals(sess.State) },
+		local:   func() map[string]string { return ghclean.LocalClones(localRepos()) },
+		history: func() map[string]ghclean.History { return ghclean.RepoHistory(sess.State, sess.API) },
 	}
 }
 
@@ -88,6 +94,7 @@ type (
 	reposMsg struct {
 		repos []github.Repo
 		from  map[string]string
+		local map[string]string
 		err   error
 	}
 	eventMsg    struct{ e ghclean.Event }
@@ -131,7 +138,10 @@ type model struct {
 	from            map[string]string // SSH account: where each repository was found, by lower-case full name
 	add             textinput.Model   // SSH account: an owner/name typed in
 	adding          bool
-	cur             int // cursor in visible()
+	history         map[string]ghclean.History // what earlier runs verified
+	hint            string                     // why Enter did nothing
+	local           map[string]string          // repositories cloned on this computer -> folder
+	cur             int                        // cursor in visible()
 
 	// a pass
 	apply     bool
@@ -141,6 +151,8 @@ type model struct {
 	logLine   string
 	events    chan tea.Msg
 	stopping  bool
+	started   time.Time
+	bar       progress.Model
 
 	// report
 	sum          ghclean.Summary
@@ -168,6 +180,7 @@ func newModel(be backend) *model {
 	sp := spinner.New()
 	sp.Spinner = spinner.Line
 	return &model{be: be, ctx: ctx, cancel: cancel, spin: sp, input: in, filter: fl, add: ad,
+		bar:    progress.New(progress.WithSolidFill("6"), progress.WithoutPercentage()),
 		picked: map[string]bool{}, busy: "Looking for a GitHub login"}
 }
 
@@ -198,10 +211,10 @@ func (m *model) loadRepos() tea.Cmd {
 	if m.me.SSHHost != "" {
 		m.busy = "Looking for this account's repositories on this computer and on GitHub"
 	}
-	ctx, me, list := m.ctx, m.me, m.be.listRepos
+	ctx, me, list, local := m.ctx, m.me, m.be.listRepos, m.be.local
 	return func() tea.Msg {
 		repos, from, err := list(ctx, me)
-		return reposMsg{repos, from, err}
+		return reposMsg{repos, from, local(), err}
 	}
 }
 
@@ -224,6 +237,7 @@ func waitFor(ch chan tea.Msg) tea.Cmd { return func() tea.Msg { return <-ch } }
 // arrive one by one as messages, the last being passDoneMsg.
 func (m *model) startPass(apply bool, repos []github.Repo) tea.Cmd {
 	m.scr, m.apply, m.passRepos, m.at, m.logLine = scrRun, apply, repos, 0, ""
+	m.started = time.Now()
 	m.rows = make([]row, len(repos))
 	for i, r := range repos {
 		m.rows[i].repo = r
@@ -328,13 +342,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err.Error()
 			return m, nil
 		}
-		m.all, m.from = msg.repos, msg.from
+		m.all, m.from, m.local = msg.repos, msg.from, msg.local
 		if m.from == nil {
 			m.from = map[string]string{}
 		}
-		for _, r := range m.all {
-			m.picked[r.FullName] = m.shown(r)
-		}
+		// Nothing is ticked to begin with: what gets checked is the user's choice.
+		m.history = m.be.history()
 		return m, nil
 	case eventMsg:
 		m.event(msg.e)
@@ -381,6 +394,7 @@ func (m *model) event(e ghclean.Event) {
 // report turns a finished pass into the report screen.
 func (m *model) report(results []remediate.Result) {
 	m.scr, m.results, m.scroll = scrReport, results, 0
+	m.history = m.be.history()
 	m.sum = ghclean.Summarize(results, m.apply)
 	m.code = m.sum.ExitCode()
 	m.todo, m.todoBranches = nil, 0
@@ -534,7 +548,20 @@ func (m *model) keyRepos(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, c
 	}
 	vis := m.visible()
+	m.hint = ""
 	switch k.String() {
+	case "l": // tick what is cloned on this computer
+		for _, r := range vis {
+			if m.local[strings.ToLower(r.FullName)] != "" {
+				m.picked[r.FullName] = true
+			}
+		}
+	case "u": // tick what no earlier run has verified
+		for _, r := range vis {
+			if _, ok := m.history[strings.ToLower(r.FullName)]; !ok {
+				m.picked[r.FullName] = true
+			}
+		}
 	case "+":
 		if m.me.SSHHost != "" {
 			m.adding = true
@@ -573,6 +600,9 @@ func (m *model) keyRepos(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		if repos := m.chosen(); len(repos) > 0 {
 			return m, m.startPass(false, repos)
+		}
+		if len(m.all) > 0 {
+			m.hint = "Nothing is selected yet. Space ticks a repository, a ticks all, u ticks those not checked yet."
 		}
 	case "q":
 		return m, tea.Quit

@@ -331,13 +331,17 @@ Made for people who would rather not type commands. The Windows installer adds a
 entry to the Start menu and `pushwarden install` on macOS builds `~/Applications/PushWarden.app`;
 both open a terminal window on these screens. On Linux, run `pushwarden ui`.
 
-1. **Sign in.** A token from `GITHUB_TOKEN`, `GH_TOKEN` or a `gh` login is used when there is
-   one; with several (for example two accounts logged in to `gh`) you choose from a list.
-   Otherwise the screen explains how to create a token and takes it in a masked field. It
-   is used for this run only and never written to disk. `s` on the repository list or the
-   final report switches to another account.
-2. **Choose repositories.** Every repository the token can push to, with checkboxes. Forks and
-   archived repositories are hidden until you show them.
+1. **Sign in.** Accounts already on the machine are found: tokens from `GITHUB_TOKEN`, `GH_TOKEN`
+   and each `gh` login, and the logins git has over SSH (hosts in `~/.ssh/config` that lead to
+   github.com). With several you choose from a list. With none, the screen explains how to
+   create a token and takes it in a masked field; it is used for this run only and never
+   written to disk. `s` on the repository list or the final report switches to another account.
+2. **Choose repositories.** A list with checkboxes, nothing ticked to begin with. Each row shows
+   what earlier runs verified and whether the repository is cloned on this computer. Forks and
+   archived repositories are hidden until you show them. A token account lists every
+   repository it can push to. An SSH account cannot ask GitHub for that list: it shows the
+   local clones that use its SSH host, the account's public repositories, and names you add
+   with `+`.
 3. **Check.** A dry run over what you chose. Nothing is changed.
 4. **Review.** Every infected branch and the files that would be fixed.
 5. **Fix and push,** only after you answer `y`. One normal commit per infected branch, never a

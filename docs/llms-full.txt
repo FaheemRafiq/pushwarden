@@ -1215,7 +1215,7 @@ Rotate the token after the clean-up.
 pushwarden github-clean --token "$(gh auth token --user OTHER-LOGIN)"
 ```
 
-`gh auth login` adds an account next to the ones `gh` already has. The [guided screens](guided-screens.md#more-than-one-github-account) list every account and switch between them with one key.
+`gh auth login` adds an account next to the ones `gh` already has. The [guided screens](guided-screens.md#more-than-one-github-account) list every account and switch between them with one key. They can also use the SSH logins git already has, which `github-clean` cannot: it always needs a token.
 
 ## Selecting repositories
 
@@ -1357,59 +1357,92 @@ On every system `pushwarden ui` in a terminal does the same. The shortcuts open 
 
 ### 1. Sign in
 
-PushWarden looks for accounts you are already signed in to on this computer: the tokens in `GITHUB_TOKEN` and `GH_TOKEN`, and every account logged in to the GitHub command-line tool (`gh`).
+PushWarden looks for accounts you are already signed in to on this computer:
 
-- **One account found:** it is used and you go straight to the next step.
-- **Several found:** you choose one from a list. The last row, *Use another token*, lets you paste a token instead.
-- **None found:** the screen explains how to create a token and shows a field to paste it into.
+- **Tokens:** `GITHUB_TOKEN` and `GH_TOKEN`, and every account logged in to the GitHub command-line tool (`gh`).
+- **Git over SSH:** every SSH host in `~/.ssh/config` that leads to `github.com`, and `github.com` itself. Each is tried once (`ssh -T`), and GitHub's answer names the account. A key that needs a passphrase which is not in your SSH agent is skipped, because nothing is ever asked.
+
+What happens next depends on how many it finds:
+
+- **One account:** it is used and you go straight to the next step.
+- **Several:** you choose one from a list. The last row, *Use another token*, lets you paste a token instead.
+- **None:** the screen explains how to create a token and shows a field to paste it into.
 
 ```
   Which account's repositories do you want to check?
 
   > me                 gh login
-    me-at-work         gh login
+    me-at-work         SSH (github-work)
     Use another token  paste it on the next screen
 ```
 
 In the token field, what you paste is shown as `*`. The token is used for this run only and is never written to disk. A fine-grained token needs *Contents: Read and write* on the repositories to clean; a classic token needs the `repo` scope. See [the token section](github-clean.md#the-token).
 
+When the same account is found both as a token and over SSH, the token is listed: it can see every repository, SSH cannot (see [SSH accounts](#ssh-accounts)).
+
 ### 2. Choose the repositories
 
-Every repository the token can push to is listed with a checkbox, all ticked to begin with.
+The repositories of the account are listed with a checkbox each. **Nothing is ticked to begin with**: you choose what is checked.
 
 ```
-  Choose the repositories to check   2 of 3 selected
+  Choose the repositories to check   0 of 3 selected
+  2 verified by earlier runs, 1 not checked yet.
 
-  > [x] me/app       private
-    [x] me/lib
-    [ ] me/old-fork  fork
+  > [ ] me/app   private      fixed · 3 branches · 3 Oct 14:15
+    [ ] me/lib   local clone  clean · 1 branch · 2 Oct 23:00
+    [ ] me/site               not checked yet
+
+  On this computer: ~/code/lib
 ```
+
+Each row shows what is known about the repository:
+
+- **Tags:** `private`, `fork`, `archived`, and `local clone` when the repository is also cloned on this computer. For the highlighted row the folder of that clone is shown under the list.
+- **Earlier result:** what earlier runs verified, with the number of branches and when: `clean`, `fixed` (PushWarden pushed a fix), `needs review`, or `not checked yet`. A repository that was verified is not downloaded again unless a branch has moved since.
 
 | Key | Action |
 |---|---|
 | Up, Down | move |
 | Space | tick or untick the repository |
 | `a`, `n` | tick all, or none, of the repositories shown |
+| `u` | tick the repositories no earlier run has checked |
+| `l` | tick the repositories that are cloned on this computer |
 | `/` | type to filter the list by name; Enter keeps the filter, Esc clears it |
-| `f`, `r` | show or hide forks and archived repositories. They are hidden, and not ticked, until you show them |
+| `f`, `r` | show or hide forks and archived repositories. They are hidden until you show them |
+| `+` | SSH accounts only: add a repository by typing `owner/name` |
 | `s` | switch to another account |
 | Enter | check the ticked repositories |
 | `q` | quit |
 
 ### 3. Check
 
-Each repository is downloaded and every branch is scanned. **Nothing is changed in this step.** The list shows the result per repository as it finishes. Press `q` to stop; what is finished is remembered.
+Each repository is downloaded and every branch is scanned. **Nothing is changed in this step.**
+
+```
+  Checking 4 repositories. Nothing is changed.
+
+  █████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░  2/4   50%  1:12
+  Branches so far: 6 clean · 1 infected · 0 need review · 0 failed
+
+  + me/app   3 clean
+  ! me/lib   1 INFECTED
+  / me/site  2 branches done   > me/site @ main
+  . me/api   waiting
+```
+
+The bar counts finished repositories; the line under it counts branches as they finish. A large repository with many branches takes the longest, because it is downloaded in full. Press `q` to stop; what is finished is remembered.
 
 ### 4. Review
 
-The report lists every infected branch and the files that would be fixed.
+The report opens with the totals, then lists every infected branch and the files that would be fixed.
 
 ```
   Check finished
 
-  Repositories:               2
-  Branches clean:             1
-  Branches infected:          2
+  ┌────────────────┐┌─────────┐┌────────────┐┌───────────────┐┌──────────┐
+  │       2        ││    1    ││     2      ││       0       ││    0     │
+  │  repositories  ││  clean  ││  infected  ││  need review  ││  failed  │
+  └────────────────┘└─────────┘└────────────┘└───────────────┘└──────────┘
 
   ! me/app @ main  INFECTED, 5 files would be fixed
       - postcss.config.mjs: payload stripped
@@ -1434,16 +1467,27 @@ A push that GitHub refuses, for example to a protected branch, is reported and n
 
 ## More than one GitHub account
 
-A personal and a work account are cleaned one after the other. Clean the first, then press `s` on the repository list or on the final report to return to the list of accounts, and choose the next. The header always shows which account is signed in, and each account's fixes are pushed with that account's own token.
+A personal and a work account are cleaned one after the other. Clean the first, then press `s` on the repository list or on the final report to return to the list of accounts, and choose the next. The header always shows which account is signed in and how, and each account's fixes are pushed as that account.
 
-To make a second account appear in the list, do one of these:
+To make a second account appear in the list, any of these works:
 
+- **It already has an SSH key set up for git.** Then it is listed without you doing anything.
 - **Log it in to `gh`.** Run `gh auth login` again for the other account; `gh` keeps several accounts side by side and PushWarden lists them all.
 - **Paste a token.** Choose *Use another token*. An accepted token stays in the list until you close the program, so you can switch back without pasting it again. It is not saved.
 
-SSH keys and host names from your SSH configuration play no part: PushWarden downloads and pushes over HTTPS with the token. A fine-grained token for repositories that belong to an organisation may need that organisation's approval before it can push.
+A fine-grained token for repositories that belong to an organisation may need that organisation's approval before it can push. Progress is remembered per repository, so the accounts do not disturb each other's resume state.
 
-Progress is remembered per repository, so the accounts do not disturb each other's resume state.
+## SSH accounts
+
+An SSH account uses the key git already has, so there is nothing to paste. The trade-off: **SSH can download and push a repository that is named, but it cannot ask GitHub for the list of your repositories.** PushWarden therefore builds the list from what it can find:
+
+1. **Clones on this computer** whose remote goes through that SSH host, for example `git@github-work:my-org/api.git`. The folders searched are the ones the guard watches (`scan_roots`, or the usual project folders under your home folder).
+2. **The account's public repositories**, which GitHub lists without a token.
+3. **Names you type.** Press `+` and enter `owner/name`.
+
+A private repository that is not cloned on this computer does not appear unless you add it. The malware pushes to every repository a stolen token could reach, so for a complete clean-up use a token account, or add the missing repositories by name.
+
+Downloads and pushes go through `git@HOST:owner/name.git` with your own SSH command and settings. PushWarden reads the host names from `~/.ssh/config`; it never reads key files.
 
 ## Stopping and continuing
 
@@ -2313,6 +2357,10 @@ The feedback bundle and the central upload remove what identifies the person or 
 
 Use a fine-grained token limited to the repositories being cleaned, and rotate it afterwards.
 
+## What the guided screens read to sign in
+
+`pushwarden ui` looks for GitHub logins that already exist on the machine. It reads the `GITHUB_TOKEN` and `GH_TOKEN` variables, asks `gh` for the tokens of its logged-in accounts, reads the host names in `~/.ssh/config`, and runs `ssh -T` once per GitHub host to learn which account the key belongs to. It never reads SSH key files, and no token is written to disk. To mark local clones it reads the remote addresses in the `.git/config` of the repositories under your project folders; nothing in those repositories is run. See [Guided screens](guided-screens.md).
+
 ## Update integrity
 
 - Release checksums are signed with the project's ed25519 key. The public key is built into the program.
@@ -2514,7 +2562,11 @@ Yes. See [CI and automation](ci-and-automation.md).
 
 ### How do I clean the repositories of a second GitHub account?
 
-In the [guided screens](guided-screens.md#more-than-one-github-account), press `s` to switch accounts: every account logged in to `gh` is listed, and *Use another token* takes a pasted token. On the command line, run `github-clean` once per account with `--token`.
+In the [guided screens](guided-screens.md#more-than-one-github-account), press `s` to switch accounts: every account logged in to `gh` or set up for git over SSH is listed, and *Use another token* takes a pasted token. On the command line, run `github-clean` once per account with `--token`.
+
+### My SSH account is missing from the list, or shows too few repositories
+
+An SSH account is listed when `ssh -T git@HOST` answers with your login without asking anything. If the key has a passphrase, add it to your SSH agent first (`ssh-add`). The list of an SSH account holds only local clones, public repositories and names you add with `+`, because SSH cannot list repositories; see [SSH accounts](guided-screens.md#ssh-accounts).
 
 ### Does it support GitHub Enterprise?
 
@@ -2869,13 +2921,17 @@ Made for people who would rather not type commands. The Windows installer adds a
 entry to the Start menu and `pushwarden install` on macOS builds `~/Applications/PushWarden.app`;
 both open a terminal window on these screens. On Linux, run `pushwarden ui`.
 
-1. **Sign in.** A token from `GITHUB_TOKEN`, `GH_TOKEN` or a `gh` login is used when there is
-   one; with several (for example two accounts logged in to `gh`) you choose from a list.
-   Otherwise the screen explains how to create a token and takes it in a masked field. It
-   is used for this run only and never written to disk. `s` on the repository list or the
-   final report switches to another account.
-2. **Choose repositories.** Every repository the token can push to, with checkboxes. Forks and
-   archived repositories are hidden until you show them.
+1. **Sign in.** Accounts already on the machine are found: tokens from `GITHUB_TOKEN`, `GH_TOKEN`
+   and each `gh` login, and the logins git has over SSH (hosts in `~/.ssh/config` that lead to
+   github.com). With several you choose from a list. With none, the screen explains how to
+   create a token and takes it in a masked field; it is used for this run only and never
+   written to disk. `s` on the repository list or the final report switches to another account.
+2. **Choose repositories.** A list with checkboxes, nothing ticked to begin with. Each row shows
+   what earlier runs verified and whether the repository is cloned on this computer. Forks and
+   archived repositories are hidden until you show them. A token account lists every
+   repository it can push to. An SSH account cannot ask GitHub for that list: it shows the
+   local clones that use its SSH host, the account's public repositories, and names you add
+   with `+`.
 3. **Check.** A dry run over what you chose. Nothing is changed.
 4. **Review.** Every infected branch and the files that would be fixed.
 5. **Fix and push,** only after you answer `y`. One normal commit per infected branch, never a

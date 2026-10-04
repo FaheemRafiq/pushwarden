@@ -53,6 +53,10 @@ The feedback bundle and the central upload remove what identifies the person or 
 
 Use a fine-grained token limited to the repositories being cleaned, and rotate it afterwards.
 
+## What the guided screens read to sign in
+
+`pushwarden ui` looks for GitHub logins that already exist on the machine. It reads the `GITHUB_TOKEN` and `GH_TOKEN` variables, asks `gh` for the tokens of its logged-in accounts, reads the host names in `~/.ssh/config`, and runs `ssh -T` once per GitHub host to learn which account the key belongs to. It never reads SSH key files, and no token is written to disk. To mark local clones it reads the remote addresses in the `.git/config` of the repositories under your project folders; nothing in those repositories is run. See [Guided screens](guided-screens.md).
+
 ## Update integrity
 
 - Release checksums are signed with the project's ed25519 key. The public key is built into the program.

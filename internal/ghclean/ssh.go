@@ -177,6 +177,37 @@ func remoteURLs(repoDir string) []string {
 	return out
 }
 
+// LocalClones maps the GitHub repositories cloned on this computer to their
+// folder, by lower-case "owner/name". localRepos are repository folders; a
+// remote counts when it points at github.com over HTTPS or through one of
+// the ssh hosts that lead there.
+func LocalClones(localRepos []string) map[string]string {
+	hosts := map[string]bool{}
+	if home, err := os.UserHomeDir(); err == nil {
+		cfg, _ := os.ReadFile(filepath.Join(home, ".ssh", "config"))
+		for _, h := range sshGitHubHosts(string(cfg)) {
+			hosts[strings.ToLower(h)] = true
+		}
+	}
+	out := map[string]string{}
+	for _, dir := range localRepos {
+		for _, u := range remoteURLs(dir) {
+			full := ""
+			if host, name, ok := parseSSHRemote(u); ok && hosts[strings.ToLower(host)] {
+				full = name
+			} else if rest, ok := strings.CutPrefix(u, "https://github.com/"); ok {
+				if rest = strings.TrimSuffix(strings.Trim(rest, "/"), ".git"); ValidRepoName(rest) {
+					full = rest
+				}
+			}
+			if k := strings.ToLower(full); full != "" && out[k] == "" {
+				out[k] = dir
+			}
+		}
+	}
+	return out
+}
+
 // SSHRepo builds the repository entry an SSH account cleans fullName through.
 func SSHRepo(a Account, fullName string) github.Repo {
 	owner, name, _ := strings.Cut(fullName, "/")

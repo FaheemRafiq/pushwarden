@@ -78,7 +78,7 @@ Rotate the token after the clean-up.
 pushwarden github-clean --token "$(gh auth token --user OTHER-LOGIN)"
 ```
 
-`gh auth login` adds an account next to the ones `gh` already has. The [guided screens](guided-screens.md#more-than-one-github-account) list every account and switch between them with one key.
+`gh auth login` adds an account next to the ones `gh` already has. The [guided screens](guided-screens.md#more-than-one-github-account) list every account and switch between them with one key. They can also use the SSH logins git already has, which `github-clean` cannot: it always needs a token.
 
 ## Selecting repositories
 
