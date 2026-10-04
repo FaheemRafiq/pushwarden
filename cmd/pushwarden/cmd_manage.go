@@ -451,7 +451,12 @@ func cmdConfig(args []string) int {
 func cmdStatus(args []string) int {
 	c := mustCtx()
 	u := ui.New(false, false)
-	u.Banner(version, c.I.Version)
+	h := readHealth(c)
+	cs := h.checks()
+	for _, l := range append(statusHeader(u, h, cs), statusChecks(u, cs)...) {
+		fmt.Println(l)
+	}
+	fmt.Println("\n  " + u.C("BOLD", "DETAILS"))
 	rows := [][2]string{
 		{"Indicators", c.I.Version + " (" + c.I.Source + ")"},
 		{"Action / auto-kill / prompt", fmt.Sprintf("%s / %v / %v", c.Cfg.Action, c.Cfg.AutoKill, c.Cfg.Prompt)},
@@ -463,32 +468,26 @@ func cmdStatus(args []string) int {
 	}
 	rows = append(statusServiceRows(c), rows...)
 	for _, r := range rows {
-		fmt.Printf("  %-36s %s\n", u.C("BOLD_CYAN", r[0]+":"), r[1])
+		fmt.Printf("    %s %s\n", u.C("BOLD_CYAN", fmt.Sprintf("%-28s", r[0]+":")), r[1])
 	}
 	if rep, err := report.Latest(c.DataDir); err == nil && rep.Stats != nil {
 		s := rep.Stats
-		fmt.Printf("\n  Latest report (%s): %d repos, %d critical, %d high, %d warning\n", rep.Generated, s.ReposScanned, s.Critical, s.High, s.Warning)
+		fmt.Printf("\n  %s (%s): %d repos, %d critical, %d high, %d warning\n", u.C("BOLD", "LATEST SWEEP"), rep.Generated, s.ReposScanned, s.Critical, s.High, s.Warning)
 		for _, f := range rep.Findings {
 			if f.Severity >= findings.High {
 				fmt.Printf("    [%s] %s  %s  %s\n", f.Severity, f.Title, f.Path, f.Action)
 			}
 		}
 	}
-	fmt.Println("\n  Editor hardening:")
-	eds := c.P.EditorSettings()
-	labels := make([]string, 0, len(eds))
-	for l := range eds {
-		labels = append(labels, l)
-	}
-	sort.Strings(labels)
-	for _, l := range labels {
-		v := harden.EditorStatus(eds[l])
-		mark := "!! "
-		if v == "off" {
-			mark = "OK "
+	fmt.Println("\n  " + u.C("BOLD", "EDITOR HARDENING"))
+	for _, l := range sortedKeys(h.editors) {
+		mark := u.C("BOLD_RED", "!!")
+		if h.editors[l] == "off" {
+			mark = u.C("BOLD_GREEN", "OK")
 		}
-		fmt.Printf("    %s%-18s task.allowAutomaticTasks = %s\n", mark, l, v)
+		fmt.Printf("    %s  %-18s task.allowAutomaticTasks = %s\n", mark, l, h.editors[l])
 	}
+	fmt.Println()
 	return 0
 }
 

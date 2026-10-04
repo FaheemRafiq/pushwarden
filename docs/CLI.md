@@ -116,17 +116,42 @@ pushwarden --deep ~/proj                 # same as `pushwarden scan --deep ~/pro
 
 ### status
 
-Protection status, editor hardening state and the latest report.
+Protection status: a score, what each layer of protection is doing, and the details.
 
 ```
 pushwarden status
 ```
 
-Shows whether the guard is alive and which real-time backend it uses (inotify, kqueue,
+The output has three parts.
+
+**The verdict.** A score out of 100 with a bar, one word for it and a sentence on what it means:
+`PROTECTED` (90 or more), `PARTLY PROTECTED` (65 to 89) or `AT RISK` (below 65). When the latest
+sweep found something critical or high the word is `THREATS FOUND`, whatever the score. On a
+terminal the PushWarden shield is drawn beside it in the colour of the verdict; piped or in CI
+the same information is plain text.
+
+**Protection.** One line per layer, marked `OK`, ` !` (partly) or `!!` (missing), with the command
+that fixes it:
+
+| Layer | Points | Full marks when |
+|---|---|---|
+| Background guard | 25 | the guard is alive |
+| Real-time file protection | 15 | a native watcher is in use (8 for polling) |
+| Starts when you sign in | 10 | the user service is registered |
+| Malware servers blocked | 10 | the firewall block is active and persistent (5 if it is lost on restart) |
+| Editors cannot auto-run tasks | 10 | every VS Code-family editor found is hardened |
+| Indicators up to date | 5 | the indicator file is at most 30 days old |
+| Recent full sweep | 5 | a full sweep finished in the last 24 hours |
+| Nothing critical or high found | 20 | the latest sweep found none |
+
+The score measures how much of the protection is switched on. It is not a guarantee that the
+machine is clean; `scan --home` and `history` show what was actually found.
+
+**Details.** Whether the guard is alive and which real-time backend it uses (inotify, kqueue,
 ReadDirectoryChangesW, or polling); during a sweep the Guard line reads `scanning 7/17 repositories
 (name)` and updates as it goes. Then the service state, the installed binary, the time of the
 last full sweep, how many repositories are tracked, the indicator version, the configured
-action policy, webhook and firewall state, the data directory, the summary of the latest report,
+action policy, webhook and firewall state, the data directory, the summary of the latest sweep,
 and each VS Code-family editor with its `task.allowAutomaticTasks` setting. Always exits `0`.
 
 ### history and restore

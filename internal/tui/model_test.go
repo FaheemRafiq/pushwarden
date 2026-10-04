@@ -277,6 +277,15 @@ func TestChooseAndSwitchAccounts(t *testing.T) {
 	if !m.final || f.passes[0] != "dry work/site" {
 		t.Fatalf("final=%v passes=%v", m.final, f.passes)
 	}
+	// b on a report goes back to the same account's list, selection kept
+	send(t, m, key("b"))
+	if v := m.View(); m.scr != scrRepos || m.login != "work" || !strings.Contains(v, "1 of 1 selected") {
+		t.Fatalf("back to the list:\n%s", v)
+	}
+	send(t, m, key("enter"))
+	if !m.final || len(f.passes) != 2 {
+		t.Fatalf("a second check from the list: final=%v passes=%v", m.final, f.passes)
+	}
 	// s on the final report: the entered account is remembered and marked current
 	send(t, m, key("s"))
 	if v := m.View(); m.scr != scrToken || len(m.accounts) != 3 || !strings.Contains(v, "entered, current") {

@@ -478,6 +478,8 @@ func (m *model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.err = ""
 				return m, m.chooseAccount()
 			}
+		case "b": // back to the list, to check more of this account
+			m.scr, m.hint = scrRepos, ""
 		case "q", "esc":
 			return m, tea.Quit
 		}

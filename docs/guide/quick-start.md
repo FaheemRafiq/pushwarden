@@ -20,7 +20,28 @@ pushwarden github-clean --apply # fix and push them
 pushwarden status
 ```
 
-Look for `Guard: alive`, a real-time backend other than `off`, and `Firewall: active (persistent ...)`.
+The top of the output is the verdict: a score out of 100 and one word, `PROTECTED`, `PARTLY PROTECTED`, `AT RISK` or `THREATS FOUND`.
+
+```
+      ▄▄████████▄▄       PushWarden 0.5.2
+    ████████████████     PolinRider / Contagious Interview protection
+    ███▀▀▀▀▀▀▀▀▀▀███
+    ███  █▀▀▀▀█  ███     PROTECTED  ████████████████████  100/100
+    ███  █▄▄▄▄▀  ███     Files are checked as they are written, the malware's
+    ███  █       ███     servers are blocked and editors cannot auto-run tasks.
+     ███ ▀      ███
+      ▀███▄▄▄▄███▀       ● watching 18 repositories
+         ▀▀██▀▀
+
+  PROTECTION
+    OK  Background guard                alive, v0.5.2
+    OK  Real-time file protection       every file is checked as it is written (inotify)
+    OK  Starts when you sign in         active
+    !!  Malware servers blocked         not blocked
+                                        fix: pushwarden protect --install
+```
+
+Under it, every layer of protection is listed with `OK` or `!!`, and each missing one names the command that adds it. The score says how much of the protection is switched on; it is not a guarantee that the machine is clean. The details follow: look for `Guard: alive`, a real-time backend other than `off`, and `Firewall: active (persistent ...)`.
 
 ## Scan now
 

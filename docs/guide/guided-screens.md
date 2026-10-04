@@ -118,7 +118,7 @@ The report opens with the totals, then lists every infected branch and the files
   Nothing has been changed so far.
 ```
 
-If nothing is infected the report says so and Enter closes the program. Press `q` to leave without changing anything.
+If nothing is infected the report says so and Enter closes the program. Press `b` to go back to the repository list and check more of the same account, or `q` to leave without changing anything.
 
 ### 5. Fix and push
 

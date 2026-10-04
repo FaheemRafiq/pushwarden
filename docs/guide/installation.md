@@ -98,7 +98,7 @@ pushwarden install [options]
 pushwarden status
 ```
 
-The output shows whether the guard is alive, which real-time backend it uses, the service state, the indicator version, the firewall state, disk use and the hardening state of each editor.
+The output opens with a protection score out of 100 and a list of every layer of protection with `OK` or `!!`; a missing layer names the command that adds it. Below that it shows whether the guard is alive, which real-time backend it uses, the service state, the indicator version, the firewall state, disk use and the hardening state of each editor.
 
 ## Updating
 

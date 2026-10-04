@@ -24,6 +24,9 @@ func New(ci, quiet bool) *UI {
 var colors = map[string]string{"BOLD": "\033[1m", "DIM": "\033[2m", "RED": "\033[0;31m", "BOLD_RED": "\033[1;31m",
 	"BOLD_GREEN": "\033[1;32m", "YELLOW": "\033[0;33m", "BOLD_YELLOW": "\033[1;33m", "CYAN": "\033[0;36m", "BOLD_CYAN": "\033[1;36m"}
 
+// Color reports whether output is styled: a terminal, not CI, no NO_COLOR.
+func (u *UI) Color() bool { return u.color }
+
 func (u *UI) C(color, s string) string {
 	if !u.color {
 		return s

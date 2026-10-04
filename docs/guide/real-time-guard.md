@@ -67,7 +67,7 @@ The same alert about the same finding is not repeated for 6 hours.
 pushwarden status
 ```
 
-`status` shows:
+`status` opens with a protection score and a checklist of the layers (guard, real-time protection, start at sign-in, firewall block, editor hardening, indicators, sweeps), then shows:
 
 - whether the guard is alive, and its real-time backend. During a sweep the line reads `scanning 7/17 repositories (name)` and updates as it goes
 - the service state and the installed binary

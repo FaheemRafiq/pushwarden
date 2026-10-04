@@ -648,9 +648,9 @@ func (m *model) viewReport() ([]string, string) {
 	room := max(h-8, 3)
 	m.scroll = max(min(m.scroll, len(lines)-room), 0)
 	end := min(m.scroll+room, len(lines))
-	keys := "enter fix and push · q quit without changing anything"
+	keys := "enter fix and push · b back to the list · q quit without changing anything"
 	if m.final {
-		keys = "s switch account · enter quit"
+		keys = "b back to the list · s switch account · enter quit"
 	}
 	if len(lines) > room {
 		keys = "up/down scroll · " + keys
