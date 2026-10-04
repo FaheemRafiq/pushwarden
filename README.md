@@ -126,6 +126,7 @@ threatscan github-clean --select --apply         # pick repos from a numbered li
 threatscan github-clean --repo me/api --repo me/web --apply   # only these, in this order
 threatscan github-clean --owner my-org --branch 'release/*' --apply
 threatscan github-clean --list                   # show the repos the token can push to
+threatscan ui                                    # the same on guided screens (Start menu / ~/Applications: "ThreatScan")
 ```
 
 The token comes from `--token`, `GITHUB_TOKEN`, `GH_TOKEN`, `--token-stdin`, or the `gh` CLI login.

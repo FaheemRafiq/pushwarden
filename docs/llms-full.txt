@@ -1068,6 +1068,10 @@ PolinRider steals a token, rewrites your repositories and force-pushes its backd
 threatscan github-clean [options]
 ```
 
+## Prefer screens to commands?
+
+`threatscan ui` does the same work on guided screens: sign in, tick the repositories, check them, review what was found, then fix and push after you confirm. On Windows open **ThreatScan** from the Start menu; on macOS open **ThreatScan** from `~/Applications` (the first time, macOS asks whether it may control Terminal: allow it). Progress is shared with `github-clean`, so you can stop in one and continue in the other.
+
 ## What it does for each repository
 
 1. Clones it once as a bare clone.
@@ -2314,7 +2318,7 @@ one-liner and a description of the threat, see the [README](https://github.com/F
 - [Quick start](#quick-start)
 - [Commands](#commands)
   - [scan](#scan) · [status](#status) · [history and restore](#history-and-restore) · [alerts](#alerts) · [feedback](#feedback) · [cleanup](#cleanup)
-  - [github-clean](#github-clean)
+  - [github-clean](#github-clean) · [ui](#ui)
   - [guard](#guard) · [install](#install) · [uninstall](#uninstall)
   - [update](#update) · [update-iocs](#update-iocs)
   - [harden](#harden) · [protect](#protect) · [config](#config)
@@ -2613,6 +2617,40 @@ threatscan github-clean --owner my-org --branch main --branch 'release/*' --appl
 GITHUB_TOKEN=... threatscan github-clean --ci --apply --json clean.json
 op read op://Vault/GitHub/token | threatscan github-clean --token-stdin --apply
 ```
+
+### ui
+
+The same work as [github-clean](#github-clean), on guided screens instead of flags.
+
+```
+threatscan ui [options]
+```
+
+Made for people who would rather not type commands. The Windows installer adds a **ThreatScan**
+entry to the Start menu and `threatscan install` on macOS builds `~/Applications/ThreatScan.app`;
+both open a terminal window on these screens. On Linux, run `threatscan ui`.
+
+1. **Sign in.** A token from `GITHUB_TOKEN`, `GH_TOKEN` or a `gh` login is used when there is
+   one. Otherwise the screen explains how to create a token and takes it in a masked field. It
+   is used for this run only and never written to disk.
+2. **Choose repositories.** Every repository the token can push to, with checkboxes. Forks and
+   archived repositories are hidden until you show them.
+3. **Check.** A dry run over what you chose. Nothing is changed.
+4. **Review.** Every infected branch and the files that would be fixed.
+5. **Fix and push,** only after you answer `y`. One normal commit per infected branch, never a
+   force-push, exactly as `github-clean --apply`.
+
+Stopping with `q` or `Ctrl+C` keeps what is finished: the next run continues where this one
+stopped, and shares that progress with `github-clean`.
+
+| Option | Effect |
+|---|---|
+| `--api URL` | GitHub API base URL (GitHub Enterprise). |
+| `--fresh` | Forget the progress of earlier runs and check every branch again. |
+| `--pause` | If it cannot start, wait for Enter before closing. The shortcuts use this. |
+
+**Exit codes:** as [github-clean](#github-clean); `2` also when there is no interactive terminal.
+For scripts and CI use `github-clean`.
 
 ### feedback
 

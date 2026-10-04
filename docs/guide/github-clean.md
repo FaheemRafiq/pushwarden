@@ -10,6 +10,10 @@ PolinRider steals a token, rewrites your repositories and force-pushes its backd
 threatscan github-clean [options]
 ```
 
+## Prefer screens to commands?
+
+`threatscan ui` does the same work on guided screens: sign in, tick the repositories, check them, review what was found, then fix and push after you confirm. On Windows open **ThreatScan** from the Start menu; on macOS open **ThreatScan** from `~/Applications` (the first time, macOS asks whether it may control Terminal: allow it). Progress is shared with `github-clean`, so you can stop in one and continue in the other.
+
 ## What it does for each repository
 
 1. Clones it once as a bare clone.

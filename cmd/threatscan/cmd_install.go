@@ -177,6 +177,12 @@ func cmdInstall(args []string) int {
 		} else {
 			u.OK("Notification helper: " + msg)
 		}
+		// what people who do not use a terminal click to open `threatscan ui`
+		if msg, err := notify.InstallMacLauncher(c.P, c.P.Home, m.Exe(), *dry); err != nil {
+			u.Warn("ThreatScan app not built (" + err.Error() + "); run `threatscan ui` in Terminal instead")
+		} else {
+			u.OK("ThreatScan app: " + msg)
+		}
 	}
 
 	if c.Cfg.BlockC2 && !protect.ElevationDisabled() {
@@ -283,6 +289,7 @@ func cmdUninstall(args []string) int {
 	m.UnlinkCLI()
 	if c.P.IsMac() {
 		notify.RemoveMacNotifier(c.P.InstallDir())
+		notify.RemoveMacLauncher(c.P.Home)
 	}
 	if *unblock {
 		if platform.IsAdmin() {

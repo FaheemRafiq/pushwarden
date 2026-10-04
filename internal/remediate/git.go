@@ -39,6 +39,9 @@ type Options struct {
 	KeepClones bool     // leave the clones on disk for inspection
 	Version    string   // ThreatScan version, mentioned in the commit message
 	Log        func(string)
+	// OnBranch, when set, hears every branch result as soon as it is known,
+	// before the repository as a whole is finished.
+	OnBranch func(repo string, b Branch)
 	// State, when set, remembers finished branches by commit so a later run
 	// skips what is verified and unchanged. Host tells apart the same
 	// owner/name on different GitHub servers.
@@ -112,6 +115,9 @@ type Remediator struct {
 func New(o Options, p *platform.Info, i *iocs.IOCs, dataDir string) *Remediator {
 	if o.Log == nil {
 		o.Log = func(string) {}
+	}
+	if o.OnBranch == nil {
+		o.OnBranch = func(string, Branch) {}
 	}
 	if dataDir != "" {
 		// One private, empty folder for core.hooksPath, reused by every run:
@@ -259,6 +265,9 @@ func (m *Remediator) Run(ctx context.Context, fullName, cloneURL, defaultBranch 
 			if tips, err := m.remoteTips(ctx, cloneURL); err == nil {
 				if done, ok := resumeAll(rs, tips, m.Opts.Branches, defaultBranch); ok {
 					res.Branches, res.History = done, rs.History
+					for _, b := range done {
+						m.Opts.OnBranch(fullName, b)
+					}
 					return res
 				}
 			}
@@ -348,6 +357,7 @@ func (m *Remediator) Run(ctx context.Context, fullName, cloneURL, defaultBranch 
 		if rs != nil {
 			if done, ok := rs.reuse(b, tips[b]); ok {
 				res.Branches = append(res.Branches, done)
+				m.Opts.OnBranch(fullName, done)
 				continue
 			}
 		}
@@ -359,6 +369,7 @@ func (m *Remediator) Run(ctx context.Context, fullName, cloneURL, defaultBranch 
 			m.Opts.State.record(rs, br) // saved now, so an interruption after this point keeps it
 		}
 		res.Branches = append(res.Branches, br)
+		m.Opts.OnBranch(fullName, br)
 		m.Journal.Write(journal.Event{Ctx: "github-clean", Kind: journal.KindSweep, Title: fullName + " @ " + b + ": " + br.Status,
 			Note: br.Error, Data: map[string]any{"repo": fullName, "branch": b, "status": br.Status, "fixed": br.Fixed,
 				"commit": br.Commit, "apply": m.Opts.Apply}})

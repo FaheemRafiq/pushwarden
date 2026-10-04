@@ -39,6 +39,10 @@ Name: "blockc2"; Description: "Block the PolinRider command servers in Windows F
 Source: "{#Dist}\threatscan-windows-amd64.exe"; DestDir: "{app}"; DestName: "threatscan.exe"; Check: not IsArm64; Flags: ignoreversion
 Source: "{#Dist}\threatscan-windows-arm64.exe"; DestDir: "{app}"; DestName: "threatscan.exe"; Check: IsArm64; Flags: ignoreversion
 
+[Icons]
+; For people who do not use a terminal: the guided github-clean screens.
+Name: "{autoprograms}\ThreatScan"; Filename: "{app}\threatscan.exe"; Parameters: "ui --pause"; Comment: "Check your GitHub repositories for PolinRider and clean them"
+
 [Run]
 Filename: "{app}\threatscan.exe"; Parameters: "install --unattended --no-block-c2"; Flags: runhidden waituntilterminated; StatusMsg: "Starting ThreatScan protection..."
 Filename: "{app}\threatscan.exe"; Parameters: "protect --install"; Verb: "runas"; Flags: shellexec runhidden waituntilterminated skipifsilent; Tasks: blockc2; StatusMsg: "Blocking the PolinRider command servers..."

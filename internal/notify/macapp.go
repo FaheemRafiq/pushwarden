@@ -64,38 +64,109 @@ func InstallMacNotifier(p *platform.Info, installDir, bin string, dry bool) (str
 	if !p.IsMac() {
 		return "", errors.New("macOS only")
 	}
-	for _, tool := range []string{"osacompile", "plutil"} {
-		if _, err := exec.LookPath(tool); err != nil {
-			return "", fmt.Errorf("%s not found; notifications fall back to osascript", tool)
-		}
-	}
-	if err := os.MkdirAll(installDir, 0o755); err != nil {
-		return "", err
-	}
-	src := filepath.Join(installDir, "notifier.applescript")
-	if err := os.WriteFile(src, []byte(NotifierScript(bin)), 0o644); err != nil {
-		return "", err
-	}
-	defer os.Remove(src)
-	_ = os.RemoveAll(app)
-	if rc, _, se := p.RunRC(60*time.Second, "osacompile", "-o", app, src); rc != 0 {
-		return "", errors.New("osacompile failed: " + strings.TrimSpace(se))
-	}
-	plist := filepath.Join(app, "Contents", "Info.plist")
-	for _, kv := range [][]string{
+	err := buildApplet(p, app, NotifierScript(bin), [][]string{
 		{"CFBundleIdentifier", "-string", MacBundleID},
 		{"CFBundleName", "-string", "ThreatScan"},
 		{"CFBundleDisplayName", "-string", "ThreatScan"},
 		{"LSUIElement", "-bool", "true"},
-	} {
-		if rc, _, se := p.RunRC(20*time.Second, "plutil", "-replace", kv[0], kv[1], kv[2], plist); rc != 0 {
-			return "", errors.New("plutil failed: " + strings.TrimSpace(se))
+	})
+	if err != nil {
+		return "", err
+	}
+	return "built " + app, nil
+}
+
+// buildApplet compiles an AppleScript applet at app and sets its Info.plist keys.
+func buildApplet(p *platform.Info, app, script string, plistKeys [][]string) error {
+	for _, tool := range []string{"osacompile", "plutil"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			return fmt.Errorf("%s not found", tool)
 		}
 	}
-	// ad-hoc signature: keeps the notification permission stable across rebuilds
+	dir := filepath.Dir(app)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	src := filepath.Join(dir, ".threatscan-applet.applescript")
+	if err := os.WriteFile(src, []byte(script), 0o644); err != nil {
+		return err
+	}
+	defer os.Remove(src)
+	_ = os.RemoveAll(app)
+	if rc, _, se := p.RunRC(60*time.Second, "osacompile", "-o", app, src); rc != 0 {
+		return errors.New("osacompile failed: " + strings.TrimSpace(se))
+	}
+	plist := filepath.Join(app, "Contents", "Info.plist")
+	for _, kv := range plistKeys {
+		if rc, _, se := p.RunRC(20*time.Second, "plutil", "-replace", kv[0], kv[1], kv[2], plist); rc != 0 {
+			return errors.New("plutil failed: " + strings.TrimSpace(se))
+		}
+	}
+	// ad-hoc signature: keeps the app's permissions stable across rebuilds
 	p.RunRC(60*time.Second, "codesign", "-s", "-", "-f", "--deep", app)
-	return "built " + app, nil
+	return nil
 }
 
 // RemoveMacNotifier deletes the applet (uninstall).
 func RemoveMacNotifier(installDir string) { _ = os.RemoveAll(MacAppPath(installDir)) }
+
+// The launcher is what people who do not use a terminal click: an app in
+// ~/Applications that opens Terminal on `threatscan ui`.
+const (
+	MacLauncherName     = "ThreatScan.app"
+	MacLauncherBundleID = "com.threatscan.launcher"
+)
+
+func MacLauncherPath(home string) string {
+	return filepath.Join(home, "Applications", MacLauncherName)
+}
+
+// LauncherScript is the launcher's source; bin is the threatscan binary it runs.
+func LauncherScript(bin string) string {
+	q := "'" + strings.ReplaceAll(bin, "'", `'\''`) + "'"
+	return `on run
+	tell application "Terminal"
+		activate
+		do script "exec ` + q + ` ui --pause"
+	end tell
+end run
+`
+}
+
+// InstallMacLauncher builds the launcher under home/Applications. It returns
+// what it did (or would do); a failure is reported, never fatal for the caller.
+func InstallMacLauncher(p *platform.Info, home, bin string, dry bool) (string, error) {
+	app := MacLauncherPath(home)
+	if dry {
+		return "would build " + app + " (opens `threatscan ui` in Terminal)", nil
+	}
+	if !p.IsMac() {
+		return "", errors.New("macOS only")
+	}
+	if exists(app) && !isMacLauncher(app) {
+		return "", errors.New(app + " exists and is not ThreatScan's")
+	}
+	err := buildApplet(p, app, LauncherScript(bin), [][]string{
+		{"CFBundleIdentifier", "-string", MacLauncherBundleID},
+		{"CFBundleName", "-string", "ThreatScan"},
+		{"CFBundleDisplayName", "-string", "ThreatScan"},
+	})
+	if err != nil {
+		return "", err
+	}
+	return "built " + app, nil
+}
+
+// isMacLauncher reports whether app carries the launcher's bundle id.
+func isMacLauncher(app string) bool {
+	b, err := os.ReadFile(filepath.Join(app, "Contents", "Info.plist"))
+	return err == nil && strings.Contains(string(b), MacLauncherBundleID)
+}
+
+// RemoveMacLauncher deletes the launcher (uninstall), and nothing else that
+// happens to have its name.
+func RemoveMacLauncher(home string) {
+	if app := MacLauncherPath(home); isMacLauncher(app) {
+		_ = os.RemoveAll(app)
+	}
+}

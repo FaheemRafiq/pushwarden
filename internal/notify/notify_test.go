@@ -114,3 +114,33 @@ func TestMacNotifierPieces(t *testing.T) {
 	}
 	RemoveMacNotifier(dir) // no-op when absent
 }
+
+func TestMacLauncherPieces(t *testing.T) {
+	s := LauncherScript("/Users/x/Library/Application Support/ThreatScan/threatscan")
+	for _, want := range []string{`tell application "Terminal"`, "'/Users/x/Library/Application Support/ThreatScan/threatscan' ui --pause"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("script lacks %q", want)
+		}
+	}
+	home := t.TempDir()
+	if msg, err := InstallMacLauncher(platform.New(), home, "/bin/threatscan", true); err != nil || !strings.Contains(msg, "would build") {
+		t.Fatal(msg, err)
+	}
+	if ents, _ := os.ReadDir(home); len(ents) != 0 {
+		t.Fatal("dry run created files")
+	}
+	// uninstall removes the launcher, but never another app of the same name
+	app := MacLauncherPath(home)
+	plist := filepath.Join(app, "Contents", "Info.plist")
+	os.MkdirAll(filepath.Dir(plist), 0o755)
+	os.WriteFile(plist, []byte("<string>com.example.other</string>"), 0o644)
+	RemoveMacLauncher(home)
+	if !exists(app) {
+		t.Fatal("removed an app that is not the launcher")
+	}
+	os.WriteFile(plist, []byte("<string>"+MacLauncherBundleID+"</string>"), 0o644)
+	RemoveMacLauncher(home)
+	if exists(app) {
+		t.Fatal("the launcher should be removed")
+	}
+}
