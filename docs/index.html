@@ -30,8 +30,8 @@
       <div>
         <p class="eyebrow"><i></i>Free and open source · Linux, macOS, Windows</p>
         <h1>Stop PolinRider <em>before it runs.</em></h1>
-        <p class="lede">PushWarden finds, removes and blocks the PolinRider / Contagious Interview malware that hides
-          in developer projects. A malicious file is caught the moment it is written and quarantined before it can run.</p>
+        <p class="lede">The PolinRider malware hides inside the projects you clone. PushWarden catches it the moment
+          it lands on your computer, locks it away before it can run, and tells you exactly what it found.</p>
 
         <div id="primary">
           <h2 id="primary-title" class="note" style="font-weight:600;color:var(--text);font-size:1rem;margin:0 0 10px">Install PushWarden</h2>
@@ -44,7 +44,7 @@
           </div>
           <p class="note" id="primary-note">Choose your system below.</p>
         </div>
-        <p class="platforms">Installs for your user only. No administrator password. Keeps itself up to date.</p>
+        <p class="platforms">Free. No administrator password. It keeps itself up to date.</p>
       </div>
 
       <div class="term" role="img" aria-label="Output of the pushwarden status command: protected, score 100 out of 100, every protection layer OK">
@@ -88,7 +88,7 @@
   <section class="section">
     <div class="wrap">
       <p class="kicker">The threat</p>
-      <h2>A backdoor that travels through your own repositories</h2>
+      <h2>It gets in through a project you trust</h2>
       <p class="sub">PolinRider is a campaign attributed to North Korean (DPRK, Lazarus) operators. It targets software
         developers, often through fake job interviews in which the victim is asked to clone and run a repository.</p>
       <ol class="chain">
@@ -113,54 +113,54 @@
   <section class="section alt">
     <div class="wrap">
       <p class="kicker">Protection</p>
-      <h2>Every layer the malware uses is covered</h2>
-      <p class="sub">PushWarden works like an antivirus that knows one malware family very well. Every destructive step is
-        reversible, and every decision comes with its reason.</p>
+      <h2>Install it once. It has your back.</h2>
+      <p class="sub">PushWarden runs quietly in the background and watches your projects for you. Anything it removes
+        you can put back, and it always tells you why it acted.</p>
       <div class="grid">
         <a class="card" href="guide/real-time-guard.html">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><path d="M2 12s3.600-6.500 10-6.500S22 12 22 12s-3.600 6.500-10 6.500S2 12 2 12z"/><circle cx="12" cy="12" r="2.800"/></svg>
-          <h3>Real-time guard</h3>
-          <p>Every script, config, font and editor task file written under your projects is scanned within a second. Processes and connections are checked every five seconds.</p>
+          <h3>Always watching</h3>
+          <p>A new file in your projects is checked within a second of being written. Running programs and network connections are checked every five seconds.</p>
           <span class="more">Real-time guard</span></a>
         <a class="card" href="guide/response-and-recovery.html">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><path d="M4 8h16v11H4z"/><path d="M2.500 4.500h19V8h-19zM10 12h4"/></svg>
-          <h3>Quarantine you can undo</h3>
-          <p>Payloads are stripped or the file is moved to quarantine before it can run. A native dialog shows the evidence, and anything can be restored.</p>
+          <h3>Nothing is lost</h3>
+          <p>A bad file is locked away before it can run, and you are shown what was found. Changed your mind? Put it back with one command.</p>
           <span class="more">Response and recovery</span></a>
         <a class="card" href="guide/network-block.html">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m5.700 5.700 12.600 12.600"/></svg>
-          <h3>Command servers blocked</h3>
-          <p>Outgoing traffic to the malware's servers is dropped system-wide in the firewall, and the block survives restarts.</p>
+          <h3>The attackers are cut off</h3>
+          <p>Your computer is stopped from talking to the malware's servers, so nothing can be sent to them. The block stays after a restart.</p>
           <span class="more">Blocking C2 servers</span></a>
         <a class="card" href="guide/hardening.html">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
-          <h3>Editor hardening</h3>
-          <p>Automatic tasks are turned off and workspace trust is turned on in every VS Code-family editor, so opening a folder runs nothing.</p>
+          <h3>Safe to open a project</h3>
+          <p>VS Code and editors like it are set so that opening a folder cannot run anything on its own.</p>
           <span class="more">Hardening</span></a>
         <a class="card" href="guide/github-clean.html">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><circle cx="6" cy="5" r="2.200"/><circle cx="6" cy="19" r="2.200"/><circle cx="18" cy="8" r="2.200"/><path d="M6 7.200v9.600M18 10.200c0 3.800-6 3-12 5"/></svg>
-          <h3>GitHub clean-up</h3>
-          <p>Removes the malware from every branch of every repository you can push to, with one normal commit per branch. History is never rewritten.</p>
+          <h3>Your GitHub, cleaned</h3>
+          <p>The malware is removed from every branch of your repositories with one ordinary commit each. Your history is never rewritten.</p>
           <span class="more">Cleaning GitHub repositories</span></a>
         <a class="card" href="guide/activity-history.html">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
-          <h3>Complete activity record</h3>
-          <p>Every finding, action, decision, sweep and error is journaled and searchable, with the reason for each one.</p>
+          <h3>See everything it did</h3>
+          <p>Every file it found and every step it took is written down with the reason, and you can look it up any time.</p>
           <span class="more">Activity history</span></a>
         <a class="card" href="guide/scanning.html">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><circle cx="10.500" cy="10.500" r="6.500"/><path d="m15.500 15.500 5 5"/></svg>
-          <h3>On-demand scan</h3>
-          <p>Scan any folder or your whole home directory, interactively or in a pipeline. A full sweep also runs every six hours.</p>
+          <h3>Check whenever you like</h3>
+          <p>Scan one folder or your whole computer whenever you want. A full check also runs by itself every six hours.</p>
           <span class="more">Scanning</span></a>
         <a class="card" href="guide/ci-and-automation.html">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="m8 10 3 2.500L8 15M13 15h3"/></svg>
-          <h3>CI gate and pre-commit hook</h3>
-          <p>Fails a pipeline or refuses a commit that carries an indicator, with a reusable GitHub Actions workflow.</p>
+          <h3>Keeps it out of your team's code</h3>
+          <p>Stops an infected commit before it is made, and fails the build if one slips into a pull request.</p>
           <span class="more">CI and automation</span></a>
         <a class="card" href="guide/updates.html">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.600-5.900"/><path d="M20 4v5h-5"/></svg>
-          <h3>Signed self-update</h3>
-          <p>Indicators refresh daily. The program updates itself after verifying a signature, and rolls back if a release fails.</p>
+          <h3>Stays up to date by itself</h3>
+          <p>It learns about new variants every day and updates itself. Every update is verified before it is installed.</p>
           <span class="more">Updates</span></a>
       </div>
     </div>
@@ -170,15 +170,15 @@
     <div class="wrap split">
       <div>
         <p class="kicker">Guided screens</p>
-        <h2>Clean your GitHub repositories without typing options</h2>
-        <p class="sub" style="margin-bottom:22px">Open PushWarden from the Start menu or the Applications folder, or run <code>pushwarden ui</code>.</p>
+        <h2>Clean your GitHub repositories with ease</h2>
+        <p class="sub" style="margin-bottom:22px">No commands to remember. Open PushWarden and follow the screens.</p>
         <ul class="ticks">
-          <li><b>Uses the logins you already have:</b> tokens, the GitHub CLI and git over SSH.</li>
-          <li><b>Checks first, changes nothing:</b> you see every infected branch and file before anything is fixed.</li>
-          <li><b>Fixes only after you confirm:</b> one normal commit per branch, never a force-push.</li>
-          <li><b>Remembers its progress:</b> stop at any time and continue later.</li>
+          <li><b>No new sign-in:</b> it uses the GitHub logins already on your computer.</li>
+          <li><b>Look before you fix:</b> it shows you every infected branch and file first, and changes nothing.</li>
+          <li><b>You stay in charge:</b> nothing is pushed until you say yes.</li>
+          <li><b>Take a break any time:</b> stop whenever you like and carry on later where you left off.</li>
         </ul>
-        <a class="button ghost" href="guide/guided-screens.html">How the guided screens work</a>
+        <a class="button ghost" href="guide/guided-screens.html">See how it works</a>
       </div>
       <div class="term" role="img" aria-label="The guided screens: a list of repositories with what earlier runs verified, and a check in progress">
         <div class="term-bar"><i></i><i></i><i></i><b>pushwarden ui</b></div>
@@ -205,8 +205,8 @@
   <section class="section alt" id="install">
     <div class="wrap">
       <p class="kicker">Install</p>
-      <h2>One step on every system</h2>
-      <p class="sub">Everything installs for your user only. Coming from ThreatScan, the earlier name of this program?
+      <h2>Get PushWarden</h2>
+      <p class="sub">One step, and only for your own user account. Coming from ThreatScan, the earlier name of this program?
         See <a href="guide/moving-from-threatscan.html">moving to PushWarden</a>.</p>
       <div class="oses">
         <section class="os" id="windows">
