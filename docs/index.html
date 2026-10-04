@@ -3,112 +3,268 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PushWarden Download</title>
+<title>PushWarden: protection against the PolinRider supply-chain malware</title>
 <meta name="description" content="PushWarden protects developer machines from the PolinRider / Contagious Interview supply-chain malware. Free, per user, no administrator rights.">
-<style>
-  :root {
-    --bg: #f7f7f5; --card: #ffffff; --text: #1d1d1b; --muted: #5d5d58; --line: #e2e1dc;
-    --accent: #0b6e4f; --accent-text: #ffffff; --code: #efeee9;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #141413; --card: #1e1e1c; --text: #ecebe6; --muted: #a3a29b; --line: #33332f;
-      --accent: #3fb68b; --accent-text: #0c1f17; --code: #262624;
-    }
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  }
-  main { max-width: 720px; margin: 0 auto; padding: 48px 16px 64px; }
-  h1 { font-size: 2rem; margin: 0 0 8px; letter-spacing: -0.01em; }
-  h2 { font-size: 1.1rem; margin: 0 0 12px; }
-  p { margin: 0 0 12px; }
-  .lede { color: var(--muted); font-size: 1.1rem; margin-bottom: 32px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 24px; margin-bottom: 16px; }
-  .primary { text-align: center; padding: 32px 24px; }
-  .button {
-    display: inline-block; background: var(--accent); color: var(--accent-text); text-decoration: none;
-    font-weight: 600; font-size: 1.1rem; padding: 14px 28px; border-radius: 10px;
-  }
-  .button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
-  .note { color: var(--muted); font-size: 0.92rem; margin-top: 14px; }
-  pre {
-    background: var(--code); border-radius: 8px; padding: 12px 14px; margin: 0 0 12px;
-    overflow-x: auto; font: 0.9rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  }
-  ul { margin: 0; padding-left: 20px; }
-  li { margin-bottom: 6px; }
-  a { color: var(--accent); }
-  .others { display: grid; gap: 16px; }
-  footer { color: var(--muted); font-size: 0.9rem; margin-top: 32px; }
-  [hidden] { display: none !important; }
-</style>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+<script>try { var t = localStorage.getItem("pw-theme"); if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) {}</script>
+<link rel="stylesheet" href="assets/site.css">
+<link rel="alternate" type="text/plain" title="Documentation index for language models" href="llms.txt">
 </head>
-<body>
-<main>
-  <h1>PushWarden</h1>
-  <p class="lede">Finds, removes and blocks the PolinRider / Contagious Interview malware that hides in
-    developer projects. Installs for your user only, needs no administrator password, and keeps itself up to date.</p>
-  <p><a href="guide/overview.html">Read the documentation</a> ·
-    Formerly ThreatScan: <a href="guide/moving-from-threatscan.html">moving to PushWarden</a></p>
+<body class="home">
+<a class="skip" href="#content">Skip to content</a>
+<header class="top">
+  <a class="brand" href="./"><img src="assets/logo.svg" alt="">PushWarden</a>
+  <nav class="toplinks" aria-label="Site">
+    <a href="guide/overview.html">Docs</a>
+    <a href="#install">Download</a>
+    <a href="https://github.com/FaheemRafiq/pushwarden">GitHub</a>
+    <button class="theme" id="theme" type="button" aria-label="Switch between dark and light" hidden>
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1.500v11a5.500 5.500 0 0 1 0-11z"/></svg>
+    </button>
+  </nav>
+</header>
 
-  <section class="card primary" id="primary">
-    <h2 id="primary-title">Download PushWarden</h2>
-    <p><a class="button" id="primary-button" href="https://github.com/FaheemRafiq/pushwarden/releases/latest">Download</a></p>
-    <p class="note" id="primary-note">Choose your system below.</p>
-    <pre id="primary-cmd" hidden><code>curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/installers/install.sh | sh</code></pre>
+<main id="content">
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <p class="eyebrow"><i></i>Free and open source · Linux, macOS, Windows</p>
+        <h1>Stop PolinRider <em>before it runs.</em></h1>
+        <p class="lede">PushWarden finds, removes and blocks the PolinRider / Contagious Interview malware that hides
+          in developer projects. A malicious file is caught the moment it is written and quarantined before it can run.</p>
+
+        <div id="primary">
+          <h2 id="primary-title" class="note" style="font-weight:600;color:var(--text);font-size:1rem;margin:0 0 10px">Install PushWarden</h2>
+          <div class="cta">
+            <span><a class="button" id="primary-button" href="https://github.com/FaheemRafiq/pushwarden/releases/latest">Download</a></span>
+            <a class="button ghost" href="guide/overview.html">Read the documentation</a>
+          </div>
+          <div class="install-cmd" id="primary-cmd" hidden>
+            <pre data-copy><code>curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/installers/install.sh | sh</code></pre>
+          </div>
+          <p class="note" id="primary-note">Choose your system below.</p>
+        </div>
+        <p class="platforms">Installs for your user only. No administrator password. Keeps itself up to date.</p>
+      </div>
+
+      <div class="term" role="img" aria-label="Output of the pushwarden status command: protected, score 100 out of 100, every protection layer OK">
+        <div class="term-bar"><i></i><i></i><i></i><b>pushwarden status</b></div>
+<pre aria-hidden="true"><span class="g">    ▄▄████████▄▄    </span>   <span class="b">PushWarden 0.5.2</span>
+<span class="g">  ████████████████  </span>   <span class="d">PolinRider / Contagious Interview protection</span>
+<span class="g">  ███▀▀▀▀▀▀▀▀▀▀███  </span>
+<span class="g">  ███  █▀▀▀▀█  ███  </span>   <span class="g">PROTECTED  ████████████████████</span>  <span class="b">100/100</span>
+<span class="g">  ███  █▄▄▄▄▀  ███  </span>   Files are checked as they are written, the
+<span class="g">  ███  █       ███  </span>   malware's servers are blocked and editors
+<span class="g">   ███ ▀      ███   </span>   cannot auto-run tasks.
+<span class="g">    ▀███▄▄▄▄███▀    </span>
+<span class="g">       ▀▀██▀▀       </span>   <span class="g">●</span> watching 18 repositories
+
+  <span class="b">PROTECTION</span>
+    <span class="g">OK</span>  Background guard                <span class="d">alive</span>
+    <span class="g">OK</span>  Real-time file protection       <span class="d">checked as written</span>
+    <span class="g">OK</span>  Starts when you sign in         <span class="d">active</span>
+    <span class="g">OK</span>  Malware servers blocked         <span class="d">in the firewall</span>
+    <span class="g">OK</span>  Editors cannot auto-run tasks   <span class="d">1 editor hardened</span>
+    <span class="g">OK</span>  Nothing critical or high found  <span class="d">latest sweep</span></pre>
+      </div>
+    </div>
   </section>
 
-  <div class="others">
-    <section class="card" id="windows">
-      <h2>Windows 10 and 11</h2>
-      <p><a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/PushWarden-Setup.exe">PushWarden-Setup.exe</a></p>
-      <p class="note">The installer is not code-signed yet. If SmartScreen appears, choose <em>More info</em>, then <em>Run anyway</em>.</p>
-      <p class="note">Afterwards, open <strong>PushWarden</strong> from the Start menu to check and clean your GitHub repositories on
-        <a href="guide/guided-screens.html">guided screens</a>.</p>
-    </section>
-
-    <section class="card" id="macos">
-      <h2>macOS 11 or later (Intel and Apple silicon)</h2>
-      <p>Open Terminal (Applications, Utilities, Terminal), paste this and press Return. No password needed:</p>
-      <pre><code>curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/installers/install.sh | sh</code></pre>
-      <p class="note">It downloads PushWarden, checks its SHA-256 against the published list, and sets it up for your user.</p>
-      <p>Prefer an installer? <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/PushWarden.pkg">PushWarden.pkg</a></p>
-      <p class="note">The package is not notarized yet, so macOS blocks it the first time ("unidentified developer").
-        Try to open it once, then go to System Settings, Privacy &amp; Security, and click <em>Open Anyway</em> (it appears for about an hour).
-        Or install it from Terminal: <code>installer -pkg ~/Downloads/PushWarden.pkg -target CurrentUserHomeDirectory</code></p>
-      <p class="note">Afterwards, open <strong>PushWarden</strong> from the Applications folder in your home folder to check and clean
-        your GitHub repositories on <a href="guide/guided-screens.html">guided screens</a>.</p>
-    </section>
-
-    <section class="card" id="linux">
-      <h2>Linux</h2>
-      <p>Run in a terminal (no sudo):</p>
-      <pre><code>curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/installers/install.sh | sh</code></pre>
-      <p>Or install a package (with sudo; it sets PushWarden up for your user):</p>
+  <section class="trust" aria-label="Facts">
+    <div class="wrap">
       <ul>
-        <li>x86-64: <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/pushwarden-linux-amd64.deb">.deb</a>
-          · <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/pushwarden-linux-amd64.rpm">.rpm</a></li>
-        <li>ARM64: <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/pushwarden-linux-arm64.deb">.deb</a>
-          · <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/pushwarden-linux-arm64.rpm">.rpm</a></li>
+        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><path d="M7 5 2.500 10 7 15M13 5l4.500 5L13 15"/></svg>
+          <div><b>Open source</b><span>MIT license, one Go program, no dependencies</span></div></li>
+        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><circle cx="10" cy="7" r="3.200"/><path d="M3.500 17c.8-3.200 3.400-5 6.500-5s5.700 1.800 6.500 5"/></svg>
+          <div><b>No administrator rights</b><span>Installs and runs as your user</span></div></li>
+        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><path d="M10 2 16.500 4.500v5c0 4-2.700 7-6.500 8.500-3.800-1.500-6.500-4.500-6.500-8.500v-5z"/><path d="m7 10 2.200 2.200L13.200 8"/></svg>
+          <div><b>Signed updates</b><span>Verified with ed25519 and SHA-256 before install</span></div></li>
+        <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><rect x="4" y="9" width="12" height="8" rx="1.500"/><path d="M7 9V6.500a3 3 0 0 1 6 0V9"/></svg>
+          <div><b>Private by default</b><span>Nothing leaves the machine unless you opt in</span></div></li>
       </ul>
-      <p class="note">Afterwards, <code>pushwarden ui</code> checks and cleans your GitHub repositories on
-        <a href="guide/guided-screens.html">guided screens</a>.</p>
-    </section>
-  </div>
+    </div>
+  </section>
 
-  <footer>
-    After installing, check it any time with <code>pushwarden status</code>.
-    Every download is listed with its SHA-256 in <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest">checksums.txt</a>.
-    <a href="guide/overview.html">Documentation</a> ·
-    <a href="guide/quick-start.html">Quick start</a> ·
-    <a href="guide/guided-screens.html">Guided screens</a> ·
-    <a href="reference.html">Command reference</a> ·
-    Source: <a href="https://github.com/FaheemRafiq/pushwarden">github.com/FaheemRafiq/pushwarden</a>.
-  </footer>
+  <section class="section">
+    <div class="wrap">
+      <p class="kicker">The threat</p>
+      <h2>A backdoor that travels through your own repositories</h2>
+      <p class="sub">PolinRider is a campaign attributed to North Korean (DPRK, Lazarus) operators. It targets software
+        developers, often through fake job interviews in which the victim is asked to clone and run a repository.</p>
+      <ol class="chain">
+        <li><h3>It hides in ordinary project files</h3>
+          <p>Obfuscated loaders are appended to config files such as <code>postcss.config.mjs</code>, placed in files that
+            pretend to be fonts, and started by <code>.vscode/tasks.json</code> tasks that run when a folder is opened.</p></li>
+        <li><h3>It runs when you open or build the project</h3>
+          <p>Opening the folder in the editor or starting the dev server is enough. Tokens, SSH keys, browser sessions
+            and wallet files are collected and sent to command servers.</p></li>
+        <li><h3>It spreads through git</h3>
+          <p>With a stolen token it rewrites repositories and force-pushes the backdoor to every branch it can reach,
+            so colleagues who pull become infected too.</p></li>
+      </ol>
+      <ul class="figures">
+        <li><b>2,000+</b>GitHub owners reached</li>
+        <li><b>4,000+</b>repositories hit</li>
+        <li><b>Mar to Sep 2026</b>the period those figures cover</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section alt">
+    <div class="wrap">
+      <p class="kicker">Protection</p>
+      <h2>Every layer the malware uses is covered</h2>
+      <p class="sub">PushWarden works like an antivirus that knows one malware family very well. Every destructive step is
+        reversible, and every decision comes with its reason.</p>
+      <div class="grid">
+        <a class="card" href="guide/real-time-guard.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><path d="M2 12s3.600-6.500 10-6.500S22 12 22 12s-3.600 6.500-10 6.500S2 12 2 12z"/><circle cx="12" cy="12" r="2.800"/></svg>
+          <h3>Real-time guard</h3>
+          <p>Every script, config, font and editor task file written under your projects is scanned within a second. Processes and connections are checked every five seconds.</p>
+          <span class="more">Real-time guard</span></a>
+        <a class="card" href="guide/response-and-recovery.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><path d="M4 8h16v11H4z"/><path d="M2.500 4.500h19V8h-19zM10 12h4"/></svg>
+          <h3>Quarantine you can undo</h3>
+          <p>Payloads are stripped or the file is moved to quarantine before it can run. A native dialog shows the evidence, and anything can be restored.</p>
+          <span class="more">Response and recovery</span></a>
+        <a class="card" href="guide/network-block.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m5.700 5.700 12.600 12.600"/></svg>
+          <h3>Command servers blocked</h3>
+          <p>Outgoing traffic to the malware's servers is dropped system-wide in the firewall, and the block survives restarts.</p>
+          <span class="more">Blocking C2 servers</span></a>
+        <a class="card" href="guide/hardening.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+          <h3>Editor hardening</h3>
+          <p>Automatic tasks are turned off and workspace trust is turned on in every VS Code-family editor, so opening a folder runs nothing.</p>
+          <span class="more">Hardening</span></a>
+        <a class="card" href="guide/github-clean.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><circle cx="6" cy="5" r="2.200"/><circle cx="6" cy="19" r="2.200"/><circle cx="18" cy="8" r="2.200"/><path d="M6 7.200v9.600M18 10.200c0 3.800-6 3-12 5"/></svg>
+          <h3>GitHub clean-up</h3>
+          <p>Removes the malware from every branch of every repository you can push to, with one normal commit per branch. History is never rewritten.</p>
+          <span class="more">Cleaning GitHub repositories</span></a>
+        <a class="card" href="guide/activity-history.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
+          <h3>Complete activity record</h3>
+          <p>Every finding, action, decision, sweep and error is journaled and searchable, with the reason for each one.</p>
+          <span class="more">Activity history</span></a>
+        <a class="card" href="guide/scanning.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><circle cx="10.500" cy="10.500" r="6.500"/><path d="m15.500 15.500 5 5"/></svg>
+          <h3>On-demand scan</h3>
+          <p>Scan any folder or your whole home directory, interactively or in a pipeline. A full sweep also runs every six hours.</p>
+          <span class="more">Scanning</span></a>
+        <a class="card" href="guide/ci-and-automation.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="m8 10 3 2.500L8 15M13 15h3"/></svg>
+          <h3>CI gate and pre-commit hook</h3>
+          <p>Fails a pipeline or refuses a commit that carries an indicator, with a reusable GitHub Actions workflow.</p>
+          <span class="more">CI and automation</span></a>
+        <a class="card" href="guide/updates.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.800" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.600-5.900"/><path d="M20 4v5h-5"/></svg>
+          <h3>Signed self-update</h3>
+          <p>Indicators refresh daily. The program updates itself after verifying a signature, and rolls back if a release fails.</p>
+          <span class="more">Updates</span></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap split">
+      <div>
+        <p class="kicker">Guided screens</p>
+        <h2>Clean your GitHub repositories without typing options</h2>
+        <p class="sub" style="margin-bottom:22px">Open PushWarden from the Start menu or the Applications folder, or run <code>pushwarden ui</code>.</p>
+        <ul class="ticks">
+          <li><b>Uses the logins you already have:</b> tokens, the GitHub CLI and git over SSH.</li>
+          <li><b>Checks first, changes nothing:</b> you see every infected branch and file before anything is fixed.</li>
+          <li><b>Fixes only after you confirm:</b> one normal commit per branch, never a force-push.</li>
+          <li><b>Remembers its progress:</b> stop at any time and continue later.</li>
+        </ul>
+        <a class="button ghost" href="guide/guided-screens.html">How the guided screens work</a>
+      </div>
+      <div class="term" role="img" aria-label="The guided screens: a list of repositories with what earlier runs verified, and a check in progress">
+        <div class="term-bar"><i></i><i></i><i></i><b>pushwarden ui</b></div>
+<pre aria-hidden="true"> <span class="badge"> PushWarden </span>  <span class="b">GitHub clean</span>             <span class="d">account</span> <span class="b">me</span> <span class="d">· gh login</span>
+  <span class="g">1 Sign in</span>  <span class="d">»</span>  <span class="g">2 Choose</span>  <span class="d">»</span>  <span class="c">3 Check</span>  <span class="d">»  4 Review  »  5 Fix</span>
+<span class="d">──────────────────────────────────────────────────────────────</span>
+
+  <span class="b">Checking 4 repositories. Nothing is changed.</span>
+
+  <span class="c">█████████████████</span><span class="d">░░░░░░░░░░░░░░░░░</span>  <span class="b">2/4</span>  <span class="d"> 50%  1:12</span>
+  <span class="d">Branches so far:</span> <span class="g">6 clean</span> <span class="d">·</span> <span class="r">1 infected</span> <span class="d">· 0 need review</span>
+
+  <span class="g">+</span> me/app    3 clean
+  <span class="r">!</span> me/lib    <span class="r">1 INFECTED</span>
+  / me/site   2 branches done   <span class="d">&gt; me/site @ main</span>
+  <span class="d">. me/api    waiting</span>
+
+<span class="d">──────────────────────────────────────────────────────────────</span>
+  <span class="c">q</span> <span class="d">stop (progress is saved)</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="section alt" id="install">
+    <div class="wrap">
+      <p class="kicker">Install</p>
+      <h2>One step on every system</h2>
+      <p class="sub">Everything installs for your user only. Coming from ThreatScan, the earlier name of this program?
+        See <a href="guide/moving-from-threatscan.html">moving to PushWarden</a>.</p>
+      <div class="oses">
+        <section class="os" id="windows">
+          <h3>Windows 10 and 11 <span class="tag">your system</span></h3>
+          <p><a class="button" href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/PushWarden-Setup.exe">PushWarden-Setup.exe</a></p>
+          <p class="note">The installer is not code-signed yet. If SmartScreen appears, choose <em>More info</em>, then <em>Run anyway</em>.</p>
+          <p class="note">Afterwards, open <strong>PushWarden</strong> from the Start menu to check and clean your GitHub repositories on
+            <a href="guide/guided-screens.html">guided screens</a>.</p>
+        </section>
+        <section class="os" id="macos">
+          <h3>macOS 11 or later <span class="tag">your system</span></h3>
+          <p>Intel and Apple silicon. Open Terminal (Applications, Utilities, Terminal), paste this and press Return. No password needed:</p>
+          <pre data-copy><code>curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/installers/install.sh | sh</code></pre>
+          <p class="note">It downloads PushWarden, checks its SHA-256 against the published list, and sets it up for your user.</p>
+          <p>Prefer an installer? <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/PushWarden.pkg">PushWarden.pkg</a></p>
+          <p class="note">The package is not notarized yet, so macOS blocks it the first time ("unidentified developer").
+            Try to open it once, then go to System Settings, Privacy &amp; Security, and click <em>Open Anyway</em> (it appears for about an hour).
+            Or install it from Terminal: <code>installer -pkg ~/Downloads/PushWarden.pkg -target CurrentUserHomeDirectory</code></p>
+          <p class="note">Afterwards, open <strong>PushWarden</strong> from the Applications folder in your home folder to check and clean
+            your GitHub repositories on <a href="guide/guided-screens.html">guided screens</a>.</p>
+        </section>
+        <section class="os" id="linux">
+          <h3>Linux <span class="tag">your system</span></h3>
+          <p>Run in a terminal (no sudo):</p>
+          <pre data-copy><code>curl -fsSL https://raw.githubusercontent.com/FaheemRafiq/pushwarden/main/installers/install.sh | sh</code></pre>
+          <p>Or install a package (with sudo; it sets PushWarden up for your user):</p>
+          <ul>
+            <li>x86-64: <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/pushwarden-linux-amd64.deb">.deb</a>
+              · <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/pushwarden-linux-amd64.rpm">.rpm</a></li>
+            <li>ARM64: <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/pushwarden-linux-arm64.deb">.deb</a>
+              · <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest/download/pushwarden-linux-arm64.rpm">.rpm</a></li>
+          </ul>
+          <p class="note">Afterwards, <code>pushwarden ui</code> checks and cleans your GitHub repositories on
+            <a href="guide/guided-screens.html">guided screens</a>.</p>
+        </section>
+      </div>
+      <p class="note" style="margin-top:22px">After installing, check it any time with <code>pushwarden status</code>.
+        Every download is listed with its SHA-256 in <a href="https://github.com/FaheemRafiq/pushwarden/releases/latest">checksums.txt</a>,
+        which is signed.</p>
+    </div>
+  </section>
 </main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>PushWarden is open source under the MIT license. Formerly ThreatScan.</span>
+    <nav aria-label="Footer">
+      <a href="guide/overview.html">Documentation</a>
+      <a href="guide/quick-start.html">Quick start</a>
+      <a href="guide/guided-screens.html">Guided screens</a>
+      <a href="reference.html">Command reference</a>
+      <a href="guide/security-and-privacy.html">Security and privacy</a>
+      <a href="https://github.com/FaheemRafiq/pushwarden">Source on GitHub</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="assets/site.js" defer></script>
 <script>
   (function () {
     var ua = navigator.userAgent || "";
@@ -133,10 +289,7 @@
         ? "Open Terminal (Applications, Utilities, Terminal), paste this and press Return. It verifies the download before installing. No password needed."
         : "Paste this into a terminal. It verifies the download before installing.";
     }
-    if (os) {
-      var own = document.getElementById(os);
-      own.parentNode.appendChild(own); // list the detected system last; the others stay visible
-    }
+    if (os) document.getElementById(os).classList.add("detected"); // mark the visitor's system
   })();
 </script>
 </body>
