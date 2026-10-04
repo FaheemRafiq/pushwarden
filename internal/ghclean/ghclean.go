@@ -37,8 +37,11 @@ func FindToken() (token, source string) {
 // Account is one GitHub login a run can sign in with.
 type Account struct {
 	Login  string // "" until GitHub has confirmed the token (environment tokens)
-	Source string // where the token came from, for display
+	Source string // where the login came from, for display
 	Token  string
+	// SSHHost, set instead of Token, is the ssh host (github.com or an alias
+	// from the ssh config) this account clones and pushes through.
+	SSHHost string
 }
 
 // Accounts lists every token the user already has for the GitHub server
@@ -75,6 +78,26 @@ func Accounts(api string) []Account {
 	}
 	if len(logins) == 0 { // a gh too old to list its accounts
 		add(Account{Source: "gh login", Token: token()})
+	}
+	return out
+}
+
+// AllAccounts is Accounts plus the logins git already has over SSH. Those
+// exist for github.com only, and one that a token account also covers is
+// left out: the token lists every repository, SSH cannot.
+func AllAccounts(ctx context.Context, api string) []Account {
+	out := Accounts(api)
+	if ghHost(api) != "github.com" {
+		return out
+	}
+	for _, a := range SSHAccounts(ctx) {
+		dup := false
+		for _, have := range out {
+			dup = dup || strings.EqualFold(have.Login, a.Login)
+		}
+		if !dup {
+			out = append(out, a)
+		}
 	}
 	return out
 }
@@ -206,10 +229,12 @@ func (RepoDone) event()    {}
 // Session is one signed-in github-clean run: a dry pass, then possibly an
 // apply pass over what the dry pass found.
 type Session struct {
-	Token   string
-	API     string // GitHub API base URL
-	Author  string // "Name <email>" for the fix commits
-	Version string // PushWarden version
+	Token string // empty for an SSH account
+	API   string // GitHub API base URL
+	// SSHCommand is the ssh git uses for an SSH account (see BatchSSH).
+	SSHCommand string
+	Author     string // "Name <email>" for the fix commits
+	Version    string // PushWarden version
 
 	Branches []string // glob filters on branch names; empty = every branch
 	WorkDir  string   // keep the clones here for inspection; "" = managed
@@ -232,7 +257,8 @@ func (s *Session) Run(ctx context.Context, repos []github.Repo, apply bool, emit
 	}
 	self, _ := os.Executable()
 	rem := remediate.New(remediate.Options{
-		Apply: apply, Token: s.Token, AskPass: self, Author: s.Author, Branches: s.Branches,
+		SSHCommand: s.SSHCommand,
+		Apply:      apply, Token: s.Token, AskPass: self, Author: s.Author, Branches: s.Branches,
 		WorkDir: s.WorkDir, KeepClones: s.WorkDir != "", Version: s.Version,
 		Log:      func(m string) { emit(Log{m}) },
 		OnBranch: func(repo string, b remediate.Branch) { emit(BranchDone{repo, b}) },

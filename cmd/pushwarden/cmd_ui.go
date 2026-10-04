@@ -10,7 +10,9 @@ import (
 	"github.com/FaheemRafiq/pushwarden/internal/ghclean"
 	"github.com/FaheemRafiq/pushwarden/internal/github"
 	"github.com/FaheemRafiq/pushwarden/internal/remediate"
+	"github.com/FaheemRafiq/pushwarden/internal/scan"
 	"github.com/FaheemRafiq/pushwarden/internal/tui"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 func init() {
@@ -53,10 +55,20 @@ func cmdUI(args []string) int {
 		state.Reset()
 	}
 	state.PruneClones(time.Duration(c.Cfg.CloneKeepDays)*24*time.Hour, int64(c.Cfg.CloneKeepMB)<<20, false)
+	// An SSH account cannot list its repositories through the API; the
+	// clones on this computer tell which ones it has.
+	localRepos := func() []string {
+		var out []string
+		for _, root := range c.Cfg.Roots(c.P.CommonProjectDirs) {
+			repos, _ := scan.NewRepo(root, ui.New(true, true), c.I).Discover()
+			out = append(out, repos...)
+		}
+		return out
+	}
 	code, err := tui.Run(&ghclean.Session{
 		API: api, Version: version, State: state, CloneMaxBytes: int64(c.Cfg.CloneKeepMB) << 20,
 		Journal: openJournal(c), P: c.P, I: c.I, DataDir: c.DataDir,
-	})
+	}, localRepos)
 	if err != nil {
 		return fail(err.Error())
 	}

@@ -18,10 +18,12 @@ import (
 )
 
 // Run shows the UI until the user leaves it. sess carries everything but the
-// token, which the UI finds or asks for. The exit code follows github-clean:
-// 0 = clean or all fixed, 1 = infected branches remain or failures.
-func Run(sess *ghclean.Session) (int, error) {
-	m := newModel(live(sess))
+// account, which the UI finds or asks for. localRepos returns the repository
+// folders on this computer; an SSH account's list is built from them. The exit
+// code follows github-clean: 0 = clean or all fixed, 1 = infected branches
+// remain or failures.
+func Run(sess *ghclean.Session, localRepos func() []string) (int, error) {
+	m := newModel(live(sess, localRepos))
 	_, err := tea.NewProgram(m, tea.WithAltScreen()).Run()
 	m.cancel()
 	if m.interrupted {
@@ -32,27 +34,35 @@ func Run(sess *ghclean.Session) (int, error) {
 
 // backend is what the screens need done; tests replace it.
 type backend struct {
-	accounts  func() []ghclean.Account
-	viewer    func(ctx context.Context, token string) (string, error)
-	listRepos func(ctx context.Context, token string) ([]github.Repo, error)
-	run       func(ctx context.Context, token string, repos []github.Repo, apply bool, emit func(ghclean.Event)) []remediate.Result
+	accounts func(ctx context.Context) []ghclean.Account
+	viewer   func(ctx context.Context, token string) (string, error)
+	// listRepos also tells, for an SSH account, where each repository was found.
+	listRepos func(ctx context.Context, a ghclean.Account) ([]github.Repo, map[string]string, error)
+	run       func(ctx context.Context, a ghclean.Account, repos []github.Repo, apply bool, emit func(ghclean.Event)) []remediate.Result
 	// verified is what earlier runs already checked.
 	verified func() (repos, branches int)
 }
 
-func live(sess *ghclean.Session) backend {
+func live(sess *ghclean.Session, localRepos func() []string) backend {
 	return backend{
-		accounts: func() []ghclean.Account { return ghclean.Accounts(sess.API) },
+		accounts: func(ctx context.Context) []ghclean.Account { return ghclean.AllAccounts(ctx, sess.API) },
 		viewer: func(ctx context.Context, token string) (string, error) {
 			return github.New(token, sess.API).Viewer(ctx)
 		},
-		listRepos: func(ctx context.Context, token string) ([]github.Repo, error) {
+		listRepos: func(ctx context.Context, a ghclean.Account) ([]github.Repo, map[string]string, error) {
+			if a.SSHHost != "" {
+				repos, from := ghclean.SSHRepos(ctx, github.New("", sess.API), a, localRepos())
+				return repos, from, nil
+			}
 			// forks and archived repositories are fetched too: the screen hides them until asked
-			repos, _, err := ghclean.ListRepos(ctx, github.New(token, sess.API), ghclean.Filter{Forks: true, Archived: true})
-			return repos, err
+			repos, _, err := ghclean.ListRepos(ctx, github.New(a.Token, sess.API), ghclean.Filter{Forks: true, Archived: true})
+			return repos, nil, err
 		},
-		run: func(ctx context.Context, token string, repos []github.Repo, apply bool, emit func(ghclean.Event)) []remediate.Result {
-			sess.Token = token
+		run: func(ctx context.Context, a ghclean.Account, repos []github.Repo, apply bool, emit func(ghclean.Event)) []remediate.Result {
+			sess.Token, sess.SSHCommand = a.Token, ""
+			if a.SSHHost != "" {
+				sess.SSHCommand = ghclean.BatchSSH()
+			}
 			return sess.Run(ctx, repos, apply, emit)
 		},
 		verified: func() (int, int) { return ghclean.ProgressTotals(sess.State) },
@@ -77,6 +87,7 @@ type (
 	}
 	reposMsg struct {
 		repos []github.Repo
+		from  map[string]string
 		err   error
 	}
 	eventMsg    struct{ e ghclean.Event }
@@ -109,14 +120,18 @@ type model struct {
 	input    textinput.Model
 	token    string
 	login    string
+	me       ghclean.Account // the account signed in with
 
 	// choose repositories
 	all             []github.Repo
 	forks, archived bool // show them
 	filter          textinput.Model
 	filtering       bool
-	picked          map[string]bool // by full name
-	cur             int             // cursor in visible()
+	picked          map[string]bool   // by full name
+	from            map[string]string // SSH account: where each repository was found, by lower-case full name
+	add             textinput.Model   // SSH account: an owner/name typed in
+	adding          bool
+	cur             int // cursor in visible()
 
 	// a pass
 	apply     bool
@@ -148,15 +163,17 @@ func newModel(be backend) *model {
 	in.Prompt = "  Token: "
 	fl := textinput.New()
 	fl.Prompt = "  Filter: "
+	ad := textinput.New()
+	ad.Prompt = "  Add owner/name: "
 	sp := spinner.New()
 	sp.Spinner = spinner.Line
-	return &model{be: be, ctx: ctx, cancel: cancel, spin: sp, input: in, filter: fl,
+	return &model{be: be, ctx: ctx, cancel: cancel, spin: sp, input: in, filter: fl, add: ad,
 		picked: map[string]bool{}, busy: "Looking for a GitHub login"}
 }
 
 func (m *model) Init() tea.Cmd {
 	return tea.Batch(m.spin.Tick, func() tea.Msg {
-		return accountsMsg{m.be.accounts()}
+		return accountsMsg{m.be.accounts(m.ctx)}
 	})
 }
 
@@ -165,6 +182,10 @@ func (m *model) Init() tea.Cmd {
 func (m *model) signIn(i int, token string) tea.Cmd {
 	m.signing, m.token = i, token
 	m.busy, m.err = "Signing in to GitHub", ""
+	if i >= 0 && m.accounts[i].SSHHost != "" {
+		login := m.accounts[i].Login // GitHub named it when the key was tried
+		return func() tea.Msg { return viewerMsg{login, nil} }
+	}
 	ctx, token, viewer := m.ctx, m.token, m.be.viewer
 	return func() tea.Msg {
 		login, err := viewer(ctx, token)
@@ -174,10 +195,13 @@ func (m *model) signIn(i int, token string) tea.Cmd {
 
 func (m *model) loadRepos() tea.Cmd {
 	m.busy, m.err = "Listing the repositories you can push to", ""
-	ctx, token, list := m.ctx, m.token, m.be.listRepos
+	if m.me.SSHHost != "" {
+		m.busy = "Looking for this account's repositories on this computer and on GitHub"
+	}
+	ctx, me, list := m.ctx, m.me, m.be.listRepos
 	return func() tea.Msg {
-		repos, err := list(ctx, token)
-		return reposMsg{repos, err}
+		repos, from, err := list(ctx, me)
+		return reposMsg{repos, from, err}
 	}
 }
 
@@ -206,9 +230,9 @@ func (m *model) startPass(apply bool, repos []github.Repo) tea.Cmd {
 	}
 	ch := make(chan tea.Msg, 64)
 	m.events = ch
-	ctx, token, run := m.ctx, m.token, m.be.run
+	ctx, me, run := m.ctx, m.me, m.be.run
 	go func() {
-		res := run(ctx, token, repos, apply, func(e ghclean.Event) { ch <- eventMsg{e} })
+		res := run(ctx, me, repos, apply, func(e ghclean.Event) { ch <- eventMsg{e} })
 		ch <- passDoneMsg{res}
 	}()
 	return waitFor(ch)
@@ -229,6 +253,26 @@ func (m *model) visible() []github.Repo {
 		}
 	}
 	return out
+}
+
+// addRepo puts a repository typed in for an SSH account on the list, ticked.
+func (m *model) addRepo(name string) {
+	key := strings.ToLower(name)
+	if m.from[key] == "" {
+		m.from[key] = ghclean.FromAdded
+		m.all = append(m.all, ghclean.SSHRepo(m.me, name))
+	}
+	for i, r := range m.all {
+		if strings.EqualFold(r.FullName, name) {
+			m.picked[r.FullName] = true
+			m.filter.SetValue("")
+			for j, v := range m.visible() {
+				if v.FullName == m.all[i].FullName {
+					m.cur = j
+				}
+			}
+		}
+	}
 }
 
 // chosen is what a check will run on: the ticked repositories, whatever the
@@ -274,8 +318,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.signing = len(m.accounts) - 1
 		}
 		m.accounts[m.signing].Login = msg.login
-		m.login, m.acct, m.scr = msg.login, m.signing, scrRepos
-		m.all, m.picked, m.cur = nil, map[string]bool{}, 0
+		m.login, m.acct, m.scr, m.me = msg.login, m.signing, scrRepos, m.accounts[m.signing]
+		m.all, m.picked, m.cur, m.from, m.adding = nil, map[string]bool{}, 0, nil, false
 		m.filter.SetValue("")
 		return m, m.loadRepos()
 	case reposMsg:
@@ -284,7 +328,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err.Error()
 			return m, nil
 		}
-		m.all = msg.repos
+		m.all, m.from = msg.repos, msg.from
+		if m.from == nil {
+			m.from = map[string]string{}
+		}
 		for _, r := range m.all {
 			m.picked[r.FullName] = m.shown(r)
 		}
@@ -309,6 +356,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.input, c = m.input.Update(msg)
 	case m.filtering:
 		m.filter, c = m.filter.Update(msg)
+	case m.adding:
+		m.add, c = m.add.Update(msg)
 	}
 	return m, c
 }
@@ -436,7 +485,7 @@ func (m *model) keyRepos(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if m.err != "" { // the listing failed
+	if m.err != "" && !m.adding { // the listing failed
 		switch k.String() {
 		case "enter":
 			return m, m.loadRepos()
@@ -464,8 +513,33 @@ func (m *model) keyRepos(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.cur = 0
 		return m, c
 	}
+	if m.adding {
+		switch k.Type {
+		case tea.KeyEnter:
+			name := strings.TrimSuffix(strings.TrimSpace(m.add.Value()), ".git")
+			if !ghclean.ValidRepoName(name) {
+				m.err = "Type it as owner/name, for example my-org/website."
+				return m, nil
+			}
+			m.addRepo(name)
+			fallthrough
+		case tea.KeyEsc:
+			m.adding, m.err = false, ""
+			m.add.SetValue("")
+			m.add.Blur()
+			return m, nil
+		}
+		var c tea.Cmd
+		m.add, c = m.add.Update(k)
+		return m, c
+	}
 	vis := m.visible()
 	switch k.String() {
+	case "+":
+		if m.me.SSHHost != "" {
+			m.adding = true
+			return m, m.add.Focus()
+		}
 	case "up", "k":
 		m.cur = max(m.cur-1, 0)
 	case "down", "j":

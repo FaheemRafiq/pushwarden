@@ -16,16 +16,18 @@ import (
 // fake is a backend with two pushable repositories and a fork; a dry pass
 // finds `infected` branches in me/app, an apply pass pushes them.
 type fake struct {
-	token    string            // a token GitHub accepts, as login "me"
-	logins   map[string]string // more accepted tokens and their logins
-	accounts []ghclean.Account // what is found on the machine
-	infected bool
-	passes   []string // "dry me/app me/lib", "apply me/app"
+	token     string            // a token GitHub accepts, as login "me"
+	logins    map[string]string // more accepted tokens and their logins
+	accounts  []ghclean.Account // what is found on the machine
+	infected  bool
+	passes    []string // "dry me/app me/lib", "apply me/app"
+	ranAs     []ghclean.Account
+	cloneURLs []string
 }
 
 func (f *fake) backend() backend {
 	return backend{
-		accounts: func() []ghclean.Account { return f.accounts },
+		accounts: func(context.Context) []ghclean.Account { return f.accounts },
 		viewer: func(_ context.Context, token string) (string, error) {
 			if l, ok := f.logins[token]; ok {
 				return l, nil
@@ -35,14 +37,21 @@ func (f *fake) backend() backend {
 			}
 			return "me", nil
 		},
-		listRepos: func(_ context.Context, token string) ([]github.Repo, error) {
-			if l, ok := f.logins[token]; ok {
-				return []github.Repo{{FullName: l + "/site"}}, nil
+		listRepos: func(_ context.Context, a ghclean.Account) ([]github.Repo, map[string]string, error) {
+			if a.SSHHost != "" {
+				return []github.Repo{ghclean.SSHRepo(a, a.Login+"/cloned")}, map[string]string{a.Login + "/cloned": ghclean.FromLocal}, nil
 			}
-			return []github.Repo{{FullName: "me/app"}, {FullName: "me/lib"}, {FullName: "me/forked", Fork: true}}, nil
+			if l, ok := f.logins[a.Token]; ok {
+				return []github.Repo{{FullName: l + "/site"}}, nil, nil
+			}
+			return []github.Repo{{FullName: "me/app"}, {FullName: "me/lib"}, {FullName: "me/forked", Fork: true}}, nil, nil
 		},
-		run: func(ctx context.Context, _ string, repos []github.Repo, apply bool, emit func(ghclean.Event)) []remediate.Result {
+		run: func(ctx context.Context, a ghclean.Account, repos []github.Repo, apply bool, emit func(ghclean.Event)) []remediate.Result {
 			mode := "dry"
+			f.ranAs = append(f.ranAs, a)
+			for _, r := range repos {
+				f.cloneURLs = append(f.cloneURLs, r.CloneURL)
+			}
 			if apply {
 				mode = "apply"
 			}
@@ -96,7 +105,7 @@ func send(t *testing.T, m *model, msg tea.Msg) (quit bool) {
 		if cmd == nil {
 			return false
 		}
-		if m.busy == "" && (m.scr == scrToken || m.filtering) {
+		if m.busy == "" && (m.scr == scrToken || m.filtering || m.adding) {
 			return false // a text field's cursor blink, not work
 		}
 		msg = cmd()
@@ -197,7 +206,7 @@ func TestSelectionAndCleanResult(t *testing.T) {
 func TestStopDuringPass(t *testing.T) {
 	m := signedIn(t, &fake{})
 	block := make(chan struct{})
-	m.be.run = func(ctx context.Context, _ string, repos []github.Repo, _ bool, emit func(ghclean.Event)) []remediate.Result {
+	m.be.run = func(ctx context.Context, _ ghclean.Account, repos []github.Repo, _ bool, emit func(ghclean.Event)) []remediate.Result {
 		emit(ghclean.RepoStarted{Total: len(repos), Repo: repos[0]})
 		<-block
 		return nil
@@ -280,5 +289,44 @@ func TestChooseAndSwitchAccounts(t *testing.T) {
 	send(t, m, key("enter"))
 	if m.login != "work" || len(m.accounts) != 3 {
 		t.Fatalf("login=%q accounts=%d", m.login, len(m.accounts))
+	}
+}
+
+func TestSSHAccount(t *testing.T) {
+	f := &fake{accounts: []ghclean.Account{{Login: "worker", Source: "SSH (github-work)", SSHHost: "github-work"}}}
+	m := newModel(f.backend())
+	send(t, m, accountsMsg{f.accounts})
+	v := m.View()
+	// GitHub named the login when the key was tried: no token check, straight to the list
+	if m.scr != scrRepos || m.login != "worker" || !strings.Contains(v, "worker/cloned") || !strings.Contains(v, "local clone") {
+		t.Fatalf("ssh account:\n%s", v)
+	}
+	if !strings.Contains(v, "SSH cannot list private repositories") || !strings.Contains(v, "+ add a repository") {
+		t.Fatalf("the limit of an SSH account is stated:\n%s", v)
+	}
+	// + adds a repository by name; a wrong shape is refused and can be corrected
+	send(t, m, key("+"))
+	send(t, m, key("not a repo"))
+	send(t, m, key("enter"))
+	if !m.adding || !strings.Contains(m.View(), "owner/name") {
+		t.Fatalf("a bad name keeps the field open:\n%s", m.View())
+	}
+	m.add.SetValue("acme/private-api.git")
+	send(t, m, key("enter"))
+	if v := m.View(); m.adding || !strings.Contains(v, "acme/private-api") || !strings.Contains(v, "added") || !strings.Contains(v, "2 of 2 selected") {
+		t.Fatalf("after adding:\n%s", v)
+	}
+	send(t, m, key("+"))
+	m.add.SetValue("ACME/private-api")
+	send(t, m, key("enter"))
+	if len(m.all) != 2 {
+		t.Fatalf("the same repository is not listed twice: %d", len(m.all))
+	}
+	send(t, m, key("enter"))
+	if len(f.ranAs) != 1 || f.ranAs[0].SSHHost != "github-work" || f.ranAs[0].Token != "" {
+		t.Fatalf("ran as %+v", f.ranAs)
+	}
+	if got := strings.Join(f.cloneURLs, " "); got != "git@github-work:worker/cloned.git git@github-work:acme/private-api.git" {
+		t.Fatalf("clone URLs go through the ssh host: %s", got)
 	}
 }

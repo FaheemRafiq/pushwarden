@@ -181,16 +181,27 @@ func (m *model) viewRepos() ([]string, string) {
 	if m.busy != "" {
 		return []string{m.waiting()}, "q quit"
 	}
-	if m.err != "" {
+	if m.err != "" && !m.adding {
 		return []string{"  " + stBad.Render("x "+m.err)}, "enter try again · s switch account · q quit"
 	}
+	ssh := m.me.SSHHost != ""
 	vis := m.visible()
 	b := []string{fmt.Sprintf("  %s   %d of %d selected", stBold.Render("Choose the repositories to check"), len(m.chosen()), len(m.all))}
 	if repos, branches := m.be.verified(); branches > 0 {
 		b = append(b, "  "+stDim.Render(fmt.Sprintf("Earlier runs verified %d branches in %d repositories; only what changed since is checked again.", branches, repos)))
 	}
+	if ssh {
+		b = append(b, "  "+stWarn.Render("SSH cannot list private repositories that are not on this computer."),
+			"  "+stDim.Render("Press + to add one by name, or switch to a token account for the complete list."))
+	}
 	if m.filtering || m.filter.Value() != "" {
 		b = append(b, m.filter.View())
+	}
+	if m.adding {
+		if m.err != "" {
+			b = append(b, "  "+stBad.Render("x "+m.err))
+		}
+		b = append(b, m.add.View())
 	}
 	b = append(b, "")
 	nameW := 0
@@ -204,13 +215,20 @@ func (m *model) viewRepos() ([]string, string) {
 		if m.picked[r.FullName] {
 			box = "[x]"
 		}
-		line := fmt.Sprintf("%s %-*s  %s", box, nameW, r.FullName, stDim.Render(repoTag(r)))
+		tag := repoTag(r)
+		if where := m.from[strings.ToLower(r.FullName)]; where != "" {
+			tag = strings.TrimPrefix(where+", "+tag, ", ")
+			tag = strings.TrimSuffix(tag, ", ")
+		}
+		line := fmt.Sprintf("%s %-*s  %s", box, nameW, r.FullName, stDim.Render(tag))
 		if i == m.cur {
-			mark, line = stTitle.Render("> "), stBold.Render(fmt.Sprintf("%s %-*s", box, nameW, r.FullName))+"  "+stDim.Render(repoTag(r))
+			mark, line = stTitle.Render("> "), stBold.Render(fmt.Sprintf("%s %-*s", box, nameW, r.FullName))+"  "+stDim.Render(tag)
 		}
 		b = append(b, "  "+mark+line)
 	}
 	switch {
+	case len(m.all) == 0 && ssh:
+		b = append(b, "  No repository of this account was found on this computer or among its public ones.")
 	case len(m.all) == 0:
 		b = append(b, "  This token cannot push to any repository.")
 	case len(vis) == 0:
@@ -221,14 +239,21 @@ func (m *model) viewRepos() ([]string, string) {
 	if m.filtering {
 		return b, "type to filter · enter keep · esc clear"
 	}
+	if m.adding {
+		return b, "enter add · esc cancel"
+	}
+	plus := ""
+	if ssh {
+		plus = "+ add a repository · "
+	}
 	onOff := func(on bool) string {
 		if on {
 			return "hide"
 		}
 		return "show"
 	}
-	return b, fmt.Sprintf("up/down move · space select · a all · n none · / filter · f %s forks · r %s archived · s switch account · enter check · q quit",
-		onOff(m.forks), onOff(m.archived))
+	return b, fmt.Sprintf("up/down move · space select · a all · n none · / filter · f %s forks · r %s archived · %ss switch account · enter check · q quit",
+		onOff(m.forks), onOff(m.archived), plus)
 }
 
 // rowText is the one-line state of a repository during a pass.

@@ -165,3 +165,98 @@ func TestParseGHAccounts(t *testing.T) {
 		t.Fatal("gh host names")
 	}
 }
+
+func TestSSHHostsAndGreeting(t *testing.T) {
+	cfg := `# personal
+Host github-personal
+    HostName github.com
+    IdentityFile ~/.ssh/id_personal
+
+Host github-work gh-w
+    Hostname=GitHub.com
+Host gitlab
+    HostName gitlab.com
+Host *.corp !bastion
+    HostName github.com
+Match host foo
+    HostName github.com
+`
+	if got := strings.Join(sshGitHubHosts(cfg), " "); got != "github-personal github-work gh-w github.com" {
+		t.Fatalf("hosts: %q", got)
+	}
+	if got := strings.Join(sshGitHubHosts(""), " "); got != "github.com" {
+		t.Fatalf("no config: %q", got)
+	}
+	for out, want := range map[string]string{
+		"Hi FaheemRafiq! You've successfully authenticated, but GitHub does not provide shell access.": "FaheemRafiq",
+		"Hi acme/website! You've successfully authenticated":                                           "", // a deploy key is not an account
+		"git@github.com: Permission denied (publickey).":                                               "",
+	} {
+		if got := sshGreetingLogin(out); got != want {
+			t.Errorf("%q: got %q, want %q", out, got, want)
+		}
+	}
+}
+
+func TestParseSSHRemote(t *testing.T) {
+	for u, want := range map[string]string{
+		"git@github-work:acme/api.git":         "github-work acme/api",
+		"git@github.com:me/site":               "github.com me/site",
+		"ssh://git@github-work/acme/api.git":   "github-work acme/api",
+		"ssh://git@github.com:22/me/dot.files": "github.com me/dot.files",
+		"https://github.com/me/site.git":       "",
+		"git@github-work:acme/api/extra.git":   "",
+		"/home/me/origin.git":                  "",
+		"git@github-work:../../etc/passwd":     "",
+	} {
+		host, full, ok := parseSSHRemote(u)
+		got := ""
+		if ok {
+			got = host + " " + full
+		}
+		if got != want {
+			t.Errorf("%s: got %q, want %q", u, got, want)
+		}
+	}
+}
+
+func TestSSHRepos(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "" {
+			t.Error("the public listing must not send a token")
+		}
+		if r.URL.Path != "/users/worker/repos" {
+			w.WriteHeader(404)
+			return
+		}
+		fmt.Fprint(w, `[{"full_name":"worker/api","name":"api","default_branch":"trunk","owner":{"login":"worker"}},
+		                {"full_name":"worker/oss","name":"oss","default_branch":"main","fork":true,"owner":{"login":"worker"}}]`)
+	}))
+	defer srv.Close()
+	root := t.TempDir()
+	clone := func(name, config string) string {
+		d := filepath.Join(root, name)
+		os.MkdirAll(filepath.Join(d, ".git"), 0o755)
+		os.WriteFile(filepath.Join(d, ".git", "config"), []byte(config), 0o644)
+		return d
+	}
+	dirs := []string{
+		clone("a", "[remote \"origin\"]\n\turl = git@github-work:acme/secret.git\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n"),
+		clone("b", "[remote \"origin\"]\n\turl = git@github-personal:me/blog.git\n"), // the other account
+		clone("c", "[remote \"origin\"]\n\turl = git@GitHub-Work:worker/api.git\n[remote \"up\"]\n\turl = https://github.com/x/y.git\n"),
+		filepath.Join(root, "missing"),
+	}
+	a := Account{Login: "worker", SSHHost: "github-work"}
+	repos, from := SSHRepos(context.Background(), github.New("", srv.URL), a, dirs)
+	var got []string
+	for _, r := range repos {
+		got = append(got, r.FullName+"="+from[strings.ToLower(r.FullName)]+"@"+r.CloneURL)
+	}
+	want := "acme/secret=local clone@git@github-work:acme/secret.git worker/api=local clone@git@github-work:worker/api.git worker/oss=public@git@github-work:worker/oss.git"
+	if strings.Join(got, " ") != want {
+		t.Fatalf("got  %s\nwant %s", strings.Join(got, " "), want)
+	}
+	if !repos[2].Fork || repos[2].DefaultBranch != "main" {
+		t.Fatalf("public details are kept: %+v", repos[2])
+	}
+}

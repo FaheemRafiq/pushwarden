@@ -71,6 +71,27 @@ func (a apiRepo) repo() Repo {
 		Push: a.Permissions.Push || a.Permissions.Admin}
 }
 
+// PublicRepos returns the public repositories login owns. It needs no token,
+// so it is what can be listed for an account that signs in over SSH.
+func (c *Client) PublicRepos(ctx context.Context, login string) ([]Repo, error) {
+	u := c.API + "/users/" + url.PathEscape(login) + "/repos?" + url.Values{
+		"per_page": {"100"}, "type": {"owner"}, "sort": {"full_name"}, "direction": {"asc"},
+	}.Encode()
+	var out []Repo
+	for u != "" {
+		var page []apiRepo
+		next, err := c.get(ctx, u, &page)
+		if err != nil {
+			return out, err
+		}
+		for _, a := range page {
+			out = append(out, a.repo())
+		}
+		u = next
+	}
+	return out, nil
+}
+
 // get performs one GET, retrying once after a primary rate-limit reset, and
 // returns the body plus the `next` page link (empty when there is none).
 func (c *Client) get(ctx context.Context, u string, out any) (next string, err error) {
@@ -79,7 +100,9 @@ func (c *Client) get(ctx context.Context, u string, out any) (next string, err e
 		if err != nil {
 			return "", err
 		}
-		req.Header.Set("Authorization", "Bearer "+c.Token)
+		if c.Token != "" { // without one only public data is readable
+			req.Header.Set("Authorization", "Bearer "+c.Token)
+		}
 		req.Header.Set("Accept", "application/vnd.github+json")
 		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 		req.Header.Set("User-Agent", "pushwarden")

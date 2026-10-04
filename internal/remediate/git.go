@@ -38,6 +38,9 @@ type Options struct {
 	WorkDir    string   // where clones live; "" = system temp
 	KeepClones bool     // leave the clones on disk for inspection
 	Version    string   // PushWarden version, mentioned in the commit message
+	// SSHCommand, when set, is the ssh git runs for SSH clone URLs: the
+	// user's own command plus options that keep it from stopping to ask.
+	SSHCommand string
 	Log        func(string)
 	// OnBranch, when set, hears every branch result as soon as it is known,
 	// before the repository as a whole is finished.
@@ -172,6 +175,9 @@ func (m *Remediator) git(ctx context.Context, dir string, timeout time.Duration,
 	env := append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "LC_ALL=C")
 	if m.Opts.Token != "" && m.Opts.AskPass != "" {
 		env = append(env, "GIT_ASKPASS="+m.Opts.AskPass, TokenEnv+"="+m.Opts.Token)
+	}
+	if m.Opts.SSHCommand != "" {
+		env = append(env, "GIT_SSH_COMMAND="+m.Opts.SSHCommand)
 	}
 	cmd.Env = env
 	var out, errb strings.Builder
