@@ -32,7 +32,7 @@ func Run(sess *ghclean.Session) (int, error) {
 
 // backend is what the screens need done; tests replace it.
 type backend struct {
-	findToken func() (token, source string)
+	accounts  func() []ghclean.Account
 	viewer    func(ctx context.Context, token string) (string, error)
 	listRepos func(ctx context.Context, token string) ([]github.Repo, error)
 	run       func(ctx context.Context, token string, repos []github.Repo, apply bool, emit func(ghclean.Event)) []remediate.Result
@@ -42,7 +42,7 @@ type backend struct {
 
 func live(sess *ghclean.Session) backend {
 	return backend{
-		findToken: ghclean.FindToken,
+		accounts: func() []ghclean.Account { return ghclean.Accounts(sess.API) },
 		viewer: func(ctx context.Context, token string) (string, error) {
 			return github.New(token, sess.API).Viewer(ctx)
 		},
@@ -70,8 +70,8 @@ const (
 )
 
 type (
-	tokenMsg  struct{ token, source string }
-	viewerMsg struct {
+	accountsMsg struct{ accounts []ghclean.Account }
+	viewerMsg   struct {
 		login string
 		err   error
 	}
@@ -102,8 +102,13 @@ type model struct {
 	err    string
 
 	// sign in
-	input                textinput.Model
-	token, login, source string
+	accounts []ghclean.Account // found on this machine, plus tokens entered in this session
+	acct     int               // cursor in the chooser; len(accounts) = "use another token"
+	signing  int               // the account being signed in with; -1 = a token just entered
+	pasting  bool              // the token field is shown instead of the chooser
+	input    textinput.Model
+	token    string
+	login    string
 
 	// choose repositories
 	all             []github.Repo
@@ -151,12 +156,14 @@ func newModel(be backend) *model {
 
 func (m *model) Init() tea.Cmd {
 	return tea.Batch(m.spin.Tick, func() tea.Msg {
-		t, s := m.be.findToken()
-		return tokenMsg{t, s}
+		return accountsMsg{m.be.accounts()}
 	})
 }
 
-func (m *model) signIn() tea.Cmd {
+// signIn checks a token with GitHub: account i of m.accounts, or with i = -1
+// the token just typed into the field.
+func (m *model) signIn(i int, token string) tea.Cmd {
+	m.signing, m.token = i, token
 	m.busy, m.err = "Signing in to GitHub", ""
 	ctx, token, viewer := m.ctx, m.token, m.be.viewer
 	return func() tea.Msg {
@@ -172,6 +179,19 @@ func (m *model) loadRepos() tea.Cmd {
 		repos, err := list(ctx, token)
 		return reposMsg{repos, err}
 	}
+}
+
+// chooseAccount shows the sign-in screen: the list of accounts, or the token
+// field when there is no account to list.
+func (m *model) chooseAccount() tea.Cmd {
+	m.scr, m.busy = scrToken, ""
+	m.pasting = len(m.accounts) == 0
+	m.input.SetValue("")
+	if m.pasting {
+		return m.input.Focus()
+	}
+	m.input.Blur()
+	return nil
 }
 
 func waitFor(ch chan tea.Msg) tea.Cmd { return func() tea.Msg { return <-ch } }
@@ -232,25 +252,31 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var c tea.Cmd
 		m.spin, c = m.spin.Update(msg)
 		return m, c
-	case tokenMsg:
-		if msg.token == "" {
-			m.busy = ""
-			return m, m.input.Focus()
+	case accountsMsg:
+		m.accounts = msg.accounts
+		if len(m.accounts) == 1 {
+			return m, m.signIn(0, m.accounts[0].Token)
 		}
-		m.token, m.source = msg.token, msg.source
-		return m, m.signIn()
+		return m, m.chooseAccount()
 	case viewerMsg:
 		if msg.err != nil {
-			// a found or pasted token that GitHub refuses: ask for another one
+			// GitHub refuses the token: back to choosing or entering one
 			m.err = msg.err.Error()
-			if m.source != "" {
-				m.err = "The token from " + m.source + " did not work: " + m.err
+			if m.signing >= 0 {
+				m.err = "The token from " + m.accounts[m.signing].Source + " did not work: " + m.err
 			}
-			m.busy, m.token, m.source = "", "", ""
-			m.input.SetValue("")
-			return m, m.input.Focus()
+			m.token = ""
+			return m, m.chooseAccount()
 		}
-		m.login, m.scr = msg.login, scrRepos
+		if m.signing < 0 {
+			// remembered for this session only, so switching back needs no second paste
+			m.accounts = append(m.accounts, ghclean.Account{Source: "entered", Token: m.token})
+			m.signing = len(m.accounts) - 1
+		}
+		m.accounts[m.signing].Login = msg.login
+		m.login, m.acct, m.scr = msg.login, m.signing, scrRepos
+		m.all, m.picked, m.cur = nil, map[string]bool{}, 0
+		m.filter.SetValue("")
 		return m, m.loadRepos()
 	case reposMsg:
 		m.busy = ""
@@ -279,7 +305,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// cursor blink and the like
 	var c tea.Cmd
 	switch {
-	case m.scr == scrToken:
+	case m.scr == scrToken && m.pasting:
 		m.input, c = m.input.Update(msg)
 	case m.filtering:
 		m.filter, c = m.filter.Update(msg)
@@ -326,12 +352,37 @@ func (m *model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		switch k.Type {
 		case tea.KeyEsc:
+			if m.pasting && len(m.accounts) > 0 {
+				return m, m.chooseAccount()
+			}
 			return m, tea.Quit
 		case tea.KeyEnter:
+			switch {
+			case !m.pasting && m.acct < len(m.accounts):
+				return m, m.signIn(m.acct, m.accounts[m.acct].Token)
+			case !m.pasting:
+				m.pasting, m.err = true, ""
+				return m, m.input.Focus()
+			}
 			if t := strings.TrimSpace(m.input.Value()); t != "" {
-				m.token, m.source = t, ""
 				m.input.Blur()
-				return m, m.signIn()
+				for i, a := range m.accounts {
+					if a.Token == t {
+						return m, m.signIn(i, t)
+					}
+				}
+				return m, m.signIn(-1, t)
+			}
+			return m, nil
+		}
+		if !m.pasting {
+			switch k.String() {
+			case "up", "k":
+				m.acct = max(m.acct-1, 0)
+			case "down", "j":
+				m.acct = min(m.acct+1, len(m.accounts))
+			case "q":
+				return m, tea.Quit
 			}
 			return m, nil
 		}
@@ -359,6 +410,11 @@ func (m *model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 			m.scr = scrConfirm
+		case "s":
+			if m.final {
+				m.err = ""
+				return m, m.chooseAccount()
+			}
 		case "q", "esc":
 			return m, tea.Quit
 		}
@@ -384,6 +440,9 @@ func (m *model) keyRepos(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch k.String() {
 		case "enter":
 			return m, m.loadRepos()
+		case "s":
+			m.err = ""
+			return m, m.chooseAccount()
 		case "q", "esc":
 			return m, tea.Quit
 		}
@@ -431,6 +490,9 @@ func (m *model) keyRepos(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.filtering = true
 		return m, m.filter.Focus()
+	case "s":
+		m.err = ""
+		return m, m.chooseAccount()
 	case "esc":
 		m.filter.SetValue("")
 		m.cur = 0

@@ -155,6 +155,10 @@ Yes. Protection needs no network. Indicators and updates are fetched when a conn
 
 Yes. See [CI and automation](ci-and-automation.md).
 
+### How do I clean the repositories of a second GitHub account?
+
+In the [guided screens](guided-screens.md#more-than-one-github-account), press `s` to switch accounts: every account logged in to `gh` is listed, and *Use another token* takes a pasted token. On the command line, run `github-clean` once per account with `--token`.
+
 ### Does it support GitHub Enterprise?
 
 `github-clean` does, through `--api URL`.

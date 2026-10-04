@@ -20,9 +20,21 @@ On every system `pushwarden ui` in a terminal does the same. The shortcuts open 
 
 ### 1. Sign in
 
-If you are logged in with the GitHub command-line tool (`gh`), or `GITHUB_TOKEN` or `GH_TOKEN` is set, that token is used and you go straight to the next step.
+PushWarden looks for accounts you are already signed in to on this computer: the tokens in `GITHUB_TOKEN` and `GH_TOKEN`, and every account logged in to the GitHub command-line tool (`gh`).
 
-Otherwise the screen explains how to create a token and shows a field to paste it into. What you paste is shown as `*`. The token is used for this run only and is never written to disk. A fine-grained token needs *Contents: Read and write* on the repositories to clean; a classic token needs the `repo` scope. See [the token section](github-clean.md#the-token).
+- **One account found:** it is used and you go straight to the next step.
+- **Several found:** you choose one from a list. The last row, *Use another token*, lets you paste a token instead.
+- **None found:** the screen explains how to create a token and shows a field to paste it into.
+
+```
+  Which account's repositories do you want to check?
+
+  > me                 gh login
+    me-at-work         gh login
+    Use another token  paste it on the next screen
+```
+
+In the token field, what you paste is shown as `*`. The token is used for this run only and is never written to disk. A fine-grained token needs *Contents: Read and write* on the repositories to clean; a classic token needs the `repo` scope. See [the token section](github-clean.md#the-token).
 
 ### 2. Choose the repositories
 
@@ -43,6 +55,7 @@ Every repository the token can push to is listed with a checkbox, all ticked to 
 | `a`, `n` | tick all, or none, of the repositories shown |
 | `/` | type to filter the list by name; Enter keeps the filter, Esc clears it |
 | `f`, `r` | show or hide forks and archived repositories. They are hidden, and not ticked, until you show them |
+| `s` | switch to another account |
 | Enter | check the ticked repositories |
 | `q` | quit |
 
@@ -81,6 +94,19 @@ Enter asks once more, and only `y` goes ahead. Each infected branch then gets on
 The final report shows what was pushed and what to do next: rotate the token and every secret those repositories or their CI could read, review *Settings, Applications* and *Deploy keys* on GitHub, and ask collaborators to `git pull`.
 
 A push that GitHub refuses, for example to a protected branch, is reported and not forced. See [Per-branch status](github-clean.md#per-branch-status).
+
+## More than one GitHub account
+
+A personal and a work account are cleaned one after the other. Clean the first, then press `s` on the repository list or on the final report to return to the list of accounts, and choose the next. The header always shows which account is signed in, and each account's fixes are pushed with that account's own token.
+
+To make a second account appear in the list, do one of these:
+
+- **Log it in to `gh`.** Run `gh auth login` again for the other account; `gh` keeps several accounts side by side and PushWarden lists them all.
+- **Paste a token.** Choose *Use another token*. An accepted token stays in the list until you close the program, so you can switch back without pasting it again. It is not saved.
+
+SSH keys and host names from your SSH configuration play no part: PushWarden downloads and pushes over HTTPS with the token. A fine-grained token for repositories that belong to an organisation may need that organisation's approval before it can push.
+
+Progress is remembered per repository, so the accounts do not disturb each other's resume state.
 
 ## Stopping and continuing
 

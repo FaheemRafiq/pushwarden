@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/FaheemRafiq/pushwarden/internal/findings"
+	"github.com/FaheemRafiq/pushwarden/internal/ghclean"
 	"github.com/FaheemRafiq/pushwarden/internal/github"
 	"github.com/FaheemRafiq/pushwarden/internal/remediate"
 )
@@ -105,6 +106,33 @@ func (m *model) viewToken() ([]string, string) {
 	if m.err != "" {
 		b = append(b, "  "+stBad.Render("x "+m.err), "")
 	}
+	if !m.pasting {
+		b = append(b, "  Which account's repositories do you want to check?", "")
+		nameW := len("Use another token")
+		for _, a := range m.accounts {
+			nameW = max(nameW, len(accountName(a)))
+		}
+		for i := 0; i <= len(m.accounts); i++ {
+			name, note := "Use another token", "paste it on the next screen"
+			if i < len(m.accounts) {
+				name, note = accountName(m.accounts[i]), m.accounts[i].Source
+				if m.login != "" && m.accounts[i].Login == m.login {
+					note += ", current"
+				}
+			}
+			line := fmt.Sprintf("  %-*s  %s", nameW, name, stDim.Render(note))
+			if i == m.acct {
+				line = stTitle.Render("> ") + stBold.Render(fmt.Sprintf("%-*s", nameW, name)) + "  " + stDim.Render(note)
+			}
+			b = append(b, "  "+line)
+		}
+		b = append(b, "", "  "+stDim.Render("Another account? Log it in with `gh auth login`, or choose Use another token."))
+		return b, "up/down move · enter choose · q quit"
+	}
+	back := "esc quit"
+	if len(m.accounts) > 0 {
+		back = "esc back to the accounts"
+	}
 	b = append(b,
 		"  PushWarden needs a GitHub token to read and fix your repositories.",
 		"  It is used for this run only and is never written to disk.",
@@ -116,7 +144,15 @@ func (m *model) viewToken() ([]string, string) {
 		"    4. Generate the token, copy it, paste it here and press Enter",
 		"",
 		m.input.View())
-	return b, "enter sign in · esc quit"
+	return b, "enter sign in · " + back
+}
+
+// accountName is how an account is listed before and after GitHub named it.
+func accountName(a ghclean.Account) string {
+	if a.Login != "" {
+		return a.Login
+	}
+	return "token from " + a.Source
 }
 
 func repoTag(r github.Repo) string {
@@ -146,7 +182,7 @@ func (m *model) viewRepos() ([]string, string) {
 		return []string{m.waiting()}, "q quit"
 	}
 	if m.err != "" {
-		return []string{"  " + stBad.Render("x "+m.err)}, "enter try again · q quit"
+		return []string{"  " + stBad.Render("x "+m.err)}, "enter try again · s switch account · q quit"
 	}
 	vis := m.visible()
 	b := []string{fmt.Sprintf("  %s   %d of %d selected", stBold.Render("Choose the repositories to check"), len(m.chosen()), len(m.all))}
@@ -191,7 +227,7 @@ func (m *model) viewRepos() ([]string, string) {
 		}
 		return "show"
 	}
-	return b, fmt.Sprintf("up/down move · space select · a all · n none · / filter · f %s forks · r %s archived · enter check · q quit",
+	return b, fmt.Sprintf("up/down move · space select · a all · n none · / filter · f %s forks · r %s archived · s switch account · enter check · q quit",
 		onOff(m.forks), onOff(m.archived))
 }
 
@@ -373,7 +409,7 @@ func (m *model) viewReport() ([]string, string) {
 	end := min(m.scroll+room, len(lines))
 	keys := "enter fix and push · q quit without changing anything"
 	if m.final {
-		keys = "enter quit"
+		keys = "s switch account · enter quit"
 	}
 	if len(lines) > room {
 		keys = "up/down scroll · " + keys

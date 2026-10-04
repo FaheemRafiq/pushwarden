@@ -147,3 +147,21 @@ func TestSessionEvents(t *testing.T) {
 		t.Fatalf("resumed pass: %s %+v %+v", kinds, br, s)
 	}
 }
+
+func TestParseGHAccounts(t *testing.T) {
+	status := []byte(`{"hosts":{
+		"github.com":[{"state":"success","active":false,"login":"work"},{"state":"success","active":true,"login":"me"},{"state":"error","active":false,"login":"expired"}],
+		"ghe.example.com":[{"state":"success","active":true,"login":"corp"}]}}`)
+	if got := strings.Join(parseGHAccounts(status, "github.com"), " "); got != "me work" {
+		t.Fatalf("active first, unusable logins left out: %q", got)
+	}
+	if got := strings.Join(parseGHAccounts(status, "ghe.example.com"), " "); got != "corp" {
+		t.Fatalf("other server: %q", got)
+	}
+	if got := parseGHAccounts([]byte("unknown flag: --json"), "github.com"); got != nil {
+		t.Fatalf("an old gh lists nothing: %v", got)
+	}
+	if ghHost("https://api.github.com") != "github.com" || ghHost("https://ghe.example.com/api/v3") != "ghe.example.com" {
+		t.Fatal("gh host names")
+	}
+}

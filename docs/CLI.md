@@ -332,8 +332,10 @@ entry to the Start menu and `pushwarden install` on macOS builds `~/Applications
 both open a terminal window on these screens. On Linux, run `pushwarden ui`.
 
 1. **Sign in.** A token from `GITHUB_TOKEN`, `GH_TOKEN` or a `gh` login is used when there is
-   one. Otherwise the screen explains how to create a token and takes it in a masked field. It
-   is used for this run only and never written to disk.
+   one; with several (for example two accounts logged in to `gh`) you choose from a list.
+   Otherwise the screen explains how to create a token and takes it in a masked field. It
+   is used for this run only and never written to disk. `s` on the repository list or the
+   final report switches to another account.
 2. **Choose repositories.** Every repository the token can push to, with checkboxes. Forks and
    archived repositories are hidden until you show them.
 3. **Check.** A dry run over what you chose. Nothing is changed.

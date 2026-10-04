@@ -70,6 +70,16 @@ How the token is handled:
 
 Rotate the token after the clean-up.
 
+### More than one account
+
+`github-clean` works with one token per run. For a second account, run it again with that account's token:
+
+```sh
+pushwarden github-clean --token "$(gh auth token --user OTHER-LOGIN)"
+```
+
+`gh auth login` adds an account next to the ones `gh` already has. The [guided screens](guided-screens.md#more-than-one-github-account) list every account and switch between them with one key.
+
 ## Selecting repositories
 
 ```sh

@@ -16,21 +16,29 @@ import (
 // fake is a backend with two pushable repositories and a fork; a dry pass
 // finds `infected` branches in me/app, an apply pass pushes them.
 type fake struct {
-	token    string // the only token GitHub accepts
+	token    string            // a token GitHub accepts, as login "me"
+	logins   map[string]string // more accepted tokens and their logins
+	accounts []ghclean.Account // what is found on the machine
 	infected bool
 	passes   []string // "dry me/app me/lib", "apply me/app"
 }
 
 func (f *fake) backend() backend {
 	return backend{
-		findToken: func() (string, string) { return "", "" },
+		accounts: func() []ghclean.Account { return f.accounts },
 		viewer: func(_ context.Context, token string) (string, error) {
+			if l, ok := f.logins[token]; ok {
+				return l, nil
+			}
 			if token != f.token {
 				return "", errors.New("GitHub rejected the token")
 			}
 			return "me", nil
 		},
-		listRepos: func(context.Context, string) ([]github.Repo, error) {
+		listRepos: func(_ context.Context, token string) ([]github.Repo, error) {
+			if l, ok := f.logins[token]; ok {
+				return []github.Repo{{FullName: l + "/site"}}, nil
+			}
 			return []github.Repo{{FullName: "me/app"}, {FullName: "me/lib"}, {FullName: "me/forked", Fork: true}}, nil
 		},
 		run: func(ctx context.Context, _ string, repos []github.Repo, apply bool, emit func(ghclean.Event)) []remediate.Result {
@@ -105,7 +113,7 @@ func signedIn(t *testing.T, f *fake) *model {
 	t.Helper()
 	f.token = "good"
 	m := newModel(f.backend())
-	send(t, m, tokenMsg{})
+	send(t, m, accountsMsg{})
 	if m.scr != scrToken || m.busy != "" || !strings.Contains(m.View(), "How to create one") {
 		t.Fatalf("without a login the token is asked for:\n%s", m.View())
 	}
@@ -206,5 +214,71 @@ func TestStopDuringPass(t *testing.T) {
 	close(block)
 	if !send(t, m, waitFor(m.events)()) || !m.interrupted {
 		t.Fatal("the program ends once the pass has wound down")
+	}
+}
+
+func TestOneAccountSignsInDirectly(t *testing.T) {
+	f := &fake{token: "good", accounts: []ghclean.Account{{Login: "me", Source: "gh login", Token: "good"}}}
+	m := newModel(f.backend())
+	send(t, m, accountsMsg{f.accounts})
+	if m.scr != scrRepos || m.login != "me" {
+		t.Fatalf("a single account needs no choosing: scr=%d login=%q\n%s", m.scr, m.login, m.View())
+	}
+}
+
+func TestChooseAndSwitchAccounts(t *testing.T) {
+	f := &fake{token: "good", logins: map[string]string{"work-tok": "work", "third-tok": "third"},
+		accounts: []ghclean.Account{{Login: "me", Source: "gh login", Token: "good"}, {Source: "$GITHUB_TOKEN", Token: "stale"}}}
+	m := newModel(f.backend())
+	send(t, m, accountsMsg{f.accounts})
+	if v := m.View(); m.scr != scrToken || m.pasting || !strings.Contains(v, "token from $GITHUB_TOKEN") || !strings.Contains(v, "Use another token") {
+		t.Fatalf("two accounts are offered:\n%s", v)
+	}
+	// a found token that GitHub refuses comes back to the list with the reason
+	send(t, m, key("down"))
+	send(t, m, key("enter"))
+	if v := m.View(); m.scr != scrToken || m.pasting || !strings.Contains(v, "The token from $GITHUB_TOKEN did not work") {
+		t.Fatalf("refused account:\n%s", v)
+	}
+	// "Use another token": paste the work account's
+	send(t, m, key("down"))
+	send(t, m, key("enter"))
+	if !m.pasting {
+		t.Fatal("the last row opens the token field")
+	}
+	send(t, m, key("work-tok"))
+	send(t, m, key("enter"))
+	if v := m.View(); m.scr != scrRepos || m.login != "work" || !strings.Contains(v, "work/site") {
+		t.Fatalf("signed in as the pasted account:\n%s", v)
+	}
+	send(t, m, key("enter")) // check: clean, final report
+	if !m.final || f.passes[0] != "dry work/site" {
+		t.Fatalf("final=%v passes=%v", m.final, f.passes)
+	}
+	// s on the final report: the entered account is remembered and marked current
+	send(t, m, key("s"))
+	if v := m.View(); m.scr != scrToken || len(m.accounts) != 3 || !strings.Contains(v, "entered, current") {
+		t.Fatalf("back at the accounts:\n%s", v)
+	}
+	// choose the first one; its repositories replace the list, nothing carries over
+	m.acct = 0
+	send(t, m, key("enter"))
+	if v := m.View(); m.login != "me" || strings.Contains(v, "work/site") || !strings.Contains(v, "me/app") || !strings.Contains(v, "2 of 3 selected") {
+		t.Fatalf("switched to me:\n%s", v)
+	}
+	// s on the repository list, then esc from the token field returns to the list of accounts
+	send(t, m, key("s"))
+	m.acct = len(m.accounts)
+	send(t, m, key("enter"))
+	send(t, m, key("esc"))
+	if m.scr != scrToken || m.pasting {
+		t.Fatal("esc in the token field goes back to the accounts")
+	}
+	// pasting a token that is already listed does not add it twice
+	send(t, m, key("enter"))
+	send(t, m, key("work-tok"))
+	send(t, m, key("enter"))
+	if m.login != "work" || len(m.accounts) != 3 {
+		t.Fatalf("login=%q accounts=%d", m.login, len(m.accounts))
 	}
 }

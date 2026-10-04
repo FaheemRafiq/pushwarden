@@ -4,6 +4,7 @@ package ghclean
 
 import (
 	"context"
+	"encoding/json"
 	"net/url"
 	"os"
 	"os/exec"
@@ -31,6 +32,85 @@ func FindToken() (token, source string) {
 		}
 	}
 	return "", ""
+}
+
+// Account is one GitHub login a run can sign in with.
+type Account struct {
+	Login  string // "" until GitHub has confirmed the token (environment tokens)
+	Source string // where the token came from, for display
+	Token  string
+}
+
+// Accounts lists every token the user already has for the GitHub server
+// behind api: $GITHUB_TOKEN, $GH_TOKEN, then each account logged in to the gh
+// CLI, the active one first.
+func Accounts(api string) []Account {
+	var out []Account
+	add := func(a Account) {
+		for _, have := range out {
+			if have.Token == a.Token {
+				return
+			}
+		}
+		if a.Token != "" {
+			out = append(out, a)
+		}
+	}
+	for _, k := range []string{"GITHUB_TOKEN", "GH_TOKEN"} {
+		add(Account{Source: "$" + k, Token: strings.TrimSpace(os.Getenv(k))})
+	}
+	gh, err := exec.LookPath("gh")
+	if err != nil {
+		return out
+	}
+	token := func(args ...string) string {
+		b, _ := exec.Command(gh, append([]string{"auth", "token"}, args...)...).Output()
+		return strings.TrimSpace(string(b))
+	}
+	host := ghHost(api)
+	status, _ := exec.Command(gh, "auth", "status", "--json", "hosts").Output()
+	logins := parseGHAccounts(status, host)
+	for _, l := range logins {
+		add(Account{Login: l, Source: "gh login", Token: token("--hostname", host, "--user", l)})
+	}
+	if len(logins) == 0 { // a gh too old to list its accounts
+		add(Account{Source: "gh login", Token: token()})
+	}
+	return out
+}
+
+// ghHost is the name the gh CLI knows the server behind api by.
+func ghHost(api string) string {
+	if h := APIHost(api); h != "api.github.com" {
+		return h
+	}
+	return "github.com"
+}
+
+// parseGHAccounts reads `gh auth status --json hosts` and returns the logins
+// that are usable on host, the active one first.
+func parseGHAccounts(status []byte, host string) []string {
+	var st struct {
+		Hosts map[string][]struct {
+			State  string `json:"state"`
+			Active bool   `json:"active"`
+			Login  string `json:"login"`
+		} `json:"hosts"`
+	}
+	if json.Unmarshal(status, &st) != nil {
+		return nil
+	}
+	var out []string
+	for _, a := range st.Hosts[host] {
+		switch {
+		case a.State != "success" || a.Login == "":
+		case a.Active:
+			out = append([]string{a.Login}, out...)
+		default:
+			out = append(out, a.Login)
+		}
+	}
+	return out
 }
 
 // Filter narrows the repositories the token can push to.
