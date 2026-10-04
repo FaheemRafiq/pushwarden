@@ -629,7 +629,8 @@ Update PushWarden to the latest release.
 pushwarden update [--check]
 ```
 
-`--check` only reports whether a newer release exists. Releases are verified before they replace
+`--check` only reports whether a newer release exists. On a terminal the download shows a
+progress bar with the megabytes received and the percentage. Releases are verified before they replace
 the binary: the checksums file is signed with the project's ed25519 key and the download's
 SHA-256 must match. The previous binary is kept; if the new one fails to start the guard rolls
 back. The guard does this on its own every `update_interval` seconds when `auto_update` is on.

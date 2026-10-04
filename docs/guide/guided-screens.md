@@ -84,7 +84,7 @@ Each repository is downloaded and every branch is scanned. **Nothing is changed 
 ```
   Checking 4 repositories. Nothing is changed.
 
-  █████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░  2/4   50%  1:12
+  ████████████░░░░░░░░░░░░  2/4   50%  1:12
   Branches so far: 6 clean · 1 infected · 0 need review · 0 failed
 
   + me/app   3 clean

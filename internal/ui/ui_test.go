@@ -49,10 +49,30 @@ func TestLiveBarIsClearedBeforeLines(t *testing.T) {
 		u.Info("found something")
 		u.Step(4, 4, "done")
 	})
-	if !strings.Contains(out, "\r\033[K  [") || !strings.Contains(out, "\r\033[K  i ") {
+	if !strings.Contains(out, "\r\033[K  \033[1;36m"+strings.Repeat(BarFull, 6)) || !strings.Contains(out, "\r\033[K  i ") {
 		t.Fatalf("bar not drawn in place / not cleared before a line:\n%q", out)
 	}
 	if u.Live() {
 		t.Fatal("bar should be finished")
+	}
+}
+
+func TestBarIsTheSameEverywhere(t *testing.T) {
+	full, empty := BarCells(0.5, BarWidth)
+	if full != strings.Repeat(BarFull, 12) || empty != strings.Repeat(BarEmpty, 12) {
+		t.Fatalf("half: %q %q", full, empty)
+	}
+	for frac, want := range map[float64]int{-1: 0, 0: 0, 0.02: 0, 0.03: 1, 0.99: 24, 1: 24, 7: 24} {
+		full, empty := BarCells(frac, BarWidth)
+		if n := len([]rune(full)); n != want || n+len([]rune(empty)) != BarWidth {
+			t.Errorf("%v: %d filled, want %d", frac, n, want)
+		}
+	}
+	if got := PlainBar(0.25, 8); got != "[##------]" {
+		t.Fatalf("plain: %s", got)
+	}
+	// without a terminal the coloured bar falls back to the plain one
+	if got := New(true, false).Bar(1, "BOLD_CYAN"); got != "["+strings.Repeat("#", BarWidth)+"]" {
+		t.Fatalf("no colour: %s", got)
 	}
 }

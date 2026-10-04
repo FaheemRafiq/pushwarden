@@ -199,14 +199,12 @@ func wrapText(s string, w int) []string {
 // bar and what it means. Without a colour terminal it is plain text.
 func statusHeader(u *ui.UI, h health, cs []check) []string {
 	score, level, colour, meaning := h.verdict(cs)
-	const cells = 20
-	filled := score * cells / 100
 	if !u.Color() {
 		return []string{
 			"",
 			"  PushWarden " + version + " - PolinRider / Contagious Interview protection",
 			"",
-			fmt.Sprintf("  Protection:  %s  %d/100  [%s%s]", level, score, strings.Repeat("#", filled), strings.Repeat("-", cells-filled)),
+			fmt.Sprintf("  Protection:  %s  %d/100  %s", level, score, u.Bar(float64(score)/100, colour)),
 			"  " + meaning,
 		}
 	}
@@ -214,8 +212,7 @@ func statusHeader(u *ui.UI, h health, cs []check) []string {
 		u.C("BOLD", "PushWarden "+version),
 		u.C("DIM", "PolinRider / Contagious Interview protection"),
 		"",
-		fmt.Sprintf("%s  %s%s  %s", u.C(colour, level), u.C(colour, strings.Repeat("█", filled)),
-			u.C("DIM", strings.Repeat("░", cells-filled)), u.C("BOLD", fmt.Sprintf("%d/100", score))),
+		fmt.Sprintf("%s  %s  %s", u.C(colour, level), u.Bar(float64(score)/100, colour), u.C("BOLD", fmt.Sprintf("%d/100", score))),
 	}
 	right = append(right, wrapText(meaning, 58)...)
 	right = append(right, "")

@@ -35,6 +35,7 @@ const (
 type Asset struct {
 	Name string `json:"name"`
 	URL  string `json:"browser_download_url"`
+	Size int64  `json:"size"`
 }
 
 type Release struct {
@@ -87,6 +88,8 @@ type Updater struct {
 	GOARCH  string
 	Client  *http.Client
 	Log     func(string)
+	// Progress, when set, hears how much of the program download has arrived.
+	Progress func(done, total int64)
 }
 
 func New(dataDir, exe string, cfg *config.Config) *Updater {
@@ -189,7 +192,9 @@ func (u *Updater) Check() (*Release, error) {
 
 // ── 2-5. download, verify, test, swap ───────────────────────────────────────
 
-func (u *Updater) download(url, dst string, limit int64) error {
+// download fetches url into dst, refusing more than limit bytes. size is the
+// expected length when the server does not state one (0 = unknown).
+func (u *Updater) download(url, dst string, limit, size int64) error {
 	resp, err := get(u.Client, url, "application/octet-stream")
 	if err != nil {
 		return err
@@ -199,7 +204,14 @@ func (u *Updater) download(url, dst string, limit int64) error {
 	if err != nil {
 		return err
 	}
-	n, err := io.Copy(f, io.LimitReader(resp.Body, limit+1))
+	var body io.Reader = resp.Body
+	if resp.ContentLength > 0 {
+		size = resp.ContentLength
+	}
+	if u.Progress != nil && limit == maxBinaryBytes && size > 0 {
+		body = &progressReader{r: resp.Body, total: size, report: u.Progress}
+	}
+	n, err := io.Copy(f, io.LimitReader(body, limit+1))
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}
@@ -207,6 +219,25 @@ func (u *Updater) download(url, dst string, limit int64) error {
 		err = fmt.Errorf("%s is larger than %d bytes", filepath.Base(dst), limit)
 	}
 	return err
+}
+
+// progressReader reports a download as it is read: at most ten times a
+// second, and once more when everything has arrived.
+type progressReader struct {
+	r           io.Reader
+	done, total int64
+	last        time.Time
+	report      func(done, total int64)
+}
+
+func (p *progressReader) Read(b []byte) (int, error) {
+	n, err := p.r.Read(b)
+	p.done += int64(n)
+	if now := time.Now(); p.done >= p.total || now.Sub(p.last) >= 100*time.Millisecond {
+		p.last = now
+		p.report(min(p.done, p.total), p.total)
+	}
+	return n, err
 }
 
 // VerifySignature checks sig (base64 or raw ed25519) over msg against any key.
@@ -283,12 +314,12 @@ func (u *Updater) Apply(rel *Release) (err error) {
 	}()
 	newBin := filepath.Join(dir, name)
 	for _, d := range []struct {
-		url, dst string
-		max      int64
-	}{{sums.URL, filepath.Join(dir, "checksums.txt"), 1 << 20},
-		{sig.URL, filepath.Join(dir, "checksums.txt.sig"), 4096},
-		{bin.URL, newBin, maxBinaryBytes}} {
-		if err := u.download(d.url, d.dst, d.max); err != nil {
+		url, dst  string
+		max, size int64
+	}{{sums.URL, filepath.Join(dir, "checksums.txt"), 1 << 20, 0},
+		{sig.URL, filepath.Join(dir, "checksums.txt.sig"), 4096, 0},
+		{bin.URL, newBin, maxBinaryBytes, bin.Size}} {
+		if err := u.download(d.url, d.dst, d.max, d.size); err != nil {
 			return fmt.Errorf("download: %w", err)
 		}
 	}

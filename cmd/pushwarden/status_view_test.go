@@ -73,7 +73,7 @@ func TestHealthScore(t *testing.T) {
 func TestStatusHeaderPlain(t *testing.T) {
 	h := healthy()
 	text := strings.Join(statusHeader(ui.New(true, false), h, h.checks()), "\n")
-	if !strings.Contains(text, "Protection:  PROTECTED  100/100  [####################]") || strings.ContainsAny(text, "█▄▀░●") {
+	if !strings.Contains(text, "Protection:  PROTECTED  100/100  [########################]") || strings.ContainsAny(text, "█▄▀░●") {
 		t.Fatalf("plain header:\n%s", text)
 	}
 }

@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -118,6 +119,7 @@ func newFixture(t *testing.T, bin string) *fixture {
 			http.NotFound(w, r)
 			return
 		}
+		w.Header().Set("Content-Length", strconv.Itoa(len(b))) // as a real download server does
 		w.Write(b)
 	}))
 	t.Cleanup(f.srv.Close)
@@ -339,5 +341,30 @@ func TestCompareVersions(t *testing.T) {
 		if got := CompareVersions(c.a, c.b); got != c.want {
 			t.Errorf("CompareVersions(%s, %s) = %d, want %d", c.a, c.b, got, c.want)
 		}
+	}
+}
+
+// The program download reports its progress; the small checksum files do not.
+func TestDownloadProgress(t *testing.T) {
+	_, good, _ := fakeBins(t)
+	f := newFixture(t, good)
+	size := int64(len(read(t, good)))
+	var calls int
+	var last, total int64
+	f.u.Progress = func(done, all int64) {
+		if all != size || done < last || done > all {
+			t.Errorf("progress %d/%d (binary is %d bytes, last was %d)", done, all, size, last)
+		}
+		calls, last, total = calls+1, done, all
+	}
+	rel, err := f.u.Check()
+	if err != nil || rel == nil {
+		t.Fatal(rel, err)
+	}
+	if err := f.u.Apply(rel); err != nil {
+		t.Fatal(err)
+	}
+	if calls == 0 || last != total || total != size {
+		t.Fatalf("the download must end at 100%%: calls=%d last=%d total=%d size=%d", calls, last, total, size)
 	}
 }

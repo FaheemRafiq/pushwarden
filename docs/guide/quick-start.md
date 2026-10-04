@@ -26,7 +26,7 @@ The top of the output is the verdict: a score out of 100 and one word, `PROTECTE
       ▄▄████████▄▄       PushWarden 0.5.2
     ████████████████     PolinRider / Contagious Interview protection
     ███▀▀▀▀▀▀▀▀▀▀███
-    ███  █▀▀▀▀█  ███     PROTECTED  ████████████████████  100/100
+    ███  █▀▀▀▀█  ███     PROTECTED  ████████████████████████  100/100
     ███  █▄▄▄▄▀  ███     Files are checked as they are written, the malware's
     ███  █       ███     servers are blocked and editors cannot auto-run tasks.
      ███ ▀      ███

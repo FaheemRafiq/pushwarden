@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -152,7 +151,6 @@ type model struct {
 	events    chan tea.Msg
 	stopping  bool
 	started   time.Time
-	bar       progress.Model
 
 	// report
 	sum          ghclean.Summary
@@ -180,7 +178,6 @@ func newModel(be backend) *model {
 	sp := spinner.New()
 	sp.Spinner = spinner.Line
 	return &model{be: be, ctx: ctx, cancel: cancel, spin: sp, input: in, filter: fl, add: ad,
-		bar:    progress.New(progress.WithSolidFill("6"), progress.WithoutPercentage()),
 		picked: map[string]bool{}, busy: "Looking for a GitHub login"}
 }
 

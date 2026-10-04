@@ -45,6 +45,57 @@ func (u *UI) P(format string, a ...any) {
 	fmt.Printf(format+"\n", a...)
 }
 
+// One progress bar for the whole program: the scan, the update download, the
+// status score and the guided screens all draw these cells at this width.
+const (
+	BarFull  = "█"
+	BarEmpty = "░"
+	BarWidth = 24
+)
+
+// BarCells returns the filled and the empty part of a bar for frac (0 to 1).
+func BarCells(frac float64, width int) (full, empty string) {
+	n := int(frac*float64(width) + 0.5)
+	n = max(min(n, width), 0)
+	return strings.Repeat(BarFull, n), strings.Repeat(BarEmpty, width-n)
+}
+
+// PlainBar is the bar for output without colour: [#####-----].
+func PlainBar(frac float64, width int) string {
+	full, empty := BarCells(frac, width)
+	return "[" + strings.Repeat("#", len([]rune(full))) + strings.Repeat("-", len([]rune(empty))) + "]"
+}
+
+// Bar is the bar in colour (the filled part in the given colour), or the
+// plain form when colour is off.
+func (u *UI) Bar(frac float64, colour string) string {
+	if !u.color {
+		return PlainBar(frac, BarWidth)
+	}
+	full, empty := BarCells(frac, BarWidth)
+	if empty == "" {
+		return u.C(colour, full)
+	}
+	return u.C(colour, full) + u.C("DIM", empty)
+}
+
+// Meter draws the bar in place on a terminal: bar, count, percent, label.
+// frac >= 1 ends the line. Without a terminal it prints nothing.
+func (u *UI) Meter(frac float64, count, label string) {
+	if u.Quiet || !u.color {
+		return
+	}
+	if len(label) > 50 {
+		label = "..." + label[len(label)-47:]
+	}
+	fmt.Printf("\r\033[K  %s  %s  %s  %s", u.Bar(frac, "BOLD_CYAN"), u.C("BOLD", count), u.C("DIM", fmt.Sprintf("%3.0f%%", frac*100)), u.C("DIM", label))
+	u.barLive = true
+	if frac >= 1 {
+		fmt.Println()
+		u.barLive = false
+	}
+}
+
 // Step reports progress through a list: an in-place bar on a terminal, a
 // numbered line otherwise. done == total ends the bar.
 func (u *UI) Step(done, total int, label string) {
@@ -57,18 +108,7 @@ func (u *UI) Step(done, total int, label string) {
 		}
 		return
 	}
-	width := 24
-	filled := done * width / total
-	bar := strings.Repeat("#", filled) + strings.Repeat("-", width-filled)
-	if len(label) > 50 {
-		label = "..." + label[len(label)-47:]
-	}
-	fmt.Printf("\r\033[K  [%s] %d/%d  %s", u.C("BOLD_GREEN", bar), done, total, u.C("DIM", label))
-	u.barLive = true
-	if done >= total {
-		fmt.Println()
-		u.barLive = false
-	}
+	u.Meter(float64(done)/float64(total), fmt.Sprintf("%d/%d", done, total), label)
 }
 
 // Live reports whether a progress bar is being drawn (callers skip their

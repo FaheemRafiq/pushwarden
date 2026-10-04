@@ -128,6 +128,9 @@ func cmdUpdate(args []string) int {
 		return 0
 	}
 	u.Info("Downloading and verifying PushWarden " + rel.Version() + "...")
+	up.Progress = func(done, total int64) {
+		u.Meter(float64(done)/float64(total), fmt.Sprintf("%.1f/%.1f MB", float64(done)/(1<<20), float64(total)/(1<<20)), "PushWarden "+rel.Version())
+	}
 	if err := up.Apply(rel); err != nil {
 		u.Err("Update refused: " + err.Error())
 		return 1

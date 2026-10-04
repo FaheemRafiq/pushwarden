@@ -13,6 +13,7 @@ import (
 	"github.com/FaheemRafiq/pushwarden/internal/ghclean"
 	"github.com/FaheemRafiq/pushwarden/internal/github"
 	"github.com/FaheemRafiq/pushwarden/internal/remediate"
+	"github.com/FaheemRafiq/pushwarden/internal/ui"
 )
 
 // The 16 base colours follow the terminal's own theme, light or dark.
@@ -430,7 +431,6 @@ func clock(d time.Duration) string {
 }
 
 func (m *model) viewRun() ([]string, string) {
-	w, _ := m.size()
 	what := "Checking " + plural(len(m.rows), "repository", "repositories") + ". Nothing is changed."
 	if m.apply {
 		what = "Fixing and pushing " + plural(m.todoBranches, "branch", "branches") + " in " + plural(len(m.rows), "repository", "repositories") + "."
@@ -462,7 +462,7 @@ func (m *model) viewRun() ([]string, string) {
 	if len(m.rows) > 0 {
 		frac = float64(done) / float64(len(m.rows))
 	}
-	m.bar.Width = max(min(w-44, 50), 10)
+	full, empty := ui.BarCells(frac, ui.BarWidth) // the same bar as the rest of the program
 	tally := []string{stGood.Render(fmt.Sprintf("%d clean", clean))}
 	if m.apply {
 		tally = append(tally, stGood.Render(fmt.Sprintf("%d fixed", fixed)))
@@ -473,7 +473,7 @@ func (m *model) viewRun() ([]string, string) {
 	b := []string{
 		"  " + stBold.Render(what),
 		"",
-		fmt.Sprintf("  %s  %s  %s  %s", m.bar.ViewAs(frac), stBold.Render(fmt.Sprintf("%d/%d", done, len(m.rows))),
+		fmt.Sprintf("  %s  %s  %s  %s", stKey.Render(full)+stDim.Render(empty), stBold.Render(fmt.Sprintf("%d/%d", done, len(m.rows))),
 			stDim.Render(fmt.Sprintf("%3.0f%%", frac*100)), stDim.Render(clock(time.Since(m.started)))),
 		"  " + stDim.Render("Branches so far: ") + strings.Join(tally, stDim.Render(" · ")),
 		"",
